@@ -113,8 +113,7 @@ serve(async (req) => {
                 {
                   type: "text/html",
                   value: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2>[NTW] Your ${program} Registration is Confirmed</h2>
-                    <p>Hello ${participant.name},</p>
+                             <p>Hello ${participant.name},</p>
                     <p>You have been successfully registered for the <strong>${program}</strong> training program.</p>
                     <p>To access your program materials, please visit to select the correct NTW programme:</p>
                     <div style="text-align: center; margin: 20px 0;">

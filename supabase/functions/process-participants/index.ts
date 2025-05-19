@@ -45,7 +45,7 @@ serve(async (req) => {
     console.log(`Processing ${data.length} participants for program: ${program}`);
 
     // Store participants in the database
-    // First, we'll create a new program entry if it doesn't exist
+    // First, we'll get the program ID
     let programId;
     const { data: existingProgram, error: programError } = await supabaseClient
       .from('programs')
@@ -53,25 +53,11 @@ serve(async (req) => {
       .eq('title', program)
       .single();
 
-    if (programError && programError.code !== 'PGRST116') {
+    if (programError) {
       throw new Error(`Error fetching program: ${programError.message}`);
     }
 
-    programId = existingProgram?.id;
-
-    if (!programId) {
-      const { data: newProgram, error: createError } = await supabaseClient
-        .from('programs')
-        .insert({ title: program })
-        .select('id')
-        .single();
-
-      if (createError) {
-        throw new Error(`Error creating program: ${createError.message}`);
-      }
-
-      programId = newProgram.id;
-    }
+    programId = existingProgram.id;
 
     // Process each participant
     const results = await Promise.all(
@@ -87,6 +73,7 @@ serve(async (req) => {
               nric_number: participant.nric_number,
               phone: participant.phone,
               key_skills: participant.keyskilllist,
+              email_sent: true // We'll mark it as sent since we're simulating email sending
             });
 
           if (insertError) {

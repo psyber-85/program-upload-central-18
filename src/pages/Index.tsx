@@ -36,6 +36,7 @@ const Index = () => {
 
     try {
       setIsSubmitting(true);
+      toast.info(`Processing ${parsedData.length} participants...`);
       
       // Prepare the payload in the required format
       const payload = {
@@ -50,8 +51,12 @@ const Index = () => {
 
       if (error) throw error;
 
-      toast.success('Data submitted successfully!');
-      handleReset();
+      if (data.success) {
+        toast.success(`Successfully processed ${data.results.length} participants`);
+        handleReset();
+      } else {
+        throw new Error(data.message || 'Failed to process participants');
+      }
     } catch (error) {
       console.error('Error submitting data:', error);
       toast.error('Failed to submit data. Please try again.');

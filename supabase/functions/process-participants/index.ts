@@ -97,7 +97,6 @@ serve(async (req) => {
                 {
                   type: "text/html",
                   value: `<div>
-                    <h2>[NTW] Your ${program} Registration is Confirmed</h2>
                     <p>Hello ${participant.name},</p>
                     <p>You have been successfully registered for the <strong>${program}</strong> training program.</p>
                     <p>To access your program materials, please visit <a href="https://theaihq.net/shop-new/">https://theaihq.net/shop-new/</a> and find the relevant National Training Week (NTW) program to retrieve the program web link.</p>

@@ -19,6 +19,7 @@ export type Database = {
           nric_number: string
           phone: string | null
           program_id: string
+          program_name: string
           registered_at: string
         }
         Insert: {
@@ -30,6 +31,7 @@ export type Database = {
           nric_number: string
           phone?: string | null
           program_id: string
+          program_name: string
           registered_at?: string
         }
         Update: {
@@ -41,6 +43,7 @@ export type Database = {
           nric_number?: string
           phone?: string | null
           program_id?: string
+          program_name?: string
           registered_at?: string
         }
         Relationships: [

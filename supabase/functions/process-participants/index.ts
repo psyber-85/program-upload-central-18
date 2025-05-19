@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.5.0";
 
@@ -61,6 +62,7 @@ serve(async (req) => {
             .from('participants')
             .insert({
               program_id: programId,
+              program_name: program, // Store the program name
               name: participant.name,
               email: participant.email,
               nric_number: participant.nric_number,
@@ -98,7 +100,8 @@ serve(async (req) => {
                     <h2>Welcome to ${program} Training Program</h2>
                     <p>Hello ${participant.name},</p>
                     <p>You have been successfully registered for the <strong>${program}</strong> training program.</p>
-                    <p>We look forward to seeing you!</p>
+                    <p>To access your program materials, please visit <a href="https://theaihq.net/shop-new/">https://theaihq.net/shop-new/</a> and find the relevant National Training Week (NTW) program link.</p>
+                    <p>After completing the program, your certificate will be issued from the NTW site.</p>
                     <p>Best regards,<br>National Training Week Team</p>
                   </div>`,
                 },

@@ -60,9 +60,9 @@ serve(async (req) => {
 
     programId = existingProgram.id;
 
-    // Configure SendGrid - fixed by using the correct import method
+    // Configure SendGrid - fixed by using the correct method from the namespace import
     const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY") || "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";
-    sendgrid.setApiKey(SENDGRID_API_KEY);
+    sendgrid.mail.setApiKey(SENDGRID_API_KEY);
 
     // Process each participant
     const results = await Promise.all(
@@ -101,7 +101,7 @@ serve(async (req) => {
               </div>`,
             };
             
-            await sendgrid.send(msg);
+            await sendgrid.mail.send(msg);
             console.log(`Email sent to: ${participant.email}`);
             
             // Update participant record to mark email as sent

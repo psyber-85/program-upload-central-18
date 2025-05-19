@@ -115,7 +115,7 @@ serve(async (req) => {
                   value: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                              <p>Hello ${participant.name},</p>
                     <p>You have been successfully registered for the <strong>${program}</strong> training program.</p>
-                    <p>To access your program materials, please visit to select the correct NTW programme:</p>
+                    <p>To access your program materials, please visit the link and select the correct NTW programme. You will get an automated link to the programm access:</p>
                     <div style="text-align: center; margin: 20px 0;">
                       <a href="https://theaihq.net/shop-new/" style="${buttonStyle}">Access Program Link</a>
                     </div>

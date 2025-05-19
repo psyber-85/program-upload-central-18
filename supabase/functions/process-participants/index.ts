@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.5.0";
+import * as sendgrid from "https://esm.sh/@sendgrid/mail@7.7.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -59,9 +60,9 @@ serve(async (req) => {
 
     programId = existingProgram.id;
 
-    // Configure SendGrid
-    const sgMail = await import("https://esm.sh/@sendgrid/mail@7.7.0");
-    sgMail.setApiKey(Deno.env.get("SENDGRID_API_KEY") || "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");
+    // Configure SendGrid - fixed by using the correct import method
+    const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY") || "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";
+    sendgrid.setApiKey(SENDGRID_API_KEY);
 
     // Process each participant
     const results = await Promise.all(
@@ -100,7 +101,7 @@ serve(async (req) => {
               </div>`,
             };
             
-            await sgMail.send(msg);
+            await sendgrid.send(msg);
             console.log(`Email sent to: ${participant.email}`);
             
             // Update participant record to mark email as sent

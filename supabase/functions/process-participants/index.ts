@@ -1,7 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.5.0";
-import * as sendgrid from "https://esm.sh/@sendgrid/mail@7.7.0";
+import { send } from "https://esm.sh/@sendgrid/mail@7.7.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -60,9 +60,9 @@ serve(async (req) => {
 
     programId = existingProgram.id;
 
-    // Configure SendGrid - fixed by using the correct method from the namespace import
+    // Configure SendGrid - using direct import instead of namespace
     const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY") || "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";
-    sendgrid.mail.setApiKey(SENDGRID_API_KEY);
+    send.setApiKey(SENDGRID_API_KEY);
 
     // Process each participant
     const results = await Promise.all(
@@ -89,7 +89,10 @@ serve(async (req) => {
           try {
             const msg = {
               to: participant.email,
-              from: 'notifications@ntw-training.org', // Replace with your verified sender
+              from: {
+                email: 'info@theaihq.net',
+                name: 'AIHQ - theaihq.net'
+              },
               subject: `Welcome to ${program} Training Program`,
               text: `Hello ${participant.name},\n\nYou have been registered for the ${program} training program. We look forward to seeing you!\n\nBest regards,\nNational Training Week Team`,
               html: `<div>
@@ -101,7 +104,7 @@ serve(async (req) => {
               </div>`,
             };
             
-            await sendgrid.mail.send(msg);
+            await send(msg);
             console.log(`Email sent to: ${participant.email}`);
             
             // Update participant record to mark email as sent

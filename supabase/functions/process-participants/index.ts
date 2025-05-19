@@ -21,13 +21,11 @@ type RequestPayload = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Create Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -38,13 +36,11 @@ serve(async (req) => {
       }
     );
 
-    // Get request payload
     const payload: RequestPayload = await req.json();
     const { program, data } = payload;
 
     console.log(`Processing ${data.length} participants for program: ${program}`);
 
-    // Get program ID
     const { data: existingProgram, error: programError } = await supabaseClient
       .from('programs')
       .select('id')
@@ -57,15 +53,12 @@ serve(async (req) => {
 
     const programId = existingProgram.id;
 
-    // Configure SendGrid
-    const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY") || "";
-    sgMail.setApiKey(SENDGRID_API_KEY);
+    // 🔑 Hardcoded SendGrid API key
+    sgMail.setApiKey("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");
 
-    // Process each participant
     const results = await Promise.all(
       data.map(async (participant) => {
         try {
-          // Insert participant
           const { error: insertError } = await supabaseClient
             .from('participants')
             .insert({
@@ -82,7 +75,6 @@ serve(async (req) => {
             throw new Error(`Error inserting participant: ${insertError.message}`);
           }
 
-          // Send email
           const msg = {
             to: participant.email,
             from: {
@@ -103,7 +95,6 @@ serve(async (req) => {
           await sgMail.send(msg);
           console.log(`Email sent to: ${participant.email}`);
 
-          // Update email_sent flag
           await supabaseClient
             .from('participants')
             .update({ email_sent: true })

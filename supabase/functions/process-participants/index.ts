@@ -86,7 +86,7 @@ serve(async (req) => {
               personalizations: [
                 {
                   to: [{ email: participant.email }],
-                  subject: `Welcome to ${program} Training Program`,
+                  subject: `[NTW] Your ${program} Registration is Confirmed`,
                 },
               ],
               from: {
@@ -97,12 +97,21 @@ serve(async (req) => {
                 {
                   type: "text/html",
                   value: `<div>
-                    <h2>Welcome to ${program} Training Program</h2>
+                    <h2>[NTW] Your ${program} Registration is Confirmed</h2>
                     <p>Hello ${participant.name},</p>
                     <p>You have been successfully registered for the <strong>${program}</strong> training program.</p>
-                    <p>To access your program materials, please visit <a href="https://theaihq.net/shop-new/">https://theaihq.net/shop-new/</a> and find the relevant National Training Week (NTW) program link.</p>
+                    <p>To access your program materials, please visit <a href="https://theaihq.net/shop-new/">https://theaihq.net/shop-new/</a> and find the relevant National Training Week (NTW) program to retrieve the program web link.</p>
                     <p>After completing the program, your certificate will be issued from the NTW site.</p>
-                    <p>Best regards,<br>National Training Week Team</p>
+                    <p>Best regards,<br>AIHQ - National Training Week Team</p>
+                    
+                    <hr style="margin: 20px 0;">
+                    
+                    <h2>[NTW] Pendaftaran ${program} Anda Disahkan</h2>
+                    <p>Salam ${participant.name},</p>
+                    <p>Anda telah berjaya didaftarkan untuk program latihan <strong>${program}</strong>.</p>
+                    <p>Untuk mengakses bahan program anda, sila layari <a href="https://theaihq.net/shop-new/">https://theaihq.net/shop-new/</a> dan cari program Minggu Latihan Nasional (NTW) yang berkaitan untuk mendapatkan pautan web program.</p>
+                    <p>Selepas menyelesaikan program, sijil anda akan dikeluarkan dari laman NTW.</p>
+                    <p>Salam hormat,<br>AIHQ - Pasukan Minggu Latihan Nasional</p>
                   </div>`,
                 },
               ],

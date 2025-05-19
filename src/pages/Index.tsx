@@ -5,21 +5,22 @@ import FileUploader from '../components/FileUploader';
 import DataTable from '../components/DataTable';
 import { supabase } from '../supabase/client';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 
 const Index = () => {
   const [selectedProgram, setSelectedProgram] = useState('');
   const [parsedData, setParsedData] = useState([]);
-  const [fileName, setFileName] = useState('');
+  const [fileNames, setFileNames] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleDataParsed = (data, name) => {
+  const handleDataParsed = (data, names) => {
     setParsedData(data);
-    setFileName(name);
+    setFileNames(names);
   };
 
   const handleReset = () => {
     setParsedData([]);
-    setFileName('');
+    setFileNames('');
     setSelectedProgram('');
   };
 
@@ -36,7 +37,7 @@ const Index = () => {
 
     try {
       setIsSubmitting(true);
-      toast.info(`Processing ${parsedData.length} participants...`);
+      toast.info(`Processing ${parsedData.length} participants from ${fileNames.split(', ').length} file(s)...`);
       
       // Prepare the payload in the required format
       const payload = {
@@ -66,6 +67,7 @@ const Index = () => {
   };
 
   const isReadyToSubmit = selectedProgram && parsedData.length > 0;
+  const fileCount = fileNames ? fileNames.split(', ').length : 0;
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8">
@@ -88,27 +90,43 @@ const Index = () => {
         </div>
 
         {parsedData.length > 0 && (
-          <DataTable data={parsedData.slice(0, 10)} />
+          <>
+            <div className="mb-2 text-sm text-gray-600">
+              {fileCount > 1 ? (
+                <p>Showing combined data from {fileCount} files: {fileNames}</p>
+              ) : (
+                <p>Showing data from: {fileNames}</p>
+              )}
+            </div>
+            <DataTable data={parsedData.slice(0, 10)} />
+          </>
         )}
 
         <div className="mt-8 flex justify-end gap-4">
-          <button
+          <Button
+            variant="outline"
             onClick={handleReset}
-            className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+            className="px-6 py-2"
           >
             Reset
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="default"
             onClick={handleSubmit}
             disabled={!isReadyToSubmit || isSubmitting}
-            className={`px-6 py-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+            className={`px-6 py-2 ${
               isReadyToSubmit && !isSubmitting
-                ? 'bg-blue-600 hover:bg-blue-700'
-                : 'bg-blue-400 cursor-not-allowed'
+                ? ''
+                : 'opacity-70 cursor-not-allowed'
             }`}
           >
-            {isSubmitting ? 'Submitting...' : 'Submit Data'}
-          </button>
+            {isSubmitting 
+              ? 'Processing...' 
+              : parsedData.length > 0 
+                ? `Submit ${parsedData.length} Participants` 
+                : 'Submit Data'
+            }
+          </Button>
         </div>
       </div>
     </div>

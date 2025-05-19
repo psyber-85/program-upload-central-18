@@ -75,6 +75,22 @@ serve(async (req) => {
             throw new Error(`Error inserting participant: ${insertError.message}`);
           }
 
+          // Email button styling
+          const buttonStyle = `
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-weight: bold;
+          `;
+
           // Send email via raw SendGrid API
           const emailResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
             method: "POST",
@@ -96,19 +112,26 @@ serve(async (req) => {
               content: [
                 {
                   type: "text/html",
-                  value: `<div>
+                  value: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2>[NTW] Your ${program} Registration is Confirmed</h2>
                     <p>Hello ${participant.name},</p>
                     <p>You have been successfully registered for the <strong>${program}</strong> training program.</p>
-                    <p>To access your program materials, please visit <a href="https://theaihq.net/shop-new/">https://theaihq.net/shop-new/</a> and find the relevant National Training Week (NTW) program to retrieve the program web link.</p>
+                    <p>To access your program materials, please visit:</p>
+                    <div style="text-align: center; margin: 20px 0;">
+                      <a href="https://theaihq.net/shop-new/" style="${buttonStyle}">Access Program Materials</a>
+                    </div>
                     <p>After completing the program, your certificate will be issued from the NTW site.</p>
                     <p>Best regards,<br>AIHQ - National Training Week Team</p>
                     
-                    <hr style="margin: 20px 0;">
+                    <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
                     
                     <h2>[NTW] Pendaftaran ${program} Anda Disahkan</h2>
                     <p>Salam ${participant.name},</p>
                     <p>Anda telah berjaya didaftarkan untuk program latihan <strong>${program}</strong>.</p>
-                    <p>Untuk mengakses bahan program anda, sila layari <a href="https://theaihq.net/shop-new/">https://theaihq.net/shop-new/</a> dan cari program Minggu Latihan Nasional (NTW) yang berkaitan untuk mendapatkan pautan web program.</p>
+                    <p>Untuk mengakses bahan program anda, sila layari:</p>
+                    <div style="text-align: center; margin: 20px 0;">
+                      <a href="https://theaihq.net/shop-new/" style="${buttonStyle}">Akses Bahan Program</a>
+                    </div>
                     <p>Selepas menyelesaikan program, sijil anda akan dikeluarkan dari laman NTW.</p>
                     <p>Salam hormat,<br>AIHQ - Pasukan Minggu Latihan Nasional</p>
                   </div>`,

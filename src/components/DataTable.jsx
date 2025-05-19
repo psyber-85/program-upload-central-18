@@ -6,9 +6,14 @@ const DataTable = ({ data = [] }) => {
     return null;
   }
 
+  const totalRows = data.length;
+  const displayRows = data.slice(0, 10);
+
   return (
     <div className="bg-white p-6 rounded-lg shadow-md overflow-hidden">
-      <h2 className="text-xl font-bold mb-4">Preview Data ({data.length} rows)</h2>
+      <h2 className="text-xl font-bold mb-4">
+        Data Preview {totalRows > 10 ? `(${displayRows.length} of ${totalRows} rows)` : `(${totalRows} rows)`}
+      </h2>
       
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
@@ -26,7 +31,7 @@ const DataTable = ({ data = [] }) => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {data.map((row, rowIndex) => (
+            {displayRows.map((row, rowIndex) => (
               <tr key={rowIndex}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                   {row.name}
@@ -49,9 +54,10 @@ const DataTable = ({ data = [] }) => {
         </table>
       </div>
       
-      {data.length > 10 && (
+      {totalRows > 10 && (
         <div className="mt-4 text-center text-sm text-gray-500">
-          Showing {Math.min(10, data.length)} of {data.length} rows
+          <p>Showing 10 of {totalRows} rows</p>
+          <p className="text-xs mt-1">All {totalRows} rows will be processed on submission</p>
         </div>
       )}
     </div>

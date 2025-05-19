@@ -1,7 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.5.0";
-import { send } from "https://esm.sh/@sendgrid/mail@7.7.0";
+import { sgMail } from "https://esm.sh/@sendgrid/mail@7.7.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

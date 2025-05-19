@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.5.0";
-import sgMail from "https://esm.sh/@sendgrid/mail@7.7.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -53,8 +52,7 @@ serve(async (req) => {
 
     const programId = existingProgram.id;
 
-    // 🔑 Hardcoded SendGrid API key
-    sgMail.setApiKey("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");
+    const SENDGRID_API_KEY = "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";
 
     const results = await Promise.all(
       data.map(async (participant) => {
@@ -75,25 +73,43 @@ serve(async (req) => {
             throw new Error(`Error inserting participant: ${insertError.message}`);
           }
 
-          const msg = {
-            to: participant.email,
-            from: {
-              email: 'info@theaihq.net',
-              name: 'AIHQ - theaihq.net'
+          // Send email via raw SendGrid API
+          const emailResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${SENDGRID_API_KEY}`,
+              "Content-Type": "application/json",
             },
-            subject: `Welcome to ${program} Training Program`,
-            text: `Hello ${participant.name},\n\nYou have been registered for the ${program} training program. We look forward to seeing you!\n\nBest regards,\nNational Training Week Team`,
-            html: `<div>
-              <h2>Welcome to ${program} Training Program</h2>
-              <p>Hello ${participant.name},</p>
-              <p>You have been successfully registered for the <strong>${program}</strong> training program.</p>
-              <p>We look forward to seeing you!</p>
-              <p>Best regards,<br>National Training Week Team</p>
-            </div>`,
-          };
+            body: JSON.stringify({
+              personalizations: [
+                {
+                  to: [{ email: participant.email }],
+                  subject: `Welcome to ${program} Training Program`,
+                },
+              ],
+              from: {
+                email: "info@theaihq.net",
+                name: "AIHQ - theaihq.net",
+              },
+              content: [
+                {
+                  type: "text/html",
+                  value: `<div>
+                    <h2>Welcome to ${program} Training Program</h2>
+                    <p>Hello ${participant.name},</p>
+                    <p>You have been successfully registered for the <strong>${program}</strong> training program.</p>
+                    <p>We look forward to seeing you!</p>
+                    <p>Best regards,<br>National Training Week Team</p>
+                  </div>`,
+                },
+              ],
+            }),
+          });
 
-          await sgMail.send(msg);
-          console.log(`Email sent to: ${participant.email}`);
+          if (!emailResponse.ok) {
+            const errorText = await emailResponse.text();
+            throw new Error(`SendGrid error ${emailResponse.status}: ${errorText}`);
+          }
 
           await supabaseClient
             .from('participants')

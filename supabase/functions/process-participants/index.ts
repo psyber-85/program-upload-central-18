@@ -1,7 +1,6 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.5.0";
-import { sgMail } from "https://esm.sh/@sendgrid/mail@7.7.0";
+import sgMail from "https://esm.sh/@sendgrid/mail@7.7.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,7 +27,7 @@ serve(async (req) => {
   }
 
   try {
-    // Create a Supabase client with the Deno runtime
+    // Create Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -39,15 +38,13 @@ serve(async (req) => {
       }
     );
 
-    // Get the request payload
+    // Get request payload
     const payload: RequestPayload = await req.json();
     const { program, data } = payload;
 
     console.log(`Processing ${data.length} participants for program: ${program}`);
 
-    // Store participants in the database
-    // First, we'll get the program ID
-    let programId;
+    // Get program ID
     const { data: existingProgram, error: programError } = await supabaseClient
       .from('programs')
       .select('id')
@@ -58,17 +55,17 @@ serve(async (req) => {
       throw new Error(`Error fetching program: ${programError.message}`);
     }
 
-    programId = existingProgram.id;
+    const programId = existingProgram.id;
 
-    // Configure SendGrid - using direct import instead of namespace
-    const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY") || "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";
-    send.setApiKey(SENDGRID_API_KEY);
+    // Configure SendGrid
+    const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY") || "";
+    sgMail.setApiKey(SENDGRID_API_KEY);
 
     // Process each participant
     const results = await Promise.all(
       data.map(async (participant) => {
         try {
-          // Insert participant into database
+          // Insert participant
           const { error: insertError } = await supabaseClient
             .from('participants')
             .insert({
@@ -78,67 +75,57 @@ serve(async (req) => {
               nric_number: participant.nric_number,
               phone: participant.phone,
               key_skills: participant.keyskilllist,
-              email_sent: false // We'll update this after sending the email
+              email_sent: false,
             });
 
           if (insertError) {
             throw new Error(`Error inserting participant: ${insertError.message}`);
           }
 
-          // Send email using SendGrid
-          try {
-            const msg = {
-              to: participant.email,
-              from: {
-                email: 'info@theaihq.net',
-                name: 'AIHQ - theaihq.net'
-              },
-              subject: `Welcome to ${program} Training Program`,
-              text: `Hello ${participant.name},\n\nYou have been registered for the ${program} training program. We look forward to seeing you!\n\nBest regards,\nNational Training Week Team`,
-              html: `<div>
-                <h2>Welcome to ${program} Training Program</h2>
-                <p>Hello ${participant.name},</p>
-                <p>You have been successfully registered for the <strong>${program}</strong> training program.</p>
-                <p>We look forward to seeing you!</p>
-                <p>Best regards,<br>National Training Week Team</p>
-              </div>`,
-            };
-            
-            await send(msg);
-            console.log(`Email sent to: ${participant.email}`);
-            
-            // Update participant record to mark email as sent
-            await supabaseClient
-              .from('participants')
-              .update({ email_sent: true })
-              .eq('email', participant.email)
-              .eq('program_id', programId);
+          // Send email
+          const msg = {
+            to: participant.email,
+            from: {
+              email: 'info@theaihq.net',
+              name: 'AIHQ - theaihq.net'
+            },
+            subject: `Welcome to ${program} Training Program`,
+            text: `Hello ${participant.name},\n\nYou have been registered for the ${program} training program. We look forward to seeing you!\n\nBest regards,\nNational Training Week Team`,
+            html: `<div>
+              <h2>Welcome to ${program} Training Program</h2>
+              <p>Hello ${participant.name},</p>
+              <p>You have been successfully registered for the <strong>${program}</strong> training program.</p>
+              <p>We look forward to seeing you!</p>
+              <p>Best regards,<br>National Training Week Team</p>
+            </div>`,
+          };
 
-            return {
-              email: participant.email,
-              status: 'success',
-              message: 'Participant registered and email sent',
-            };
-          } catch (emailError) {
-            console.error(`Error sending email to ${participant.email}:`, emailError);
-            return {
-              email: participant.email,
-              status: 'partial_success',
-              message: 'Participant registered but email failed to send',
-            };
-          }
-        } catch (error) {
-          console.error(`Error processing participant ${participant.email}:`, error);
+          await sgMail.send(msg);
+          console.log(`Email sent to: ${participant.email}`);
+
+          // Update email_sent flag
+          await supabaseClient
+            .from('participants')
+            .update({ email_sent: true })
+            .eq('email', participant.email)
+            .eq('program_id', programId);
+
           return {
             email: participant.email,
-            status: 'error',
-            message: error.message,
+            status: 'success',
+            message: 'Participant registered and email sent',
+          };
+        } catch (emailError) {
+          console.error(`Error sending email to ${participant.email}:`, emailError);
+          return {
+            email: participant.email,
+            status: 'partial_success',
+            message: 'Participant registered but email failed to send',
           };
         }
       })
     );
 
-    // Return the results
     return new Response(
       JSON.stringify({
         success: true,
@@ -152,7 +139,7 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error('Error processing participants:', error);
-    
+
     return new Response(
       JSON.stringify({
         success: false,

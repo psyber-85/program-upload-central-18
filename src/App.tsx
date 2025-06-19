@@ -8,6 +8,7 @@ import Navigation from "./components/Navigation";
 import Index from "./pages/Index";
 import TrainingOutlineCreator from "./pages/TrainingOutlineCreator";
 import CertificateGenerator from "./pages/CertificateGenerator";
+import RegisterTracker from "./pages/RegisterTracker";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/training-outline" element={<TrainingOutlineCreator />} />
           <Route path="/certificates" element={<CertificateGenerator />} />
+          <Route path="/register-tracker" element={<RegisterTracker />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

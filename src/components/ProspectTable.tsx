@@ -1,17 +1,17 @@
-
 import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
-import { Phone, Mail, User, Building, AlertCircle, Search, ChevronUp, ChevronDown } from 'lucide-react';
+import { Phone, Mail, User, Building, AlertCircle, Search, ChevronUp, ChevronDown, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import LogCallModal from './LogCallModal';
 import AddHRContactModal from './AddHRContactModal';
 import NotifyHRModal from './NotifyHRModal';
 import UpdateStatusModal from './UpdateStatusModal';
+import ViewCallNotesModal from './ViewCallNotesModal';
 
 interface HRContact {
   name: string;
@@ -32,6 +32,7 @@ interface Prospect {
   registration_status: 'Pending' | 'Approved' | 'Rejected' | 'Postponed' | 'On Hold';
   lastCall?: string;
   hrContact?: HRContact;
+  hasCallNotes?: boolean;
 }
 
 type SortField = 'name' | 'email' | 'org' | 'role' | 'program' | 'registration_status' | 'lastCall';
@@ -53,6 +54,63 @@ const ProspectTable = () => {
 
   useEffect(() => {
     fetchProspects();
+    
+    // Set up real-time subscription for prospects
+    const prospectsChannel = supabase
+      .channel('prospects-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'prospects'
+        },
+        () => {
+          console.log('Prospect data changed, refreshing...');
+          fetchProspects();
+        }
+      )
+      .subscribe();
+
+    // Set up real-time subscription for HR contacts
+    const hrChannel = supabase
+      .channel('hr-contacts-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'hr_contacts'
+        },
+        () => {
+          console.log('HR contact data changed, refreshing...');
+          fetchProspects();
+        }
+      )
+      .subscribe();
+
+    // Set up real-time subscription for calls
+    const callsChannel = supabase
+      .channel('calls-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'prospect_calls'
+        },
+        () => {
+          console.log('Call data changed, refreshing...');
+          fetchProspects();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(prospectsChannel);
+      supabase.removeChannel(hrChannel);
+      supabase.removeChannel(callsChannel);
+    };
   }, []);
 
   useEffect(() => {
@@ -109,7 +167,7 @@ const ProspectTable = () => {
         .from('prospects')
         .select(`
           *,
-          prospect_calls(call_date),
+          prospect_calls(call_date, notes),
           hr_contacts(name, email, email_sent_at)
         `)
         .order('created_at', { ascending: false });
@@ -122,6 +180,7 @@ const ProspectTable = () => {
           : undefined;
         
         const hrContact = prospect.hr_contacts?.length > 0 ? prospect.hr_contacts[0] : undefined;
+        const hasCallNotes = prospect.prospect_calls?.some((call: any) => call.notes && call.notes.trim() !== '') || false;
 
         return {
           id: prospect.id,
@@ -139,7 +198,8 @@ const ProspectTable = () => {
             name: hrContact.name,
             email: hrContact.email,
             email_sent_at: hrContact.email_sent_at
-          } : undefined
+          } : undefined,
+          hasCallNotes
         };
       }) || [];
 
@@ -293,7 +353,19 @@ const ProspectTable = () => {
                   <TableCell className="hidden lg:table-cell">{prospect.org || '—'}</TableCell>
                   <TableCell className="hidden lg:table-cell">{prospect.role || '—'}</TableCell>
                   <TableCell className="hidden md:table-cell">
-                    {prospect.lastCall || '—'}
+                    <div className="flex items-center gap-2">
+                      {prospect.lastCall || '—'}
+                      {prospect.hasCallNotes && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleModalOpen('viewNotes', prospect.id)}
+                          className="p-1 h-auto"
+                        >
+                          <Eye className="w-3 h-3" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="hidden lg:table-cell">
                     {prospect.hrContact?.name || '—'}
@@ -426,6 +498,11 @@ const ProspectTable = () => {
         onClose={handleModalClose}
         prospectId={selectedProspect || ''}
         onComplete={refreshProspects}
+      />
+      <ViewCallNotesModal
+        isOpen={activeModal === 'viewNotes'}
+        onClose={handleModalClose}
+        prospectId={selectedProspect || ''}
       />
     </div>
   );

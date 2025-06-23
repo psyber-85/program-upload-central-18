@@ -13,6 +13,7 @@ type Participant = {
   nric_number: string;
   phone: string;
   keyskilllist: string;
+  program_name: string;
 };
 
 type RequestPayload = {
@@ -41,19 +42,36 @@ serve(async (req) => {
 
     console.log(`Processing ${data.length} participants for program: ${program}`);
 
+    // Get or create program
+    let programId;
     const { data: existingProgram, error: programError } = await supabaseClient
       .from('programs')
       .select('id')
       .eq('title', program)
       .single();
 
-    if (programError) {
+    if (programError && programError.code !== 'PGRST116') {
       throw new Error(`Error fetching program: ${programError.message}`);
     }
 
-    const programId = existingProgram.id;
+    if (existingProgram) {
+      programId = existingProgram.id;
+    } else {
+      const { data: newProgram, error: createError } = await supabaseClient
+        .from('programs')
+        .insert([{ title: program }])
+        .select('id')
+        .single();
 
-    const SENDGRID_API_KEY = "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";
+      if (createError) throw createError;
+      programId = newProgram.id;
+    }
+
+    const SENDGRID_API_KEY = Deno.env.get('SENDGRID_API_KEY');
+    
+    if (!SENDGRID_API_KEY) {
+      throw new Error('SENDGRID_API_KEY is not configured');
+    }
 
     const results = await Promise.all(
       data.map(async (participant) => {
@@ -62,7 +80,7 @@ serve(async (req) => {
             .from('participants')
             .insert({
               program_id: programId,
-              program_name: program, // Store the program name
+              program_name: participant.program_name || program,
               name: participant.name,
               email: participant.email,
               nric_number: participant.nric_number,
@@ -91,7 +109,7 @@ serve(async (req) => {
             font-weight: bold;
           `;
 
-          // Send email via raw SendGrid API
+          // Send email via SendGrid API
           const emailResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
             method: "POST",
             headers: {
@@ -102,7 +120,7 @@ serve(async (req) => {
               personalizations: [
                 {
                   to: [{ email: participant.email }],
-                  subject: `[NTW] Your ${program} Registration is Confirmed`,
+                  subject: `[NTW] Your ${participant.program_name || program} Registration is Confirmed`,
                 },
               ],
               from: {
@@ -114,8 +132,8 @@ serve(async (req) => {
                   type: "text/html",
                   value: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                              <p>Hello ${participant.name},</p>
-                    <p>You have been successfully registered for the <strong>${program}</strong> training program.</p>
-                    <p>To access your program materials, please visit the link and select the correct NTW programme. You will get an automated link to the programm access:</p>
+                    <p>You have been successfully registered for the <strong>${participant.program_name || program}</strong> training program.</p>
+                    <p>To access your program materials, please visit the link and select the correct NTW programme. You will get an automated link to the program access:</p>
                     <div style="text-align: center; margin: 20px 0;">
                       <a href="https://theaihq.net/shop-new/" style="${buttonStyle}">Access Program Link</a>
                     </div>
@@ -124,9 +142,9 @@ serve(async (req) => {
                     
                     <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
                     
-                    <h2>[NTW] Pendaftaran ${program} Anda Disahkan</h2>
+                    <h2>[NTW] Pendaftaran ${participant.program_name || program} Anda Disahkan</h2>
                     <p>Salam ${participant.name},</p>
-                    <p>Anda telah berjaya didaftarkan untuk program latihan <strong>${program}</strong>.</p>
+                    <p>Anda telah berjaya didaftarkan untuk program latihan <strong>${participant.program_name || program}</strong>.</p>
                     <p>Untuk mengakses bahan program anda, sila layari:</p>
                     <div style="text-align: center; margin: 20px 0;">
                       <a href="https://theaihq.net/shop-new/" style="${buttonStyle}">Akses Program</a>
@@ -141,6 +159,7 @@ serve(async (req) => {
 
           if (!emailResponse.ok) {
             const errorText = await emailResponse.text();
+            console.error(`SendGrid error ${emailResponse.status}: ${errorText}`);
             throw new Error(`SendGrid error ${emailResponse.status}: ${errorText}`);
           }
 
@@ -156,11 +175,11 @@ serve(async (req) => {
             message: 'Participant registered and email sent',
           };
         } catch (emailError) {
-          console.error(`Error sending email to ${participant.email}:`, emailError);
+          console.error(`Error processing participant ${participant.email}:`, emailError);
           return {
             email: participant.email,
-            status: 'partial_success',
-            message: 'Participant registered but email failed to send',
+            status: 'error',
+            message: `Failed to process: ${emailError.message}`,
           };
         }
       })

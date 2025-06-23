@@ -23,6 +23,27 @@ const ProgramSummary = () => {
 
   useEffect(() => {
     fetchProgramStats();
+    
+    // Set up real-time subscription for prospects table changes
+    const prospectsChannel = supabase
+      .channel('program-stats-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'prospects'
+        },
+        () => {
+          console.log('Prospect data changed, refreshing stats...');
+          fetchProgramStats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(prospectsChannel);
+    };
   }, []);
 
   const fetchProgramStats = async () => {

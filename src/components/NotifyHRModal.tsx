@@ -24,7 +24,7 @@ const templates = {
 
 We recently spoke with [Prospect Name] about our "Business Writing with AI Masterclass." Attached is the sign-up form. Please confirm if you'd like to proceed.
 
-Regards, [Your Company]`
+Regards, AIHQ Team`
   },
   "ChatGPT Skill Boost Masterclass": {
     subject: "Invitation: ChatGPT Skill Boost Masterclass",
@@ -32,7 +32,7 @@ Regards, [Your Company]`
 
 [Prospect Name] expressed interest in our "ChatGPT Skill Boost Masterclass." Attached is the sign-up form. Let us know how you'd like to proceed.
 
-Best, [Your Team]`
+Best, AIHQ Team`
   },
   default: {
     subject: "Programme Sign-Up Form",
@@ -40,7 +40,7 @@ Best, [Your Team]`
 
 We recently spoke with [Prospect Name] about our programme. Attached is the sign-up form. Please confirm if you'd like to proceed.
 
-Best regards, [Your Company]`
+Best regards, AIHQ Team`
   }
 };
 
@@ -120,7 +120,7 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hrContactId) {
+    if (!hrContactId || !prospectData?.hr_contacts?.[0]?.email) {
       toast({
         title: "Error",
         description: "No HR contact found for this prospect",
@@ -132,16 +132,14 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
     setIsSubmitting(true);
 
     try {
-      // In a real implementation, you would send the actual email here
-      // For now, we'll just mark that an email was sent
-      
-      const { error } = await supabase
-        .from('hr_contacts')
-        .update({
-          email_sent_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', hrContactId);
+      const { data, error } = await supabase.functions.invoke('send-hr-notification', {
+        body: {
+          to: prospectData.hr_contacts[0].email,
+          subject: formData.subject,
+          body: formData.body,
+          hrContactId: hrContactId
+        }
+      });
 
       if (error) throw error;
 
@@ -217,9 +215,6 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
             <div className="p-3 bg-blue-50 rounded-lg">
               <p className="text-sm text-blue-700">
                 📎 Sign-up form PDF will be automatically attached to this email
-              </p>
-              <p className="text-xs text-blue-600 mt-1">
-                Note: This is a demo version. In production, this would send an actual email.
               </p>
             </div>
           </div>

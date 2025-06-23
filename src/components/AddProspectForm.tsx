@@ -1,21 +1,18 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
-// Mock programmes data
-const mockProgrammes = [
-  { id: '1', name: 'Business Writing with AI Masterclass' },
-  { id: '2', name: 'ChatGPT Skill Boost Masterclass' },
-  { id: '3', name: 'Digital Leadership Programme' },
-  { id: '4', name: 'AI Tools for Productivity' }
-];
+interface Program {
+  id: string;
+  title: string;
+}
 
 const AddProspectForm = () => {
-  const [programmes, setProgrammes] = useState<Array<{id: string, name: string}>>([]);
+  const [programmes, setProgrammes] = useState<Program[]>([]);
   const [formData, setFormData] = useState({
     programmeId: '',
     name: '',
@@ -25,13 +22,34 @@ const AddProspectForm = () => {
     jobRole: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    // TODO: fetch('/api/programmes')
-    // Using mock data for now
-    setProgrammes(mockProgrammes);
+    fetchPrograms();
   }, []);
+
+  const fetchPrograms = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('programs')
+        .select('id, title')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      setProgrammes(data || []);
+    } catch (error) {
+      console.error('Error fetching programs:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load programs",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -46,7 +64,7 @@ const AddProspectForm = () => {
     setIsSubmitting(true);
 
     try {
-      // TODO: fetch('/api/prospects', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(formData) })
+      // TODO: Replace with actual Supabase insert when participants table is ready
       console.log('Adding prospect:', formData);
       
       // Simulate API call
@@ -94,12 +112,15 @@ const AddProspectForm = () => {
               value={formData.programmeId}
               onChange={handleInputChange}
               required
-              className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md"
+              disabled={loading}
+              className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md disabled:opacity-50"
             >
-              <option value="">Select a programme...</option>
+              <option value="">
+                {loading ? 'Loading programs...' : 'Select a programme...'}
+              </option>
               {programmes.map((programme) => (
                 <option key={programme.id} value={programme.id}>
-                  {programme.name}
+                  {programme.title}
                 </option>
               ))}
             </select>
@@ -162,7 +183,7 @@ const AddProspectForm = () => {
           </div>
 
           <div className="md:col-span-2">
-            <Button type="submit" disabled={isSubmitting} className="w-full">
+            <Button type="submit" disabled={isSubmitting || loading} className="w-full">
               {isSubmitting ? 'Adding Prospect...' : 'Add Prospect'}
             </Button>
           </div>

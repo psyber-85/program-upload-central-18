@@ -9,22 +9,10 @@ import { Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import * as XLSX from 'xlsx';
 
-// Product ID to Program Title translation mapping
-const PRODUCT_ID_TRANSLATIONS: Record<string, string> = {
-  'business-writing-ai': 'Business Writing with AI: 2-Day Masterclass',
-  'ai-ready-leader': 'The AI-Ready Leader: Win the Future with Strategic Action',
-  'chatgpt-skill-boost': 'ChatGPT Skill Boost (Intermediate)',
-  'ai-chatgpt-hr': 'AI and ChatGPT for HR Professionals - 2 Day Masterclass'
-};
-
 const BulkUploadForm = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
-
-  const translateProductId = (productId: string): string => {
-    return PRODUCT_ID_TRANSLATIONS[productId] || productId;
-  };
 
   // Function to normalize payment status values
   const normalizePaymentStatus = (paymentStatus: string): string | null => {
@@ -157,11 +145,6 @@ const BulkUploadForm = () => {
       fileData.forEach((row: any) => {
         let programTitle = row.product_type;
         
-        // Translate product_id if present
-        if (row.product_id) {
-          programTitle = translateProductId(row.product_id);
-        }
-        
         if (!programTitle) {
           throw new Error('Program information missing in data');
         }
@@ -281,15 +264,14 @@ const BulkUploadForm = () => {
               <li>org</li>
               <li>role</li>
               <li>payment (accepts: paid/pending/failed and common variations)</li>
-              <li>product_type (program name)</li>
-              <li>product_id (optional - will be automatically translated to program titles)</li>
+              <li>product_type (program name - use full program titles)</li>
             </ul>
             <div className="mt-3 p-3 bg-blue-100 rounded">
-              <p className="text-xs text-blue-800 font-medium">Auto Program Detection & Payment Status Normalization:</p>
+              <p className="text-xs text-blue-800 font-medium">Program Names & Payment Status Normalization:</p>
               <p className="text-xs text-blue-700">
-                Programs will be automatically detected from the product_type or product_id columns. 
+                Use the full program names in the product_type column (e.g., "AI for Business Leaders Masterclass"). 
                 Payment statuses will be automatically normalized (e.g., "Paid" → "paid", "Processing" → "pending").
-                No need to select a program manually - the system will create programs as needed.
+                Programs will be created automatically if they don't exist.
               </p>
             </div>
           </div>

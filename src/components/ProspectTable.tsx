@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -35,7 +36,7 @@ interface Prospect {
   hasCallNotes?: boolean;
 }
 
-type SortField = 'name' | 'email' | 'org' | 'role' | 'program' | 'registration_status' | 'lastCall';
+type SortField = 'name' | 'email' | 'org' | 'role' | 'program' | 'registration_status' | 'payment_status' | 'lastCall';
 type SortDirection = 'asc' | 'desc';
 
 const ProspectTable = () => {
@@ -241,6 +242,20 @@ const ProspectTable = () => {
     }
   };
 
+  const getPaymentBadgeVariant = (status: string | null) => {
+    switch (status) {
+      case 'paid': return 'default';
+      case 'pending': return 'secondary';
+      case 'failed': return 'destructive';
+      default: return 'outline';
+    }
+  };
+
+  const formatPaymentStatus = (status: string | null) => {
+    if (!status) return 'Not Set';
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
   const handleModalOpen = (modalType: string, prospectId: string) => {
     setSelectedProspect(prospectId);
     setActiveModal(modalType);
@@ -275,84 +290,123 @@ const ProspectTable = () => {
   return (
     <div className="bg-white rounded-lg shadow">
       {/* Search Bar */}
-      <div className="p-4 border-b">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <Input
-            placeholder="Search prospects..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <div className="mt-2 text-sm text-gray-600">
-          Showing {filteredProspects.length} of {prospects.length} prospects
+      <div className="p-4 border-b bg-gray-50 rounded-t-lg">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              placeholder="Search prospects..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <div className="text-sm text-gray-600 font-medium">
+            Showing {filteredProspects.length} of {prospects.length} prospects
+          </div>
         </div>
       </div>
 
+      {/* Table Container with Better Spacing */}
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead className="cursor-pointer" onClick={() => handleSort('program')}>
-                <div className="flex items-center gap-1">
-                  Programme {getSortIcon('program')}
-                </div>
-              </TableHead>
-              <TableHead className="cursor-pointer" onClick={() => handleSort('name')}>
+            <TableRow className="bg-gray-50/50">
+              {/* Core Information Group */}
+              <TableHead className="cursor-pointer font-semibold" onClick={() => handleSort('name')}>
                 <div className="flex items-center gap-1">
                   Name {getSortIcon('name')}
                 </div>
               </TableHead>
-              <TableHead className="hidden sm:table-cell cursor-pointer" onClick={() => handleSort('email')}>
+              <TableHead className="cursor-pointer font-semibold" onClick={() => handleSort('program')}>
+                <div className="flex items-center gap-1">
+                  Programme {getSortIcon('program')}
+                </div>
+              </TableHead>
+              
+              {/* Contact Information Group */}
+              <TableHead className="hidden sm:table-cell cursor-pointer font-semibold" onClick={() => handleSort('email')}>
                 <div className="flex items-center gap-1">
                   Email {getSortIcon('email')}
                 </div>
               </TableHead>
-              <TableHead className="hidden md:table-cell">Phone</TableHead>
-              <TableHead className="hidden lg:table-cell cursor-pointer" onClick={() => handleSort('org')}>
+              <TableHead className="hidden md:table-cell font-semibold">Phone</TableHead>
+              
+              {/* Organization Information Group */}
+              <TableHead className="hidden lg:table-cell cursor-pointer font-semibold" onClick={() => handleSort('org')}>
                 <div className="flex items-center gap-1">
                   Company {getSortIcon('org')}
                 </div>
               </TableHead>
-              <TableHead className="hidden lg:table-cell cursor-pointer" onClick={() => handleSort('role')}>
+              <TableHead className="hidden lg:table-cell cursor-pointer font-semibold" onClick={() => handleSort('role')}>
                 <div className="flex items-center gap-1">
                   Job Role {getSortIcon('role')}
                 </div>
               </TableHead>
-              <TableHead className="hidden md:table-cell cursor-pointer" onClick={() => handleSort('lastCall')}>
+              
+              {/* Status Information Group */}
+              <TableHead className="cursor-pointer font-semibold" onClick={() => handleSort('payment_status')}>
                 <div className="flex items-center gap-1">
-                  Last Call {getSortIcon('lastCall')}
+                  Payment {getSortIcon('payment_status')}
                 </div>
               </TableHead>
-              <TableHead className="hidden lg:table-cell">HR Contact</TableHead>
-              <TableHead className="hidden lg:table-cell">HR Email</TableHead>
-              <TableHead className="hidden md:table-cell">HR Email Sent</TableHead>
-              <TableHead className="cursor-pointer" onClick={() => handleSort('registration_status')}>
+              <TableHead className="cursor-pointer font-semibold" onClick={() => handleSort('registration_status')}>
                 <div className="flex items-center gap-1">
                   Status {getSortIcon('registration_status')}
                 </div>
               </TableHead>
-              <TableHead>Actions</TableHead>
+              
+              {/* Activity Information Group */}
+              <TableHead className="hidden md:table-cell cursor-pointer font-semibold" onClick={() => handleSort('lastCall')}>
+                <div className="flex items-center gap-1">
+                  Last Call {getSortIcon('lastCall')}
+                </div>
+              </TableHead>
+              <TableHead className="hidden lg:table-cell font-semibold">HR Contact</TableHead>
+              
+              <TableHead className="font-semibold">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {currentProspects.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12} className="text-center py-6">
+                <TableCell colSpan={11} className="text-center py-8 text-gray-500">
                   {searchTerm ? 'No prospects found matching your search.' : 'No prospects found. Add some prospects to get started.'}
                 </TableCell>
               </TableRow>
             ) : (
               currentProspects.map((prospect) => (
-                <TableRow key={prospect.id}>
-                  <TableCell className="font-medium">{prospect.program}</TableCell>
-                  <TableCell>{prospect.name}</TableCell>
-                  <TableCell className="hidden sm:table-cell">{prospect.email}</TableCell>
-                  <TableCell className="hidden md:table-cell">{prospect.phone || '—'}</TableCell>
-                  <TableCell className="hidden lg:table-cell">{prospect.org || '—'}</TableCell>
-                  <TableCell className="hidden lg:table-cell">{prospect.role || '—'}</TableCell>
-                  <TableCell className="hidden md:table-cell">
+                <TableRow key={prospect.id} className="hover:bg-gray-50/50">
+                  {/* Core Information */}
+                  <TableCell className="font-medium text-gray-900">{prospect.name}</TableCell>
+                  <TableCell className="max-w-[200px]">
+                    <div className="truncate text-sm font-medium text-blue-700">
+                      {prospect.program}
+                    </div>
+                  </TableCell>
+                  
+                  {/* Contact Information */}
+                  <TableCell className="hidden sm:table-cell text-sm">{prospect.email}</TableCell>
+                  <TableCell className="hidden md:table-cell text-sm">{prospect.phone || '—'}</TableCell>
+                  
+                  {/* Organization Information */}
+                  <TableCell className="hidden lg:table-cell text-sm">{prospect.org || '—'}</TableCell>
+                  <TableCell className="hidden lg:table-cell text-sm">{prospect.role || '—'}</TableCell>
+                  
+                  {/* Status Information */}
+                  <TableCell>
+                    <Badge variant={getPaymentBadgeVariant(prospect.payment_status)} className="text-xs">
+                      {formatPaymentStatus(prospect.payment_status)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={getStatusBadgeVariant(prospect.registration_status)} className="text-xs">
+                      {prospect.registration_status}
+                    </Badge>
+                  </TableCell>
+                  
+                  {/* Activity Information */}
+                  <TableCell className="hidden md:table-cell text-sm">
                     <div className="flex items-center gap-2">
                       {prospect.lastCall || '—'}
                       {prospect.hasCallNotes && (
@@ -360,75 +414,67 @@ const ProspectTable = () => {
                           size="sm"
                           variant="ghost"
                           onClick={() => handleModalOpen('viewNotes', prospect.id)}
-                          className="p-1 h-auto"
+                          className="p-1 h-auto hover:bg-blue-50"
                         >
-                          <Eye className="w-3 h-3" />
+                          <Eye className="w-3 h-3 text-blue-600" />
                         </Button>
                       )}
                     </div>
                   </TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    {prospect.hrContact?.name || '—'}
+                  <TableCell className="hidden lg:table-cell text-sm">
+                    <div className="space-y-1">
+                      <div>{prospect.hrContact?.name || '—'}</div>
+                      {prospect.hrContact?.email_sent_at && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-green-600 text-xs">✅</span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(prospect.hrContact.email_sent_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    {prospect.hrContact?.email || '—'}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {prospect.hrContact?.email_sent_at ? (
-                      <div className="flex items-center gap-1">
-                        <span className="text-green-600">✅</span>
-                        <span className="text-xs text-gray-500">
-                          {new Date(prospect.hrContact.email_sent_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    ) : '—'}
-                  </TableCell>
+                  
+                  {/* Actions */}
                   <TableCell>
-                    <Badge variant={getStatusBadgeVariant(prospect.registration_status)}>
-                      {prospect.registration_status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col sm:flex-row gap-1">
+                    <div className="flex flex-wrap gap-1">
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => handleModalOpen('call', prospect.id)}
-                        className="text-xs"
+                        className="text-xs px-2 py-1 h-auto"
                       >
-                        <Phone className="w-3 h-3" />
-                        <span className="hidden sm:inline ml-1">Call</span>
+                        <Phone className="w-3 h-3 mr-1" />
+                        Call
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => handleModalOpen('hr', prospect.id)}
-                        className="text-xs"
+                        className="text-xs px-2 py-1 h-auto"
                       >
-                        <User className="w-3 h-3" />
-                        <span className="hidden sm:inline ml-1">
-                          {prospect.hrContact?.name ? 'Edit HR' : 'Add HR'}
-                        </span>
+                        <User className="w-3 h-3 mr-1" />
+                        {prospect.hrContact?.name ? 'Edit HR' : 'Add HR'}
                       </Button>
                       {prospect.hrContact?.email && (
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleModalOpen('notify', prospect.id)}
-                          className="text-xs"
+                          className="text-xs px-2 py-1 h-auto"
                         >
-                          <Mail className="w-3 h-3" />
-                          <span className="hidden sm:inline ml-1">Notify</span>
+                          <Mail className="w-3 h-3 mr-1" />
+                          Notify
                         </Button>
                       )}
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => handleModalOpen('status', prospect.id)}
-                        className="text-xs"
+                        className="text-xs px-2 py-1 h-auto"
                       >
-                        <AlertCircle className="w-3 h-3" />
-                        <span className="hidden sm:inline ml-1">Status</span>
+                        <AlertCircle className="w-3 h-3 mr-1" />
+                        Status
                       </Button>
                     </div>
                   </TableCell>
@@ -441,7 +487,7 @@ const ProspectTable = () => {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="p-4 border-t">
+        <div className="p-4 border-t bg-gray-50 rounded-b-lg">
           <Pagination>
             <PaginationContent>
               <PaginationItem>

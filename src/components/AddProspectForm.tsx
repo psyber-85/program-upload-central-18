@@ -12,14 +12,6 @@ interface Program {
   title: string;
 }
 
-// Define the 4 masterclasses that should be available
-const MASTERCLASSES = [
-  'Business Writing with AI: 2-Day Masterclass',
-  'The AI-Ready Leader: Win the Future with Strategic Action',
-  'ChatGPT Skill Boost (Intermediate)',
-  'AI and ChatGPT for HR Professionals - 2 Day Masterclass'
-];
-
 const AddProspectForm = () => {
   const [programmes, setProgrammes] = useState<Program[]>([]);
   const [formData, setFormData] = useState({
@@ -43,31 +35,10 @@ const AddProspectForm = () => {
 
   const fetchPrograms = async () => {
     try {
-      // First, ensure all masterclasses exist in the database
-      for (const masterclass of MASTERCLASSES) {
-        const { data: existingProgram, error: fetchError } = await supabase
-          .from('programs')
-          .select('id')
-          .eq('title', masterclass)
-          .single();
-
-        if (fetchError && fetchError.code === 'PGRST116') {
-          // Program doesn't exist, create it
-          const { error: createError } = await supabase
-            .from('programs')
-            .insert([{ title: masterclass }]);
-
-          if (createError) {
-            console.error('Error creating program:', createError);
-          }
-        }
-      }
-
-      // Now fetch only the masterclasses
+      // Fetch all programs from the database
       const { data, error } = await supabase
         .from('programs')
         .select('id, title')
-        .in('title', MASTERCLASSES)
         .order('title', { ascending: true });
 
       if (error) throw error;
@@ -163,7 +134,7 @@ const AddProspectForm = () => {
               className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md disabled:opacity-50"
             >
               <option value="">
-                {loading ? 'Loading masterclasses...' : 'Select a masterclass...'}
+                {loading ? 'Loading programmes...' : 'Select a programme...'}
               </option>
               {programmes.map((programme) => (
                 <option key={programme.id} value={programme.id}>
@@ -171,11 +142,6 @@ const AddProspectForm = () => {
                 </option>
               ))}
             </select>
-            {programmes.length === 0 && !loading && (
-              <p className="text-sm text-gray-500 mt-1">
-                Only the 4 core masterclasses are available for prospect registration.
-              </p>
-            )}
           </div>
 
           <div>

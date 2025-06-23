@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,8 +19,10 @@ const AddProspectForm = () => {
     name: '',
     email: '',
     phone: '',
-    company: '',
-    jobRole: ''
+    org: '',
+    role: '',
+    payment: '',
+    product_type: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -81,8 +84,10 @@ const AddProspectForm = () => {
         name: '',
         email: '',
         phone: '',
-        company: '',
-        jobRole: ''
+        org: '',
+        role: '',
+        payment: '',
+        product_type: ''
       });
     } catch (error) {
       toast({
@@ -161,23 +166,52 @@ const AddProspectForm = () => {
           </div>
 
           <div>
-            <Label htmlFor="company">Company</Label>
+            <Label htmlFor="org">Organization</Label>
             <Input
-              id="company"
-              name="company"
-              value={formData.company}
+              id="org"
+              name="org"
+              value={formData.org}
               onChange={handleInputChange}
               required
             />
           </div>
 
-          <div className="md:col-span-2">
-            <Label htmlFor="jobRole">Job Role</Label>
+          <div>
+            <Label htmlFor="role">Job Role</Label>
             <Input
-              id="jobRole"
-              name="jobRole"
-              value={formData.jobRole}
+              id="role"
+              name="role"
+              value={formData.role}
               onChange={handleInputChange}
+              required
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="payment">Payment Status</Label>
+            <select
+              id="payment"
+              name="payment"
+              value={formData.payment}
+              onChange={handleInputChange}
+              required
+              className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md"
+            >
+              <option value="">Select payment status...</option>
+              <option value="paid">Paid</option>
+              <option value="pending">Pending</option>
+              <option value="failed">Failed</option>
+            </select>
+          </div>
+
+          <div>
+            <Label htmlFor="product_type">Product Type</Label>
+            <Input
+              id="product_type"
+              name="product_type"
+              value={formData.product_type}
+              onChange={handleInputChange}
+              placeholder="e.g., masterclass, workshop"
               required
             />
           </div>

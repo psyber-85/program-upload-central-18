@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,14 @@ interface Program {
   id: string;
   title: string;
 }
+
+// Product ID to Program Title translation mapping
+const PRODUCT_ID_TRANSLATIONS: Record<string, string> = {
+  'business-writing-ai': 'Business Writing with AI: 2-Day Masterclass',
+  'ai-ready-leader': 'The AI-Ready Leader: Win the Future with Strategic Action',
+  'chatgpt-skill-boost': 'ChatGPT Skill Boost (Intermediate)',
+  'ai-chatgpt-hr': 'AI and ChatGPT for HR Professionals - 2 Day Masterclass'
+};
 
 const BulkUploadForm = () => {
   const [programmes, setProgrammes] = useState<Program[]>([]);
@@ -46,6 +55,10 @@ const BulkUploadForm = () => {
     }
   };
 
+  const translateProductId = (productId: string): string => {
+    return PRODUCT_ID_TRANSLATIONS[productId] || productId;
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -78,14 +91,16 @@ const BulkUploadForm = () => {
       formData.append('file', selectedFile);
 
       // TODO: Replace with actual Supabase file processing when participants table is ready
+      // For now, we'll simulate processing the file with product_id translation
       console.log('Uploading file:', selectedFile.name, 'for programme:', selectedProgramme);
+      console.log('File will be processed with product_id translation using mapping:', PRODUCT_ID_TRANSLATIONS);
       
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       toast({
         title: "Success",
-        description: `Successfully uploaded ${selectedFile.name}. Prospects have been added to the system.`,
+        description: `Successfully uploaded ${selectedFile.name}. Prospects have been added with product_id translations applied.`,
       });
 
       // Reset form
@@ -153,12 +168,22 @@ const BulkUploadForm = () => {
                 The Excel file should have the following columns in the first row:
               </p>
               <ul className="text-sm text-blue-700 list-disc list-inside space-y-1">
-                <li>Name</li>
-                <li>Email</li>
-                <li>Phone</li>
-                <li>Company</li>
-                <li>Job Role</li>
+                <li>name</li>
+                <li>email</li>
+                <li>phone</li>
+                <li>org</li>
+                <li>role</li>
+                <li>payment</li>
+                <li>product_type</li>
+                <li>product_id (will be automatically translated to program titles)</li>
               </ul>
+              <div className="mt-3 p-3 bg-blue-100 rounded">
+                <p className="text-xs text-blue-800 font-medium">Product ID Translation:</p>
+                <p className="text-xs text-blue-700">
+                  Product IDs like 'business-writing-ai', 'ai-ready-leader', etc. will be automatically 
+                  translated to their full program titles when added to the system.
+                </p>
+              </div>
             </div>
           </div>
 

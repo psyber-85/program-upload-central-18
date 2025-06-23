@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -5,6 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Mail } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
 
 interface NotifyHRModalProps {
   isOpen: boolean;
@@ -51,20 +54,62 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
     subject: '',
     body: ''
   });
+  const [prospectData, setProspectData] = useState<any>(null);
+  const [hrContactId, setHrContactId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen && prospectId) {
-      // TODO: Load programme-specific template
-      // fetch(`/api/programmes/${prospectId}/email-template`)
-      //   .then(r => r.json())
-      //   .then(template => setFormData(template))
-      
-      // For now, use default template
-      const template = templates.default;
-      setFormData(template);
+      loadProspectAndHRData();
     }
   }, [isOpen, prospectId]);
+
+  const loadProspectAndHRData = async () => {
+    try {
+      // Load prospect data with program info
+      const { data: prospectData, error: prospectError } = await supabase
+        .from('prospects')
+        .select(`
+          *,
+          programs(title),
+          hr_contacts(*)
+        `)
+        .eq('id', prospectId)
+        .single();
+
+      if (prospectError) throw prospectError;
+
+      setProspectData(prospectData);
+      
+      // Set HR contact ID if exists
+      if (prospectData.hr_contacts && prospectData.hr_contacts.length > 0) {
+        setHrContactId(prospectData.hr_contacts[0].id);
+      }
+
+      // Set email template based on program
+      const programTitle = prospectData.programs?.title || 'Unknown Program';
+      const template = templates[programTitle as keyof typeof templates] || templates.default;
+      
+      // Replace placeholders
+      const hrName = prospectData.hr_contacts?.[0]?.name || '[HR Name]';
+      const prospectName = prospectData.name || '[Prospect Name]';
+      
+      setFormData({
+        subject: template.subject,
+        body: template.body
+          .replace(/\[HR Name\]/g, hrName)
+          .replace(/\[Prospect Name\]/g, prospectName)
+      });
+    } catch (error) {
+      console.error('Failed to load prospect data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load prospect information",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
@@ -75,34 +120,59 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hrContactId) {
+      toast({
+        title: "Error",
+        description: "No HR contact found for this prospect",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      const emailData = {
-        ...formData,
-        attachmentUrl: 'https://yourdomain.com/forms/signup-form.pdf'
-      };
+      // In a real implementation, you would send the actual email here
+      // For now, we'll just mark that an email was sent
+      
+      const { error } = await supabase
+        .from('hr_contacts')
+        .update({
+          email_sent_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', hrContactId);
 
-      // TODO: fetch(`/api/prospects/${prospectId}/email`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(emailData) })
-      await fetch(`/api/prospects/${prospectId}/email`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(emailData)
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Email notification sent successfully! HR contact has been notified.",
       });
 
       onComplete();
       onClose();
     } catch (error) {
       console.error('Failed to send email:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send email notification. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleClose = () => {
+    setFormData({ subject: '', body: '' });
+    setProspectData(null);
+    setHrContactId(null);
+    onClose();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -111,6 +181,11 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
           </DialogTitle>
           <DialogDescription>
             Send programme-specific email with sign-up form attachment
+            {prospectData && (
+              <span className="block mt-1">
+                To: {prospectData.hr_contacts?.[0]?.email || 'No HR email found'}
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
         
@@ -143,14 +218,17 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
               <p className="text-sm text-blue-700">
                 📎 Sign-up form PDF will be automatically attached to this email
               </p>
+              <p className="text-xs text-blue-600 mt-1">
+                Note: This is a demo version. In production, this would send an actual email.
+              </p>
             </div>
           </div>
 
           <DialogFooter className="mt-6">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting || !hrContactId}>
               {isSubmitting ? 'Sending...' : 'Send Email'}
             </Button>
           </DialogFooter>

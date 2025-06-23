@@ -3,7 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Phone, Mail, User, Building, AlertCircle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
+import { Phone, Mail, User, Building, AlertCircle, Search, ChevronUp, ChevronDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import LogCallModal from './LogCallModal';
@@ -32,17 +34,57 @@ interface Prospect {
   hrContact?: HRContact;
 }
 
+type SortField = 'name' | 'email' | 'org' | 'role' | 'program' | 'registration_status' | 'lastCall';
+type SortDirection = 'asc' | 'desc';
+
 const ProspectTable = () => {
   const [prospects, setProspects] = useState<Prospect[]>([]);
+  const [filteredProspects, setFilteredProspects] = useState<Prospect[]>([]);
   const [programs, setPrograms] = useState<{[key: string]: string}>({});
   const [selectedProspect, setSelectedProspect] = useState<string | null>(null);
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [prospectsPerPage] = useState(10);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchProspects();
   }, []);
+
+  useEffect(() => {
+    // Filter and sort prospects
+    let filtered = prospects.filter(prospect => 
+      prospect.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      prospect.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      prospect.program.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (prospect.org && prospect.org.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (prospect.role && prospect.role.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+
+    // Sort prospects
+    filtered.sort((a, b) => {
+      let aValue = a[sortField] || '';
+      let bValue = b[sortField] || '';
+      
+      if (sortField === 'lastCall') {
+        aValue = a.lastCall || '1900-01-01';
+        bValue = b.lastCall || '1900-01-01';
+      }
+      
+      if (sortDirection === 'asc') {
+        return aValue.toString().localeCompare(bValue.toString());
+      } else {
+        return bValue.toString().localeCompare(aValue.toString());
+      }
+    });
+
+    setFilteredProspects(filtered);
+    setCurrentPage(1); // Reset to first page when filtering
+  }, [searchTerm, prospects, sortField, sortDirection]);
 
   const fetchProspects = async () => {
     try {
@@ -114,6 +156,20 @@ const ProspectTable = () => {
     }
   };
 
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return null;
+    return sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />;
+  };
+
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'Approved': return 'default';
@@ -139,6 +195,12 @@ const ProspectTable = () => {
     fetchProspects();
   };
 
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredProspects.length / prospectsPerPage);
+  const startIndex = (currentPage - 1) * prospectsPerPage;
+  const endIndex = startIndex + prospectsPerPage;
+  const currentProspects = filteredProspects.slice(startIndex, endIndex);
+
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow p-6">
@@ -152,33 +214,77 @@ const ProspectTable = () => {
 
   return (
     <div className="bg-white rounded-lg shadow">
+      {/* Search Bar */}
+      <div className="p-4 border-b">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Input
+            placeholder="Search prospects..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <div className="mt-2 text-sm text-gray-600">
+          Showing {filteredProspects.length} of {prospects.length} prospects
+        </div>
+      </div>
+
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Programme</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead className="hidden sm:table-cell">Email</TableHead>
+              <TableHead className="cursor-pointer" onClick={() => handleSort('program')}>
+                <div className="flex items-center gap-1">
+                  Programme {getSortIcon('program')}
+                </div>
+              </TableHead>
+              <TableHead className="cursor-pointer" onClick={() => handleSort('name')}>
+                <div className="flex items-center gap-1">
+                  Name {getSortIcon('name')}
+                </div>
+              </TableHead>
+              <TableHead className="hidden sm:table-cell cursor-pointer" onClick={() => handleSort('email')}>
+                <div className="flex items-center gap-1">
+                  Email {getSortIcon('email')}
+                </div>
+              </TableHead>
               <TableHead className="hidden md:table-cell">Phone</TableHead>
-              <TableHead className="hidden lg:table-cell">Company</TableHead>
-              <TableHead className="hidden lg:table-cell">Job Role</TableHead>
-              <TableHead className="hidden md:table-cell">Last Call</TableHead>
+              <TableHead className="hidden lg:table-cell cursor-pointer" onClick={() => handleSort('org')}>
+                <div className="flex items-center gap-1">
+                  Company {getSortIcon('org')}
+                </div>
+              </TableHead>
+              <TableHead className="hidden lg:table-cell cursor-pointer" onClick={() => handleSort('role')}>
+                <div className="flex items-center gap-1">
+                  Job Role {getSortIcon('role')}
+                </div>
+              </TableHead>
+              <TableHead className="hidden md:table-cell cursor-pointer" onClick={() => handleSort('lastCall')}>
+                <div className="flex items-center gap-1">
+                  Last Call {getSortIcon('lastCall')}
+                </div>
+              </TableHead>
               <TableHead className="hidden lg:table-cell">HR Contact</TableHead>
               <TableHead className="hidden lg:table-cell">HR Email</TableHead>
               <TableHead className="hidden md:table-cell">HR Email Sent</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead className="cursor-pointer" onClick={() => handleSort('registration_status')}>
+                <div className="flex items-center gap-1">
+                  Status {getSortIcon('registration_status')}
+                </div>
+              </TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {prospects.length === 0 ? (
+            {currentProspects.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={12} className="text-center py-6">
-                  No prospects found. Add some prospects to get started.
+                  {searchTerm ? 'No prospects found matching your search.' : 'No prospects found. Add some prospects to get started.'}
                 </TableCell>
               </TableRow>
             ) : (
-              prospects.map((prospect) => (
+              currentProspects.map((prospect) => (
                 <TableRow key={prospect.id}>
                   <TableCell className="font-medium">{prospect.program}</TableCell>
                   <TableCell>{prospect.name}</TableCell>
@@ -260,6 +366,41 @@ const ProspectTable = () => {
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="p-4 border-t">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+              
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <PaginationItem key={page}>
+                  <PaginationLink
+                    onClick={() => setCurrentPage(page)}
+                    isActive={currentPage === page}
+                    className="cursor-pointer"
+                  >
+                    {page}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+              
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
 
       {/* Modals */}
       <LogCallModal

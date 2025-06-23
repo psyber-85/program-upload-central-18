@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,11 +8,6 @@ import { useToast } from '@/components/ui/use-toast';
 import { Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import * as XLSX from 'xlsx';
-
-interface Program {
-  id: string;
-  title: string;
-}
 
 // Product ID to Program Title translation mapping
 const PRODUCT_ID_TRANSLATIONS: Record<string, string> = {
@@ -23,38 +18,9 @@ const PRODUCT_ID_TRANSLATIONS: Record<string, string> = {
 };
 
 const BulkUploadForm = () => {
-  const [programmes, setProgrammes] = useState<Program[]>([]);
-  const [selectedProgramme, setSelectedProgramme] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-
-  useEffect(() => {
-    fetchPrograms();
-  }, []);
-
-  const fetchPrograms = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('programs')
-        .select('id, title')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      setProgrammes(data || []);
-    } catch (error) {
-      console.error('Error fetching programs:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load programs",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const translateProductId = (productId: string): string => {
     return PRODUCT_ID_TRANSLATIONS[productId] || productId;
@@ -65,91 +31,177 @@ const BulkUploadForm = () => {
     if (file) {
       const validTypes = [
         'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/csv'
       ];
       
-      if (validTypes.includes(file.type) || file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) {
+      if (validTypes.includes(file.type) || 
+          file.name.endsWith('.xls') || 
+          file.name.endsWith('.xlsx') || 
+          file.name.endsWith('.csv')) {
         setSelectedFile(file);
       } else {
         toast({
           title: "Invalid file type",
-          description: "Please select an Excel file (.xls or .xlsx)",
+          description: "Please select an Excel file (.xls, .xlsx) or CSV file (.csv)",
           variant: "destructive",
         });
       }
     }
   };
 
-  const processExcelFile = async (file: File): Promise<any[]> => {
+  const processFile = async (file: File): Promise<any[]> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const sheetName = workbook.SheetNames[0];
-          const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet);
-          resolve(jsonData);
+          if (file.name.endsWith('.csv')) {
+            // Process CSV file
+            const text = e.target?.result as string;
+            const lines = text.split('\n');
+            const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+            const jsonData = [];
+            
+            for (let i = 1; i < lines.length; i++) {
+              if (lines[i].trim()) {
+                const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+                const row: any = {};
+                headers.forEach((header, index) => {
+                  row[header] = values[index] || '';
+                });
+                jsonData.push(row);
+              }
+            }
+            resolve(jsonData);
+          } else {
+            // Process Excel file
+            const data = new Uint8Array(e.target?.result as ArrayBuffer);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+            resolve(jsonData);
+          }
         } catch (error) {
           reject(error);
         }
       };
       reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsArrayBuffer(file);
+      
+      if (file.name.endsWith('.csv')) {
+        reader.readAsText(file);
+      } else {
+        reader.readAsArrayBuffer(file);
+      }
     });
   };
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProgramme || !selectedFile) return;
+    if (!selectedFile) return;
 
     setIsUploading(true);
 
     try {
-      // Process Excel file
-      const excelData = await processExcelFile(selectedFile);
+      // Process file
+      const fileData = await processFile(selectedFile);
       
-      if (excelData.length === 0) {
-        throw new Error('No data found in Excel file');
+      if (fileData.length === 0) {
+        throw new Error('No data found in file');
       }
 
       // Validate required columns
       const requiredColumns = ['name', 'email', 'phone', 'org', 'role', 'payment', 'product_type'];
-      const firstRow = excelData[0] as any;
+      const firstRow = fileData[0] as any;
       const missingColumns = requiredColumns.filter(col => !(col in firstRow));
       
       if (missingColumns.length > 0) {
         throw new Error(`Missing required columns: ${missingColumns.join(', ')}`);
       }
 
-      // Transform data for database insertion
-      const prospectsData = excelData.map((row: any) => ({
-        program_id: selectedProgramme,
-        name: row.name,
-        email: row.email,
-        phone: row.phone || null,
-        org: row.org || null,
-        role: row.role || null,
-        payment_status: row.payment || null,
-        product_type: row.product_id ? translateProductId(row.product_id) : (row.product_type || null),
-        registration_status: 'Pending'
-      }));
+      // Group data by program and process each group
+      const programGroups: Record<string, any[]> = {};
+      
+      fileData.forEach((row: any) => {
+        let programTitle = row.product_type;
+        
+        // Translate product_id if present
+        if (row.product_id) {
+          programTitle = translateProductId(row.product_id);
+        }
+        
+        if (!programTitle) {
+          throw new Error('Program information missing in data');
+        }
+        
+        if (!programGroups[programTitle]) {
+          programGroups[programTitle] = [];
+        }
+        
+        programGroups[programTitle].push({
+          name: row.name,
+          email: row.email,
+          phone: row.phone || null,
+          org: row.org || null,
+          role: row.role || null,
+          payment_status: row.payment || null,
+          product_type: programTitle,
+          registration_status: 'Pending'
+        });
+      });
 
-      // Insert into database
-      const { error } = await supabase
-        .from('prospects')
-        .insert(prospectsData);
+      let totalInserted = 0;
+      
+      // Process each program group
+      for (const [programTitle, prospects] of Object.entries(programGroups)) {
+        // Get or create program
+        let programId;
+        const { data: existingProgram, error: fetchError } = await supabase
+          .from('programs')
+          .select('id')
+          .eq('title', programTitle)
+          .single();
 
-      if (error) throw error;
+        if (fetchError && fetchError.code !== 'PGRST116') {
+          throw fetchError;
+        }
+
+        if (existingProgram) {
+          programId = existingProgram.id;
+        } else {
+          // Create new program if it doesn't exist
+          const { data: newProgram, error: createError } = await supabase
+            .from('programs')
+            .insert([{ title: programTitle }])
+            .select('id')
+            .single();
+
+          if (createError) throw createError;
+          programId = newProgram.id;
+        }
+
+        // Add program_id to prospects
+        const prospectsWithProgramId = prospects.map(prospect => ({
+          ...prospect,
+          program_id: programId
+        }));
+
+        // Insert prospects
+        const { error: insertError } = await supabase
+          .from('prospects')
+          .insert(prospectsWithProgramId);
+
+        if (insertError) throw insertError;
+        
+        totalInserted += prospects.length;
+      }
       
       toast({
         title: "Success",
-        description: `Successfully uploaded ${prospectsData.length} prospects. Product IDs have been translated to program titles.`,
+        description: `Successfully uploaded ${totalInserted} prospects across ${Object.keys(programGroups).length} program(s). Product IDs have been translated to program titles.`,
       });
 
       // Reset form
-      setSelectedProgramme('');
       setSelectedFile(null);
       const fileInput = document.getElementById('file') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
@@ -170,89 +222,62 @@ const BulkUploadForm = () => {
     <Card>
       <CardHeader>
         <CardTitle>Bulk Upload Prospects</CardTitle>
-        <CardDescription>Upload an Excel file to add multiple prospects at once</CardDescription>
+        <CardDescription>Upload an Excel or CSV file to add multiple prospects at once</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleUpload} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form onSubmit={handleUpload} className="space-y-4">
           <div>
-            <Label htmlFor="programme">Programme</Label>
-            <select
-              id="programme"
-              value={selectedProgramme}
-              onChange={(e) => setSelectedProgramme(e.target.value)}
-              required
-              disabled={loading}
-              className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md disabled:opacity-50"
-            >
-              <option value="">
-                {loading ? 'Loading programs...' : 'Select a programme...'}
-              </option>
-              {programmes.map((programme) => (
-                <option key={programme.id} value={programme.id}>
-                  {programme.title}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <Label htmlFor="file">Excel File</Label>
+            <Label htmlFor="file">Excel or CSV File</Label>
             <Input
               id="file"
               type="file"
-              accept=".xls,.xlsx"
+              accept=".xls,.xlsx,.csv"
               onChange={handleFileChange}
               required
             />
           </div>
 
-          <div className="md:col-span-2">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <h4 className="font-medium text-blue-900 mb-2">File Format Instructions:</h4>
-              <p className="text-sm text-blue-700 mb-2">
-                The Excel file should have the following columns in the first row:
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-medium text-blue-900 mb-2">File Format Instructions:</h4>
+            <p className="text-sm text-blue-700 mb-2">
+              The file should have the following columns in the first row:
+            </p>
+            <ul className="text-sm text-blue-700 list-disc list-inside space-y-1">
+              <li>name</li>
+              <li>email</li>
+              <li>phone</li>
+              <li>org</li>
+              <li>role</li>
+              <li>payment</li>
+              <li>product_type (program name)</li>
+              <li>product_id (optional - will be automatically translated to program titles)</li>
+            </ul>
+            <div className="mt-3 p-3 bg-blue-100 rounded">
+              <p className="text-xs text-blue-800 font-medium">Auto Program Detection:</p>
+              <p className="text-xs text-blue-700">
+                Programs will be automatically detected from the product_type or product_id columns. 
+                No need to select a program manually - the system will create programs as needed.
               </p>
-              <ul className="text-sm text-blue-700 list-disc list-inside space-y-1">
-                <li>name</li>
-                <li>email</li>
-                <li>phone</li>
-                <li>org</li>
-                <li>role</li>
-                <li>payment</li>
-                <li>product_type</li>
-                <li>product_id (will be automatically translated to program titles)</li>
-              </ul>
-              <div className="mt-3 p-3 bg-blue-100 rounded">
-                <p className="text-xs text-blue-800 font-medium">Product ID Translation:</p>
-                <p className="text-xs text-blue-700">
-                  Product IDs like 'business-writing-ai', 'ai-ready-leader', etc. will be automatically 
-                  translated to their full program titles when added to the system.
-                </p>
-              </div>
             </div>
           </div>
 
           {selectedFile && (
-            <div className="md:col-span-2">
-              <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                <Upload className="w-4 h-4 text-gray-500" />
-                <span className="text-sm text-gray-700">{selectedFile.name}</span>
-                <span className="text-xs text-gray-500">
-                  ({(selectedFile.size / 1024).toFixed(1)} KB)
-                </span>
-              </div>
+            <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+              <Upload className="w-4 h-4 text-gray-500" />
+              <span className="text-sm text-gray-700">{selectedFile.name}</span>
+              <span className="text-xs text-gray-500">
+                ({(selectedFile.size / 1024).toFixed(1)} KB)
+              </span>
             </div>
           )}
 
-          <div className="md:col-span-2">
-            <Button 
-              type="submit" 
-              disabled={isUploading || !selectedProgramme || !selectedFile || loading}
-              className="w-full"
-            >
-              {isUploading ? 'Uploading...' : 'Upload Prospects'}
-            </Button>
-          </div>
+          <Button 
+            type="submit" 
+            disabled={isUploading || !selectedFile}
+            className="w-full"
+          >
+            {isUploading ? 'Uploading...' : 'Upload Prospects'}
+          </Button>
         </form>
       </CardContent>
     </Card>

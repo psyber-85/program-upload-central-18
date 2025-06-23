@@ -1,12 +1,13 @@
 
 import { useState, useEffect } from 'react';
-import { supabase } from '../supabase/client';
-import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
 
 const ProgramManager = ({ selectedProgram, setSelectedProgram }) => {
   const [programTitle, setProgramTitle] = useState('');
   const [programs, setPrograms] = useState([]);
   const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchPrograms();
@@ -15,14 +16,21 @@ const ProgramManager = ({ selectedProgram, setSelectedProgram }) => {
   const fetchPrograms = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.from('programs').select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase
+        .from('programs')
+        .select('*')
+        .order('created_at', { ascending: false });
       
       if (error) throw error;
       
       setPrograms(data || []);
     } catch (error) {
       console.error('Error fetching programs:', error);
-      toast.error('Failed to load programs');
+      toast({
+        title: "Error",
+        description: "Failed to load programs",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -32,7 +40,11 @@ const ProgramManager = ({ selectedProgram, setSelectedProgram }) => {
     e.preventDefault();
     
     if (!programTitle.trim()) {
-      toast.error('Program title cannot be empty');
+      toast({
+        title: "Error",
+        description: "Program title cannot be empty",
+        variant: "destructive",
+      });
       return;
     }
     
@@ -45,12 +57,19 @@ const ProgramManager = ({ selectedProgram, setSelectedProgram }) => {
       
       if (error) throw error;
       
-      toast.success('Program added successfully');
+      toast({
+        title: "Success",
+        description: "Program added successfully",
+      });
       setProgramTitle('');
       fetchPrograms();
     } catch (error) {
       console.error('Error adding program:', error);
-      toast.error('Failed to add program');
+      toast({
+        title: "Error", 
+        description: "Failed to add program",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }

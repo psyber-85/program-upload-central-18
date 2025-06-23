@@ -3,8 +3,8 @@ import { useState } from 'react';
 import ProgramManager from '../components/ProgramManager';
 import FileUploader from '../components/FileUploader';
 import DataTable from '../components/DataTable';
-import { supabase } from '../supabase/client';
-import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 
 const Index = () => {
@@ -12,6 +12,7 @@ const Index = () => {
   const [parsedData, setParsedData] = useState([]);
   const [fileNames, setFileNames] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   const handleDataParsed = (data, names) => {
     setParsedData(data);
@@ -26,41 +27,86 @@ const Index = () => {
 
   const handleSubmit = async () => {
     if (!selectedProgram) {
-      toast.error('Please select a program');
+      toast({
+        title: "Error",
+        description: "Please select a program",
+        variant: "destructive",
+      });
       return;
     }
 
     if (parsedData.length === 0) {
-      toast.error('Please upload and parse participant data');
+      toast({
+        title: "Error", 
+        description: "Please upload and parse participant data",
+        variant: "destructive",
+      });
       return;
     }
 
     try {
       setIsSubmitting(true);
-      toast.info(`Processing ${parsedData.length} participants from ${fileNames.split(', ').length} file(s)...`);
-      
-      // Prepare the payload in the required format
-      const payload = {
-        program: selectedProgram,
-        data: parsedData
-      };
-
-      // Call the Supabase function to process data and send emails
-      const { data, error } = await supabase.functions.invoke('process-participants', {
-        body: payload
+      toast({
+        title: "Processing",
+        description: `Processing ${parsedData.length} participants from ${fileNames.split(', ').length} file(s)...`,
       });
+      
+      // First, get or create the program
+      let programId;
+      const { data: existingProgram, error: fetchError } = await supabase
+        .from('programs')
+        .select('id')
+        .eq('title', selectedProgram)
+        .single();
 
-      if (error) throw error;
-
-      if (data.success) {
-        toast.success(`Successfully processed ${data.results.length} participants`);
-        handleReset();
-      } else {
-        throw new Error(data.message || 'Failed to process participants');
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        throw fetchError;
       }
-    } catch (error) {
+
+      if (existingProgram) {
+        programId = existingProgram.id;
+      } else {
+        // Create new program if it doesn't exist
+        const { data: newProgram, error: createError } = await supabase
+          .from('programs')
+          .insert([{ title: selectedProgram }])
+          .select('id')
+          .single();
+
+        if (createError) throw createError;
+        programId = newProgram.id;
+      }
+
+      // Transform and insert participant data
+      const participantsData = parsedData.map((row: any) => ({
+        program_id: programId,
+        program_name: selectedProgram,
+        name: row.name,
+        email: row.email,
+        nric_number: row.nric_number,
+        phone: row.phone || null,
+        key_skills: row.key_skills || null,
+        email_sent: false
+      }));
+
+      const { error: insertError } = await supabase
+        .from('participants')
+        .insert(participantsData);
+
+      if (insertError) throw insertError;
+
+      toast({
+        title: "Success",
+        description: `Successfully processed ${participantsData.length} participants`,
+      });
+      handleReset();
+    } catch (error: any) {
       console.error('Error submitting data:', error);
-      toast.error('Failed to submit data. Please try again.');
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit data. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }

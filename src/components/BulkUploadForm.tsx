@@ -26,6 +26,38 @@ const BulkUploadForm = () => {
     return PRODUCT_ID_TRANSLATIONS[productId] || productId;
   };
 
+  // Function to normalize payment status values
+  const normalizePaymentStatus = (paymentStatus: string): string | null => {
+    if (!paymentStatus || paymentStatus.trim() === '') return null;
+    
+    const normalized = paymentStatus.toLowerCase().trim();
+    
+    // Map common variations to our allowed values
+    switch (normalized) {
+      case 'paid':
+      case 'complete':
+      case 'completed':
+      case 'success':
+      case 'successful':
+        return 'paid';
+      case 'pending':
+      case 'processing':
+      case 'in progress':
+      case 'waiting':
+        return 'pending';
+      case 'failed':
+      case 'failure':
+      case 'unsuccessful':
+      case 'declined':
+      case 'rejected':
+        return 'failed';
+      default:
+        // If we can't map it, return null (which is allowed)
+        console.warn(`Unknown payment status: ${paymentStatus}, setting to null`);
+        return null;
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -144,7 +176,7 @@ const BulkUploadForm = () => {
           phone: row.phone || null,
           org: row.org || null,
           role: row.role || null,
-          payment_status: row.payment || null,
+          payment_status: normalizePaymentStatus(row.payment), // Apply normalization here
           product_type: programTitle,
           registration_status: 'Pending'
         });
@@ -198,7 +230,7 @@ const BulkUploadForm = () => {
       
       toast({
         title: "Success",
-        description: `Successfully uploaded ${totalInserted} prospects across ${Object.keys(programGroups).length} program(s). Product IDs have been translated to program titles.`,
+        description: `Successfully uploaded ${totalInserted} prospects across ${Object.keys(programGroups).length} program(s). Payment statuses have been normalized to match database requirements.`,
       });
 
       // Reset form
@@ -248,14 +280,15 @@ const BulkUploadForm = () => {
               <li>phone</li>
               <li>org</li>
               <li>role</li>
-              <li>payment</li>
+              <li>payment (accepts: paid/pending/failed and common variations)</li>
               <li>product_type (program name)</li>
               <li>product_id (optional - will be automatically translated to program titles)</li>
             </ul>
             <div className="mt-3 p-3 bg-blue-100 rounded">
-              <p className="text-xs text-blue-800 font-medium">Auto Program Detection:</p>
+              <p className="text-xs text-blue-800 font-medium">Auto Program Detection & Payment Status Normalization:</p>
               <p className="text-xs text-blue-700">
                 Programs will be automatically detected from the product_type or product_id columns. 
+                Payment statuses will be automatically normalized (e.g., "Paid" → "paid", "Processing" → "pending").
                 No need to select a program manually - the system will create programs as needed.
               </p>
             </div>

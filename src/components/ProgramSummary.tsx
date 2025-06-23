@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface ProgramStats {
@@ -18,6 +19,7 @@ interface ProgramStats {
 const ProgramSummary = () => {
   const [programStats, setProgramStats] = useState<ProgramStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchProgramStats();
@@ -25,51 +27,53 @@ const ProgramSummary = () => {
 
   const fetchProgramStats = async () => {
     try {
-      // For now, using mock data since we don't have participants table connected
-      // TODO: Replace with real Supabase query when participants table is ready
-      const mockStats: ProgramStats[] = [
-        {
-          programName: 'Business Writing with AI Masterclass',
-          pending: 12,
-          approved: 8,
-          rejected: 2,
-          postponed: 1,
-          onHold: 3,
-          total: 26
-        },
-        {
-          programName: 'ChatGPT Skill Boost Masterclass',
-          pending: 15,
-          approved: 10,
-          rejected: 1,
-          postponed: 2,
-          onHold: 1,
-          total: 29
-        },
-        {
-          programName: 'Digital Leadership Programme',
-          pending: 8,
-          approved: 12,
-          rejected: 0,
-          postponed: 0,
-          onHold: 2,
-          total: 22
-        },
-        {
-          programName: 'AI Tools for Productivity',
-          pending: 6,
-          approved: 4,
-          rejected: 1,
-          postponed: 0,
-          onHold: 1,
-          total: 12
-        }
-      ];
+      setLoading(true);
       
-      setProgramStats(mockStats);
-      setLoading(false);
+      // Fetch programs and prospects
+      const { data: programs, error: programsError } = await supabase
+        .from('programs')
+        .select('id, title')
+        .order('created_at', { ascending: false });
+
+      if (programsError) throw programsError;
+
+      const { data: prospects, error: prospectsError } = await supabase
+        .from('prospects')
+        .select('program_id, registration_status');
+
+      if (prospectsError) throw prospectsError;
+
+      // Calculate statistics
+      const stats = programs?.map(program => {
+        const programProspects = prospects?.filter(p => p.program_id === program.id) || [];
+        
+        const pending = programProspects.filter(p => p.registration_status === 'Pending').length;
+        const approved = programProspects.filter(p => p.registration_status === 'Approved').length;
+        const rejected = programProspects.filter(p => p.registration_status === 'Rejected').length;
+        const postponed = programProspects.filter(p => p.registration_status === 'Postponed').length;
+        const onHold = programProspects.filter(p => p.registration_status === 'On Hold').length;
+        const total = programProspects.length;
+
+        return {
+          programName: program.title,
+          pending,
+          approved,
+          rejected,
+          postponed,
+          onHold,
+          total
+        };
+      }).filter(stat => stat.total > 0) || []; // Only show programs with prospects
+
+      setProgramStats(stats);
     } catch (error) {
       console.error('Error fetching program stats:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load program statistics",
+        variant: "destructive",
+      });
+    } finally {
       setLoading(false);
     }
   };
@@ -105,6 +109,22 @@ const ProgramSummary = () => {
         <CardContent>
           <div className="h-64 flex items-center justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (programStats.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Program Summary</CardTitle>
+          <CardDescription>No prospect data available</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64 flex items-center justify-center text-gray-500">
+            <p>Add some prospects to see program statistics</p>
           </div>
         </CardContent>
       </Card>

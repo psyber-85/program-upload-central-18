@@ -9,6 +9,47 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      hr_contacts: {
+        Row: {
+          created_at: string
+          email: string
+          email_sent_at: string | null
+          id: string
+          name: string
+          phone: string | null
+          prospect_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          email_sent_at?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          prospect_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          email_sent_at?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          prospect_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_contacts_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       participants: {
         Row: {
           email: string
@@ -76,6 +117,91 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      prospect_calls: {
+        Row: {
+          call_date: string
+          created_at: string
+          id: string
+          notes: string | null
+          prospect_id: string
+        }
+        Insert: {
+          call_date?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          prospect_id: string
+        }
+        Update: {
+          call_date?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          prospect_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prospect_calls_prospect_id_fkey"
+            columns: ["prospect_id"]
+            isOneToOne: false
+            referencedRelation: "prospects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prospects: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+          org: string | null
+          payment_status: string | null
+          phone: string | null
+          product_type: string | null
+          program_id: string
+          registration_status: string | null
+          role: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          org?: string | null
+          payment_status?: string | null
+          phone?: string | null
+          product_type?: string | null
+          program_id: string
+          registration_status?: string | null
+          role?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          org?: string | null
+          payment_status?: string | null
+          phone?: string | null
+          product_type?: string | null
+          program_id?: string
+          registration_status?: string | null
+          role?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prospects_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

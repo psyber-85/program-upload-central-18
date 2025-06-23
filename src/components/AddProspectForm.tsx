@@ -15,14 +15,15 @@ interface Program {
 const AddProspectForm = () => {
   const [programmes, setProgrammes] = useState<Program[]>([]);
   const [formData, setFormData] = useState({
-    programmeId: '',
+    program_id: '',
     name: '',
     email: '',
     phone: '',
     org: '',
     role: '',
-    payment: '',
-    product_type: ''
+    payment_status: '',
+    product_type: '',
+    registration_status: 'Pending' as const
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -67,11 +68,21 @@ const AddProspectForm = () => {
     setIsSubmitting(true);
 
     try {
-      // TODO: Replace with actual Supabase insert when participants table is ready
-      console.log('Adding prospect:', formData);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { error } = await supabase
+        .from('prospects')
+        .insert([{
+          program_id: formData.program_id,
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone || null,
+          org: formData.org || null,
+          role: formData.role || null,
+          payment_status: formData.payment_status || null,
+          product_type: formData.product_type || null,
+          registration_status: formData.registration_status
+        }]);
+
+      if (error) throw error;
       
       toast({
         title: "Success",
@@ -80,14 +91,15 @@ const AddProspectForm = () => {
 
       // Clear form
       setFormData({
-        programmeId: '',
+        program_id: '',
         name: '',
         email: '',
         phone: '',
         org: '',
         role: '',
-        payment: '',
-        product_type: ''
+        payment_status: '',
+        product_type: '',
+        registration_status: 'Pending'
       });
     } catch (error) {
       toast({
@@ -110,11 +122,11 @@ const AddProspectForm = () => {
       <CardContent>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
-            <Label htmlFor="programmeId">Programme</Label>
+            <Label htmlFor="program_id">Programme</Label>
             <select
-              id="programmeId"
-              name="programmeId"
-              value={formData.programmeId}
+              id="program_id"
+              name="program_id"
+              value={formData.program_id}
               onChange={handleInputChange}
               required
               disabled={loading}
@@ -161,7 +173,6 @@ const AddProspectForm = () => {
               name="phone"
               value={formData.phone}
               onChange={handleInputChange}
-              required
             />
           </div>
 
@@ -172,7 +183,6 @@ const AddProspectForm = () => {
               name="org"
               value={formData.org}
               onChange={handleInputChange}
-              required
             />
           </div>
 
@@ -183,18 +193,16 @@ const AddProspectForm = () => {
               name="role"
               value={formData.role}
               onChange={handleInputChange}
-              required
             />
           </div>
 
           <div>
-            <Label htmlFor="payment">Payment Status</Label>
+            <Label htmlFor="payment_status">Payment Status</Label>
             <select
-              id="payment"
-              name="payment"
-              value={formData.payment}
+              id="payment_status"
+              name="payment_status"
+              value={formData.payment_status}
               onChange={handleInputChange}
-              required
               className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md"
             >
               <option value="">Select payment status...</option>
@@ -212,7 +220,6 @@ const AddProspectForm = () => {
               value={formData.product_type}
               onChange={handleInputChange}
               placeholder="e.g., masterclass, workshop"
-              required
             />
           </div>
 

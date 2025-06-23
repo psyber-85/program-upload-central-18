@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import * as XLSX from 'xlsx';
 
 interface Program {
   id: string;
@@ -79,6 +80,26 @@ const BulkUploadForm = () => {
     }
   };
 
+  const processExcelFile = async (file: File): Promise<any[]> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+          resolve(jsonData);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedProgramme || !selectedFile) return;
@@ -86,21 +107,45 @@ const BulkUploadForm = () => {
     setIsUploading(true);
 
     try {
-      const formData = new FormData();
-      formData.append('programmeId', selectedProgramme);
-      formData.append('file', selectedFile);
-
-      // TODO: Replace with actual Supabase file processing when participants table is ready
-      // For now, we'll simulate processing the file with product_id translation
-      console.log('Uploading file:', selectedFile.name, 'for programme:', selectedProgramme);
-      console.log('File will be processed with product_id translation using mapping:', PRODUCT_ID_TRANSLATIONS);
+      // Process Excel file
+      const excelData = await processExcelFile(selectedFile);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (excelData.length === 0) {
+        throw new Error('No data found in Excel file');
+      }
+
+      // Validate required columns
+      const requiredColumns = ['name', 'email', 'phone', 'org', 'role', 'payment', 'product_type'];
+      const firstRow = excelData[0] as any;
+      const missingColumns = requiredColumns.filter(col => !(col in firstRow));
+      
+      if (missingColumns.length > 0) {
+        throw new Error(`Missing required columns: ${missingColumns.join(', ')}`);
+      }
+
+      // Transform data for database insertion
+      const prospectsData = excelData.map((row: any) => ({
+        program_id: selectedProgramme,
+        name: row.name,
+        email: row.email,
+        phone: row.phone || null,
+        org: row.org || null,
+        role: row.role || null,
+        payment_status: row.payment || null,
+        product_type: row.product_id ? translateProductId(row.product_id) : (row.product_type || null),
+        registration_status: 'Pending'
+      }));
+
+      // Insert into database
+      const { error } = await supabase
+        .from('prospects')
+        .insert(prospectsData);
+
+      if (error) throw error;
       
       toast({
         title: "Success",
-        description: `Successfully uploaded ${selectedFile.name}. Prospects have been added with product_id translations applied.`,
+        description: `Successfully uploaded ${prospectsData.length} prospects. Product IDs have been translated to program titles.`,
       });
 
       // Reset form
@@ -109,10 +154,10 @@ const BulkUploadForm = () => {
       const fileInput = document.getElementById('file') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
       
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Upload failed",
-        description: "Failed to upload file. Please try again.",
+        description: error.message || "Failed to upload file. Please try again.",
         variant: "destructive",
       });
       console.error('Upload failed:', error);

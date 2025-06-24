@@ -159,6 +159,7 @@ export type Database = {
           org: string | null
           payment_status: string | null
           phone: string | null
+          product_id: string | null
           product_type: string | null
           program_id: string
           registration_status: string | null
@@ -174,6 +175,7 @@ export type Database = {
           org?: string | null
           payment_status?: string | null
           phone?: string | null
+          product_id?: string | null
           product_type?: string | null
           program_id: string
           registration_status?: string | null
@@ -189,6 +191,7 @@ export type Database = {
           org?: string | null
           payment_status?: string | null
           phone?: string | null
+          product_id?: string | null
           product_type?: string | null
           program_id?: string
           registration_status?: string | null

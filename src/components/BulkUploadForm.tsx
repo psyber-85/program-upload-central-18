@@ -6,49 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { Upload } from 'lucide-react';
-import { mockDataService } from '@/services/mockDataService';
+import { supabaseProspectService } from '@/services/supabaseProspectService';
 import * as XLSX from 'xlsx';
-
-// Product ID to Program Title translation mapping
-const PRODUCT_ID_TRANSLATIONS: Record<string, string> = {
-  'business-writing-ai': 'Business Writing with AI: 2-Day Masterclass',
-  'ai-ready-leader': 'The AI-Ready Leader: Win the Future with Strategic Action',
-  'chatgpt-skill-boost': 'ChatGPT Skill Boost (Intermediate)',
-  'ai-chatgpt-hr': 'AI and ChatGPT for HR Professionals - 2 Day Masterclass'
-};
 
 const BulkUploadForm = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
-
-  const translateProductId = (productId: string): string => {
-    return PRODUCT_ID_TRANSLATIONS[productId] || productId;
-  };
-
-  // Function to normalize payment values
-  const normalizePayment = (payment: string): string | null => {
-    if (!payment || payment.trim() === '') return null;
-    
-    const normalized = payment.toLowerCase().trim();
-    
-    // Map to HRDC or Individual
-    switch (normalized) {
-      case 'hrdc':
-      case 'hrdf':
-      case 'human resource development corporation':
-        return 'HRDC';
-      case 'individual':
-      case 'self':
-      case 'personal':
-      case 'private':
-        return 'Individual';
-      default:
-        // If we can't map it, return the original value
-        console.warn(`Unknown payment type: ${payment}, keeping original value`);
-        return payment;
-    }
-  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -80,7 +44,6 @@ const BulkUploadForm = () => {
       reader.onload = (e) => {
         try {
           if (file.name.endsWith('.csv')) {
-            // Process CSV file
             const text = e.target?.result as string;
             const lines = text.split('\n');
             const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
@@ -98,7 +61,6 @@ const BulkUploadForm = () => {
             }
             resolve(jsonData);
           } else {
-            // Process Excel file
             const data = new Uint8Array(e.target?.result as ArrayBuffer);
             const workbook = XLSX.read(data, { type: 'array' });
             const sheetName = workbook.SheetNames[0];
@@ -127,14 +89,12 @@ const BulkUploadForm = () => {
     setIsUploading(true);
 
     try {
-      // Process file
       const fileData = await processFile(selectedFile);
       
       if (fileData.length === 0) {
         throw new Error('No data found in file');
       }
 
-      // Validate required columns - updated to match new structure
       const requiredColumns = ['name', 'email', 'phone', 'org', 'role', 'payment', 'product_type'];
       const firstRow = fileData[0] as any;
       const missingColumns = requiredColumns.filter(col => !(col in firstRow));
@@ -143,27 +103,23 @@ const BulkUploadForm = () => {
         throw new Error(`Missing required columns: ${missingColumns.join(', ')}`);
       }
 
-      // Get available programs from mock data
-      const { data: programs } = await mockDataService.getPrograms();
+      const { data: programs } = await supabaseProspectService.getPrograms();
       const programsMap = programs?.reduce((acc, program) => {
         acc[program.title] = program.id;
         return acc;
       }, {} as Record<string, string>) || {};
 
-      // Process prospects - updated to handle new structure
       const prospects = fileData.map((row: any) => {
         let programTitle = row.product_type;
         
-        // Translate product_id if present
         if (row.product_id) {
-          programTitle = translateProductId(row.product_id);
+          programTitle = supabaseProspectService.translateProductId(row.product_id);
         }
         
         if (!programTitle) {
           throw new Error('Program information missing in data');
         }
 
-        // Get program ID, default to first available program if not found
         const programId = programsMap[programTitle] || Object.values(programsMap)[0];
         
         return {
@@ -173,14 +129,14 @@ const BulkUploadForm = () => {
           phone: row.phone || null,
           org: row.org || null,
           role: row.role || null,
-          payment_status: normalizePayment(row.payment),
+          payment_status: row.payment || null,
           product_type: programTitle,
+          product_id: row.product_id || null,
           registration_status: 'Pending' as const
         };
       });
 
-      // Upload using mock data service
-      const { error } = await mockDataService.bulkUploadProspects(prospects);
+      const { error } = await supabaseProspectService.bulkUploadProspects(prospects);
 
       if (error) throw error;
       
@@ -189,7 +145,6 @@ const BulkUploadForm = () => {
         description: `Successfully uploaded ${prospects.length} prospects. Payment types have been normalized to HRDC/Individual format.`,
       });
 
-      // Reset form
       setSelectedFile(null);
       const fileInput = document.getElementById('file') as HTMLInputElement;
       if (fileInput) fileInput.value = '';

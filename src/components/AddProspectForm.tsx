@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { mockDataService } from '@/services/mockDataService';
+import { supabaseProspectService } from '@/services/supabaseProspectService';
 
 interface Program {
   id: string;
@@ -21,7 +21,7 @@ const AddProspectForm = () => {
     phone: '',
     org: '',
     role: '',
-    payment: '', // Changed from payment_status to payment
+    payment: '',
     registration_status: 'Pending' as const
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,7 +34,7 @@ const AddProspectForm = () => {
 
   const fetchPrograms = async () => {
     try {
-      const { data, error } = await mockDataService.getPrograms();
+      const { data, error } = await supabaseProspectService.getPrograms();
 
       if (error) throw error;
       
@@ -64,18 +64,17 @@ const AddProspectForm = () => {
     setIsSubmitting(true);
 
     try {
-      // Get the selected program to use as product_type
       const selectedProgram = programmes.find(p => p.id === formData.program_id);
       
-      const { error } = await mockDataService.addProspect({
+      const { error } = await supabaseProspectService.addProspect({
         program_id: formData.program_id,
         name: formData.name,
         email: formData.email,
         phone: formData.phone || null,
         org: formData.org || null,
         role: formData.role || null,
-        payment_status: formData.payment || null, // Map payment to payment_status
-        product_type: selectedProgram?.title || null, // Use program title as product_type
+        payment_status: formData.payment || null,
+        product_type: selectedProgram?.title || null,
         registration_status: formData.registration_status
       });
 

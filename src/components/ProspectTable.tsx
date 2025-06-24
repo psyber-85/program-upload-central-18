@@ -11,7 +11,7 @@ import AddHRContactModal from './AddHRContactModal';
 import NotifyHRModal from './NotifyHRModal';
 import MockUpdateStatusModal from './MockUpdateStatusModal';
 import ViewCallNotesModal from './ViewCallNotesModal';
-import { mockDataService } from '@/services/mockDataService';
+import { supabaseProspectService } from '@/services/supabaseProspectService';
 
 interface HRContact {
   name: string;
@@ -29,6 +29,7 @@ interface Prospect {
   role: string | null;
   payment_status: string | null;
   product_type: string | null;
+  product_id: string | null;
   registration_status: 'Pending' | 'Approved' | 'Rejected' | 'Postponed' | 'On Hold';
   status_reason?: string | null;
   lastCall?: string;
@@ -36,7 +37,7 @@ interface Prospect {
   hasCallNotes?: boolean;
 }
 
-type SortField = 'name' | 'email' | 'org' | 'role' | 'program' | 'registration_status' | 'payment_status' | 'lastCall';
+type SortField = 'name' | 'email' | 'org' | 'role' | 'program' | 'registration_status' | 'payment_status' | 'product_id' | 'lastCall';
 type SortDirection = 'asc' | 'desc';
 
 const ProspectTable = () => {
@@ -59,16 +60,15 @@ const ProspectTable = () => {
   }, []);
 
   useEffect(() => {
-    // Filter and sort prospects
     let filtered = prospects.filter(prospect => 
       prospect.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       prospect.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       prospect.program.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (prospect.org && prospect.org.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (prospect.role && prospect.role.toLowerCase().includes(searchTerm.toLowerCase()))
+      (prospect.role && prospect.role.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (prospect.product_id && prospect.product_id.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
-    // Sort prospects
     filtered.sort((a, b) => {
       let aValue = a[sortField] || '';
       let bValue = b[sortField] || '';
@@ -86,15 +86,14 @@ const ProspectTable = () => {
     });
 
     setFilteredProspects(filtered);
-    setCurrentPage(1); // Reset to first page when filtering
+    setCurrentPage(1);
   }, [searchTerm, prospects, sortField, sortDirection]);
 
   const fetchProspects = async () => {
     try {
       setLoading(true);
       
-      // Fetch programs first - ensure we get actual program names
-      const { data: programsData, error: programsError } = await mockDataService.getPrograms();
+      const { data: programsData, error: programsError } = await supabaseProspectService.getPrograms();
       
       if (programsError) throw programsError;
       
@@ -105,8 +104,7 @@ const ProspectTable = () => {
       
       setPrograms(programsMap);
 
-      // Fetch prospects with related data including status_reason
-      const { data: prospectsData, error: prospectsError } = await mockDataService.getProspects();
+      const { data: prospectsData, error: prospectsError } = await supabaseProspectService.getProspects();
       
       if (prospectsError) throw prospectsError;
 
@@ -128,6 +126,7 @@ const ProspectTable = () => {
           role: prospect.role,
           payment_status: prospect.payment_status,
           product_type: prospect.product_type,
+          product_id: prospect.product_id,
           registration_status: prospect.registration_status as Prospect['registration_status'],
           status_reason: prospect.status_reason,
           lastCall: lastCall ? new Date(lastCall).toLocaleDateString() : undefined,
@@ -202,13 +201,11 @@ const ProspectTable = () => {
     fetchProspects();
   };
 
-  // Smart pagination calculations
   const totalPages = Math.ceil(filteredProspects.length / prospectsPerPage);
   const startIndex = (currentPage - 1) * prospectsPerPage;
   const endIndex = startIndex + prospectsPerPage;
   const currentProspects = filteredProspects.slice(startIndex, endIndex);
 
-  // Smart pagination page numbers
   const getVisiblePages = () => {
     const maxVisible = 5;
     const pages = [];
@@ -243,7 +240,6 @@ const ProspectTable = () => {
 
   return (
     <div className="bg-white rounded-lg shadow">
-      {/* Search Bar and Column Toggle */}
       <div className="p-4 border-b">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div className="relative max-w-md">
@@ -312,6 +308,11 @@ const ProspectTable = () => {
                       Job Role {getSortIcon('role')}
                     </div>
                   </TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort('product_id')}>
+                    <div className="flex items-center gap-1">
+                      Product ID {getSortIcon('product_id')}
+                    </div>
+                  </TableHead>
                   <TableHead className="cursor-pointer" onClick={() => handleSort('lastCall')}>
                     <div className="flex items-center gap-1">
                       Last Call {getSortIcon('lastCall')}
@@ -328,7 +329,7 @@ const ProspectTable = () => {
           <TableBody>
             {currentProspects.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={showSecondaryColumns ? 13 : 5} className="text-center py-6">
+                <TableCell colSpan={showSecondaryColumns ? 14 : 5} className="text-center py-6">
                   {searchTerm ? 'No prospects found matching your search.' : 'No prospects found. Add some prospects to get started.'}
                 </TableCell>
               </TableRow>
@@ -377,6 +378,11 @@ const ProspectTable = () => {
                       <TableCell className="max-w-xs">
                         <div className="truncate" title={prospect.role || ''}>
                           {prospect.role || '—'}
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-xs">
+                        <div className="truncate" title={prospect.product_id || ''}>
+                          {prospect.product_id || '—'}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -462,7 +468,6 @@ const ProspectTable = () => {
         </Table>
       </div>
 
-      {/* Smart Pagination */}
       {totalPages > 1 && (
         <div className="p-4 border-t">
           <Pagination>
@@ -501,7 +506,6 @@ const ProspectTable = () => {
         </div>
       )}
 
-      {/* Modals */}
       <MockLogCallModal
         isOpen={activeModal === 'call'}
         onClose={handleModalClose}

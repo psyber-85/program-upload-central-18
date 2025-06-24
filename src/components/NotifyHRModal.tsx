@@ -41,7 +41,7 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
         .from('prospects')
         .select(`
           *,
-          programs(title),
+          registration_programs(title),
           hr_contacts(*)
         `)
         .eq('id', prospectId)
@@ -56,7 +56,7 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
         setHrContact(hrContactData);
         
         // Set default email subject and body
-        const programTitle = prospect.programs?.title || 'Training Program';
+        const programTitle = prospect.registration_programs?.title || 'Training Program';
         setEmailSubject(`Training Registration Confirmation - ${prospect.name}`);
         setEmailBody(`Dear ${hrContactData.name},
 
@@ -108,7 +108,7 @@ Training Administration Team`);
           subject: emailSubject,
           message: emailBody,
           prospect_name: prospectData?.name,
-          program_title: prospectData?.programs?.title
+          program_title: prospectData?.registration_programs?.title
         }
       });
 

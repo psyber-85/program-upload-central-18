@@ -109,6 +109,8 @@ const BulkUploadForm = () => {
       'AI and ChatGPT for HR Professionals - 2 Day Masterclass'
     ];
 
+    console.log('Starting validation with file data:', fileData);
+
     // Check required columns
     const requiredColumns = ['name', 'email', 'phone', 'org', 'role', 'payment', 'product_type'];
     if (fileData.length === 0) {
@@ -117,11 +119,14 @@ const BulkUploadForm = () => {
     }
 
     const firstRow = fileData[0];
-    const availableColumns = Object.keys(firstRow).map(k => k.toLowerCase());
+    const availableColumns = Object.keys(firstRow).map(k => k.toLowerCase().trim());
+    console.log('Available columns:', availableColumns);
+    
     const missingColumns = requiredColumns.filter(col => !availableColumns.includes(col));
     
     if (missingColumns.length > 0) {
       errors.push(`Missing required columns: ${missingColumns.join(', ')}`);
+      console.log('Missing columns:', missingColumns);
       return { data: [], errors };
     }
 
@@ -130,40 +135,53 @@ const BulkUploadForm = () => {
       const rowNumber = index + 2; // +2 because Excel/CSV starts at 1 and we skip header
       const rowErrors: string[] = [];
 
+      console.log(`Validating row ${rowNumber}:`, row);
+
       // Validate required fields
       if (!row.name || !row.email) {
         rowErrors.push(`Row ${rowNumber}: Missing required name or email`);
       }
 
-      // Validate payment
-      const payment = row.payment?.toLowerCase().trim();
-      if (payment && !validPayments.includes(payment)) {
+      // Validate payment - only check if value exists
+      const paymentValue = row.payment ? row.payment.toString().toLowerCase().trim() : '';
+      console.log(`Row ${rowNumber} payment value: "${paymentValue}"`);
+      
+      if (paymentValue && !validPayments.includes(paymentValue)) {
         rowErrors.push(`Row ${rowNumber}: Invalid payment "${row.payment}". Must be "hrdc" or "individual"`);
       }
 
-      // Validate program title
-      let programTitle = row.product_type?.trim();
+      // Validate program title - check product_type field
+      let programTitle = row.product_type ? row.product_type.toString().trim() : '';
+      console.log(`Row ${rowNumber} program title: "${programTitle}"`);
+      
+      // If product_id exists, try to translate it
       if (row.product_id) {
-        programTitle = supabaseProspectService.translateProductId(row.product_id);
+        const translatedTitle = supabaseProspectService.translateProductId(row.product_id);
+        if (translatedTitle !== row.product_id) {
+          programTitle = translatedTitle;
+        }
       }
       
       if (!programTitle) {
-        rowErrors.push(`Row ${rowNumber}: Missing program information`);
+        rowErrors.push(`Row ${rowNumber}: Missing program information (product_type field required)`);
       } else if (!validPrograms.includes(programTitle)) {
         rowErrors.push(`Row ${rowNumber}: Invalid program "${programTitle}". Must be exact match from available programs`);
+        console.log(`Available programs:`, validPrograms);
       }
 
       if (rowErrors.length > 0) {
         errors.push(...rowErrors);
+        console.log(`Row ${rowNumber} validation errors:`, rowErrors);
       } else {
         validData.push({
           ...row,
-          payment: payment || null,
+          payment: paymentValue || null,
           product_type: programTitle
         });
       }
     });
 
+    console.log('Validation complete. Valid data count:', validData.length, 'Error count:', errors.length);
     return { data: validData, errors };
   };
 
@@ -176,7 +194,7 @@ const BulkUploadForm = () => {
     try {
       console.log('Starting file processing...');
       const fileData = await processFile(selectedFile);
-      console.log('File processed, validating data...', fileData);
+      console.log('File processed successfully. Data preview:', fileData.slice(0, 2));
       
       const { data: validData, errors } = validateAndNormalizeData(fileData);
       
@@ -185,6 +203,7 @@ const BulkUploadForm = () => {
         const errorMessage = errors.slice(0, maxErrorsToShow).join('\n');
         const additionalErrors = errors.length > maxErrorsToShow ? `\n... and ${errors.length - maxErrorsToShow} more errors` : '';
         
+        console.error('Validation errors:', errors);
         throw new Error(`Validation failed:\n${errorMessage}${additionalErrors}`);
       }
 
@@ -198,6 +217,8 @@ const BulkUploadForm = () => {
         acc[program.title] = program.id;
         return acc;
       }, {} as Record<string, string>) || {};
+
+      console.log('Programs map:', programsMap);
 
       const prospects = validData.map((row: any) => {
         const programId = programsMap[row.product_type];
@@ -220,7 +241,7 @@ const BulkUploadForm = () => {
         };
       });
 
-      console.log('Uploading prospects to database...', prospects);
+      console.log('Final prospects to upload:', prospects);
       const { error } = await supabaseProspectService.bulkUploadProspects(prospects);
 
       if (error) {
@@ -284,16 +305,16 @@ const BulkUploadForm = () => {
             </ul>
             
             <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
-              <p className="text-xs text-red-800 font-medium">⚠️ STRICT REQUIREMENTS:</p>
+              <p className="text-xs text-red-800 font-medium">⚠️ CRITICAL REQUIREMENTS:</p>
               <p className="text-xs text-red-700">
-                • Payment: ONLY "hrdc" or "individual" (any other value will fail)<br/>
-                • Program: Must use EXACT program titles (copy-paste recommended)<br/>
-                • Headers: Can be any case but must contain required column names
+                • Payment column: ONLY accepts "hrdc" or "individual"<br/>
+                • Program column (product_type): Must match exact program titles<br/>
+                • Check console logs for detailed validation errors
               </p>
             </div>
             
             <div className="mt-2 p-3 bg-blue-100 rounded">
-              <p className="text-xs text-blue-800 font-medium">Exact Program Titles (copy these):</p>
+              <p className="text-xs text-blue-800 font-medium">Exact Program Titles (copy these exactly):</p>
               <div className="text-xs text-blue-700 mt-1 space-y-1">
                 <div>• Business Writing with AI: 2-Day Masterclass</div>
                 <div>• The AI-Ready Leader: Win the Future with Strategic Action</div>

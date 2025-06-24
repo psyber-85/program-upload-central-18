@@ -73,7 +73,7 @@ const AddProspectForm = () => {
         phone: formData.phone || null,
         org: formData.org || null,
         role: formData.role || null,
-        payment_status: formData.payment || null,
+        payment: formData.payment || null,
         product_type: selectedProgram?.title || null,
         registration_status: formData.registration_status
       });

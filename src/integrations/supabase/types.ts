@@ -204,10 +204,34 @@ export type Database = {
             foreignKeyName: "prospects_program_id_fkey"
             columns: ["program_id"]
             isOneToOne: false
-            referencedRelation: "programs"
+            referencedRelation: "registration_programs"
             referencedColumns: ["id"]
           },
         ]
+      }
+      registration_programs: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {

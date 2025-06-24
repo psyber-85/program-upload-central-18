@@ -1,11 +1,10 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 
 type ProspectInsert = Database['public']['Tables']['prospects']['Insert'];
 type ProspectUpdate = Database['public']['Tables']['prospects']['Update'];
 type ProspectRow = Database['public']['Tables']['prospects']['Row'];
-type ProgramRow = Database['public']['Tables']['programs']['Row'];
+type RegistrationProgramRow = Database['public']['Tables']['registration_programs']['Row'];
 type HRContactInsert = Database['public']['Tables']['hr_contacts']['Insert'];
 type CallInsert = Database['public']['Tables']['prospect_calls']['Insert'];
 
@@ -39,10 +38,10 @@ const normalizePayment = (payment: string): string | null => {
 };
 
 export const supabaseProspectService = {
-  // Programs
+  // Registration Programs (separate from participant manager programs)
   async getPrograms() {
     const { data, error } = await supabase
-      .from('programs')
+      .from('registration_programs')
       .select('*')
       .order('title');
     
@@ -207,7 +206,7 @@ export const supabaseProspectService = {
   // Program summary data
   async getProgramSummary() {
     const { data: programs, error: programsError } = await supabase
-      .from('programs')
+      .from('registration_programs')
       .select('*');
     
     if (programsError) return { data: null, error: programsError };

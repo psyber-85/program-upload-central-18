@@ -120,7 +120,11 @@ const BulkUploadForm = () => {
           throw new Error('Program information missing in data');
         }
 
-        const programId = programsMap[programTitle] || Object.values(programsMap)[0];
+        const programId = programsMap[programTitle];
+        
+        if (!programId) {
+          throw new Error(`Program "${programTitle}" not found in registration programs`);
+        }
         
         return {
           program_id: programId,

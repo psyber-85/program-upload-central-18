@@ -157,9 +157,8 @@ export type Database = {
           id: string
           name: string
           org: string | null
-          payment: string | null
+          payment_status: string | null
           phone: string | null
-          product_id: string | null
           product_type: string | null
           program_id: string
           registration_status: string | null
@@ -173,9 +172,8 @@ export type Database = {
           id?: string
           name: string
           org?: string | null
-          payment?: string | null
+          payment_status?: string | null
           phone?: string | null
-          product_id?: string | null
           product_type?: string | null
           program_id: string
           registration_status?: string | null
@@ -189,9 +187,8 @@ export type Database = {
           id?: string
           name?: string
           org?: string | null
-          payment?: string | null
+          payment_status?: string | null
           phone?: string | null
-          product_id?: string | null
           product_type?: string | null
           program_id?: string
           registration_status?: string | null
@@ -204,34 +201,10 @@ export type Database = {
             foreignKeyName: "prospects_program_id_fkey"
             columns: ["program_id"]
             isOneToOne: false
-            referencedRelation: "registration_programs"
+            referencedRelation: "programs"
             referencedColumns: ["id"]
           },
         ]
-      }
-      registration_programs: {
-        Row: {
-          created_at: string
-          id: string
-          product_id: string | null
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          product_id?: string | null
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          product_id?: string | null
-          title?: string
-          updated_at?: string
-        }
-        Relationships: []
       }
     }
     Views: {

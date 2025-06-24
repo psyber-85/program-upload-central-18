@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -6,13 +5,13 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from '@/components/ui/pagination';
 import { Phone, Mail, User, Building, AlertCircle, Search, ChevronUp, ChevronDown, Eye, ChevronRight, ChevronLeft, Info } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import MockLogCallModal from './MockLogCallModal';
+import LogCallModal from './LogCallModal';
 import AddHRContactModal from './AddHRContactModal';
 import NotifyHRModal from './NotifyHRModal';
-import MockUpdateStatusModal from './MockUpdateStatusModal';
+import UpdateStatusModal from './UpdateStatusModal';
 import ViewCallNotesModal from './ViewCallNotesModal';
-import { supabaseProspectService } from '@/services/supabaseProspectService';
 
 interface HRContact {
   name: string;
@@ -28,9 +27,8 @@ interface Prospect {
   phone: string | null;
   org: string | null;
   role: string | null;
-  payment: string | null;
+  payment_status: string | null;
   product_type: string | null;
-  product_id: string | null;
   registration_status: 'Pending' | 'Approved' | 'Rejected' | 'Postponed' | 'On Hold';
   status_reason?: string | null;
   lastCall?: string;
@@ -38,7 +36,7 @@ interface Prospect {
   hasCallNotes?: boolean;
 }
 
-type SortField = 'name' | 'email' | 'org' | 'role' | 'program' | 'registration_status' | 'payment' | 'product_id' | 'lastCall';
+type SortField = 'name' | 'email' | 'org' | 'role' | 'program' | 'registration_status' | 'payment_status' | 'lastCall';
 type SortDirection = 'asc' | 'desc';
 
 const ProspectTable = () => {
@@ -58,18 +56,76 @@ const ProspectTable = () => {
 
   useEffect(() => {
     fetchProspects();
+    
+    // Set up real-time subscription for prospects
+    const prospectsChannel = supabase
+      .channel('prospects-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'prospects'
+        },
+        () => {
+          console.log('Prospect data changed, refreshing...');
+          fetchProspects();
+        }
+      )
+      .subscribe();
+
+    // Set up real-time subscription for HR contacts
+    const hrChannel = supabase
+      .channel('hr-contacts-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'hr_contacts'
+        },
+        () => {
+          console.log('HR contact data changed, refreshing...');
+          fetchProspects();
+        }
+      )
+      .subscribe();
+
+    // Set up real-time subscription for calls
+    const callsChannel = supabase
+      .channel('calls-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'prospect_calls'
+        },
+        () => {
+          console.log('Call data changed, refreshing...');
+          fetchProspects();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(prospectsChannel);
+      supabase.removeChannel(hrChannel);
+      supabase.removeChannel(callsChannel);
+    };
   }, []);
 
   useEffect(() => {
+    // Filter and sort prospects
     let filtered = prospects.filter(prospect => 
       prospect.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       prospect.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       prospect.program.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (prospect.org && prospect.org.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (prospect.role && prospect.role.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (prospect.product_id && prospect.product_id.toLowerCase().includes(searchTerm.toLowerCase()))
+      (prospect.role && prospect.role.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
+    // Sort prospects
     filtered.sort((a, b) => {
       let aValue = a[sortField] || '';
       let bValue = b[sortField] || '';
@@ -87,14 +143,18 @@ const ProspectTable = () => {
     });
 
     setFilteredProspects(filtered);
-    setCurrentPage(1);
+    setCurrentPage(1); // Reset to first page when filtering
   }, [searchTerm, prospects, sortField, sortDirection]);
 
   const fetchProspects = async () => {
     try {
       setLoading(true);
       
-      const { data: programsData, error: programsError } = await supabaseProspectService.getPrograms();
+      // Fetch programs first - ensure we get actual program names
+      const { data: programsData, error: programsError } = await supabase
+        .from('programs')
+        .select('id, title')
+        .order('title');
       
       if (programsError) throw programsError;
       
@@ -105,8 +165,16 @@ const ProspectTable = () => {
       
       setPrograms(programsMap);
 
-      const { data: prospectsData, error: prospectsError } = await supabaseProspectService.getProspects();
-      
+      // Fetch prospects with related data including status_reason
+      const { data: prospectsData, error: prospectsError } = await supabase
+        .from('prospects')
+        .select(`
+          *,
+          prospect_calls(call_date, notes),
+          hr_contacts(name, email, email_sent_at)
+        `)
+        .order('created_at', { ascending: false });
+
       if (prospectsError) throw prospectsError;
 
       const formattedProspects: Prospect[] = prospectsData?.map(prospect => {
@@ -125,9 +193,8 @@ const ProspectTable = () => {
           phone: prospect.phone,
           org: prospect.org,
           role: prospect.role,
-          payment: prospect.payment,
+          payment_status: prospect.payment_status,
           product_type: prospect.product_type,
-          product_id: prospect.product_id,
           registration_status: prospect.registration_status as Prospect['registration_status'],
           status_reason: prospect.status_reason,
           lastCall: lastCall ? new Date(lastCall).toLocaleDateString() : undefined,
@@ -202,11 +269,13 @@ const ProspectTable = () => {
     fetchProspects();
   };
 
+  // Smart pagination calculations
   const totalPages = Math.ceil(filteredProspects.length / prospectsPerPage);
   const startIndex = (currentPage - 1) * prospectsPerPage;
   const endIndex = startIndex + prospectsPerPage;
   const currentProspects = filteredProspects.slice(startIndex, endIndex);
 
+  // Smart pagination page numbers
   const getVisiblePages = () => {
     const maxVisible = 5;
     const pages = [];
@@ -241,6 +310,7 @@ const ProspectTable = () => {
 
   return (
     <div className="bg-white rounded-lg shadow">
+      {/* Search Bar and Column Toggle */}
       <div className="p-4 border-b">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div className="relative max-w-md">
@@ -286,9 +356,9 @@ const ProspectTable = () => {
                   Status {getSortIcon('registration_status')}
                 </div>
               </TableHead>
-              <TableHead className="cursor-pointer" onClick={() => handleSort('payment')}>
+              <TableHead className="cursor-pointer" onClick={() => handleSort('payment_status')}>
                 <div className="flex items-center gap-1">
-                  Payment {getSortIcon('payment')}
+                  Payment {getSortIcon('payment_status')}
                 </div>
               </TableHead>
               {showSecondaryColumns && (
@@ -309,11 +379,6 @@ const ProspectTable = () => {
                       Job Role {getSortIcon('role')}
                     </div>
                   </TableHead>
-                  <TableHead className="cursor-pointer" onClick={() => handleSort('product_id')}>
-                    <div className="flex items-center gap-1">
-                      Product ID {getSortIcon('product_id')}
-                    </div>
-                  </TableHead>
                   <TableHead className="cursor-pointer" onClick={() => handleSort('lastCall')}>
                     <div className="flex items-center gap-1">
                       Last Call {getSortIcon('lastCall')}
@@ -330,7 +395,7 @@ const ProspectTable = () => {
           <TableBody>
             {currentProspects.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={showSecondaryColumns ? 14 : 5} className="text-center py-6">
+                <TableCell colSpan={showSecondaryColumns ? 13 : 5} className="text-center py-6">
                   {searchTerm ? 'No prospects found matching your search.' : 'No prospects found. Add some prospects to get started.'}
                 </TableCell>
               </TableRow>
@@ -359,8 +424,8 @@ const ProspectTable = () => {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={getPaymentBadgeVariant(prospect.payment)}>
-                      {prospect.payment || 'Not Set'}
+                    <Badge variant={getPaymentBadgeVariant(prospect.payment_status)}>
+                      {prospect.payment_status || 'Not Set'}
                     </Badge>
                   </TableCell>
                   {showSecondaryColumns && (
@@ -379,11 +444,6 @@ const ProspectTable = () => {
                       <TableCell className="max-w-xs">
                         <div className="truncate" title={prospect.role || ''}>
                           {prospect.role || '—'}
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-xs">
-                        <div className="truncate" title={prospect.product_id || ''}>
-                          {prospect.product_id || '—'}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -469,6 +529,7 @@ const ProspectTable = () => {
         </Table>
       </div>
 
+      {/* Smart Pagination */}
       {totalPages > 1 && (
         <div className="p-4 border-t">
           <Pagination>
@@ -507,7 +568,8 @@ const ProspectTable = () => {
         </div>
       )}
 
-      <MockLogCallModal
+      {/* Modals */}
+      <LogCallModal
         isOpen={activeModal === 'call'}
         onClose={handleModalClose}
         prospectId={selectedProspect || ''}
@@ -525,7 +587,7 @@ const ProspectTable = () => {
         prospectId={selectedProspect || ''}
         onComplete={refreshProspects}
       />
-      <MockUpdateStatusModal
+      <UpdateStatusModal
         isOpen={activeModal === 'status'}
         onClose={handleModalClose}
         prospectId={selectedProspect || ''}

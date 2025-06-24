@@ -6,13 +6,57 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { Upload } from 'lucide-react';
-import { supabaseProspectService } from '@/services/supabaseProspectService';
+import { supabase } from '@/integrations/supabase/client';
 import * as XLSX from 'xlsx';
+
+// Product ID to Program Title translation mapping
+const PRODUCT_ID_TRANSLATIONS: Record<string, string> = {
+  'business-writing-ai': 'Business Writing with AI: 2-Day Masterclass',
+  'ai-ready-leader': 'The AI-Ready Leader: Win the Future with Strategic Action',
+  'chatgpt-skill-boost': 'ChatGPT Skill Boost (Intermediate)',
+  'ai-chatgpt-hr': 'AI and ChatGPT for HR Professionals - 2 Day Masterclass'
+};
 
 const BulkUploadForm = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
+
+  const translateProductId = (productId: string): string => {
+    return PRODUCT_ID_TRANSLATIONS[productId] || productId;
+  };
+
+  // Function to normalize payment status values
+  const normalizePaymentStatus = (paymentStatus: string): string | null => {
+    if (!paymentStatus || paymentStatus.trim() === '') return null;
+    
+    const normalized = paymentStatus.toLowerCase().trim();
+    
+    // Map common variations to our allowed values
+    switch (normalized) {
+      case 'paid':
+      case 'complete':
+      case 'completed':
+      case 'success':
+      case 'successful':
+        return 'paid';
+      case 'pending':
+      case 'processing':
+      case 'in progress':
+      case 'waiting':
+        return 'pending';
+      case 'failed':
+      case 'failure':
+      case 'unsuccessful':
+      case 'declined':
+      case 'rejected':
+        return 'failed';
+      default:
+        // If we can't map it, return null (which is allowed)
+        console.warn(`Unknown payment status: ${paymentStatus}, setting to null`);
+        return null;
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -44,14 +88,10 @@ const BulkUploadForm = () => {
       reader.onload = (e) => {
         try {
           if (file.name.endsWith('.csv')) {
+            // Process CSV file
             const text = e.target?.result as string;
-            const lines = text.split('\n').filter(line => line.trim());
-            if (lines.length === 0) {
-              reject(new Error('CSV file is empty'));
-              return;
-            }
-            
-            const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, '').toLowerCase());
+            const lines = text.split('\n');
+            const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
             const jsonData = [];
             
             for (let i = 1; i < lines.length; i++) {
@@ -66,26 +106,16 @@ const BulkUploadForm = () => {
             }
             resolve(jsonData);
           } else {
+            // Process Excel file
             const data = new Uint8Array(e.target?.result as ArrayBuffer);
             const workbook = XLSX.read(data, { type: 'array' });
             const sheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
-            
-            // Normalize headers to lowercase for consistency
-            const normalizedData = jsonData.map((row: any) => {
-              const normalizedRow: any = {};
-              Object.keys(row).forEach(key => {
-                normalizedRow[key.toLowerCase().trim()] = row[key];
-              });
-              return normalizedRow;
-            });
-            
-            resolve(normalizedData);
+            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+            resolve(jsonData);
           }
         } catch (error) {
-          console.error('Error processing file:', error);
-          reject(new Error(`Failed to process file: ${error instanceof Error ? error.message : 'Unknown error'}`));
+          reject(error);
         }
       };
       reader.onerror = () => reject(new Error('Failed to read file'));
@@ -98,93 +128,6 @@ const BulkUploadForm = () => {
     });
   };
 
-  const validateAndNormalizeData = (fileData: any[]): { data: any[], errors: string[] } => {
-    const errors: string[] = [];
-    const validData: any[] = [];
-    const validPayments = ['hrdc', 'individual'];
-    const validPrograms = [
-      'Business Writing with AI: 2-Day Masterclass',
-      'The AI-Ready Leader: Win the Future with Strategic Action', 
-      'ChatGPT Skill Boost (Intermediate)',
-      'AI and ChatGPT for HR Professionals - 2 Day Masterclass'
-    ];
-
-    console.log('Starting validation with file data:', fileData);
-
-    // Check required columns
-    const requiredColumns = ['name', 'email', 'phone', 'org', 'role', 'payment', 'product_type'];
-    if (fileData.length === 0) {
-      errors.push('File contains no data rows');
-      return { data: [], errors };
-    }
-
-    const firstRow = fileData[0];
-    const availableColumns = Object.keys(firstRow).map(k => k.toLowerCase().trim());
-    console.log('Available columns:', availableColumns);
-    
-    const missingColumns = requiredColumns.filter(col => !availableColumns.includes(col));
-    
-    if (missingColumns.length > 0) {
-      errors.push(`Missing required columns: ${missingColumns.join(', ')}`);
-      console.log('Missing columns:', missingColumns);
-      return { data: [], errors };
-    }
-
-    // Validate each row
-    fileData.forEach((row, index) => {
-      const rowNumber = index + 2; // +2 because Excel/CSV starts at 1 and we skip header
-      const rowErrors: string[] = [];
-
-      console.log(`Validating row ${rowNumber}:`, row);
-
-      // Validate required fields
-      if (!row.name || !row.email) {
-        rowErrors.push(`Row ${rowNumber}: Missing required name or email`);
-      }
-
-      // Validate payment - only check if value exists
-      const paymentValue = row.payment ? row.payment.toString().toLowerCase().trim() : '';
-      console.log(`Row ${rowNumber} payment value: "${paymentValue}"`);
-      
-      if (paymentValue && !validPayments.includes(paymentValue)) {
-        rowErrors.push(`Row ${rowNumber}: Invalid payment "${row.payment}". Must be "hrdc" or "individual"`);
-      }
-
-      // Validate program title - check product_type field
-      let programTitle = row.product_type ? row.product_type.toString().trim() : '';
-      console.log(`Row ${rowNumber} program title: "${programTitle}"`);
-      
-      // If product_id exists, try to translate it
-      if (row.product_id) {
-        const translatedTitle = supabaseProspectService.translateProductId(row.product_id);
-        if (translatedTitle !== row.product_id) {
-          programTitle = translatedTitle;
-        }
-      }
-      
-      if (!programTitle) {
-        rowErrors.push(`Row ${rowNumber}: Missing program information (product_type field required)`);
-      } else if (!validPrograms.includes(programTitle)) {
-        rowErrors.push(`Row ${rowNumber}: Invalid program "${programTitle}". Must be exact match from available programs`);
-        console.log(`Available programs:`, validPrograms);
-      }
-
-      if (rowErrors.length > 0) {
-        errors.push(...rowErrors);
-        console.log(`Row ${rowNumber} validation errors:`, rowErrors);
-      } else {
-        validData.push({
-          ...row,
-          payment: paymentValue || null,
-          product_type: programTitle
-        });
-      }
-    });
-
-    console.log('Validation complete. Valid data count:', validData.length, 'Error count:', errors.length);
-    return { data: validData, errors };
-  };
-
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFile) return;
@@ -192,79 +135,116 @@ const BulkUploadForm = () => {
     setIsUploading(true);
 
     try {
-      console.log('Starting file processing...');
+      // Process file
       const fileData = await processFile(selectedFile);
-      console.log('File processed successfully. Data preview:', fileData.slice(0, 2));
       
-      const { data: validData, errors } = validateAndNormalizeData(fileData);
-      
-      if (errors.length > 0) {
-        const maxErrorsToShow = 10;
-        const errorMessage = errors.slice(0, maxErrorsToShow).join('\n');
-        const additionalErrors = errors.length > maxErrorsToShow ? `\n... and ${errors.length - maxErrorsToShow} more errors` : '';
-        
-        console.error('Validation errors:', errors);
-        throw new Error(`Validation failed:\n${errorMessage}${additionalErrors}`);
+      if (fileData.length === 0) {
+        throw new Error('No data found in file');
       }
 
-      if (validData.length === 0) {
-        throw new Error('No valid data found after processing');
+      // Validate required columns
+      const requiredColumns = ['name', 'email', 'phone', 'org', 'role', 'payment', 'product_type'];
+      const firstRow = fileData[0] as any;
+      const missingColumns = requiredColumns.filter(col => !(col in firstRow));
+      
+      if (missingColumns.length > 0) {
+        throw new Error(`Missing required columns: ${missingColumns.join(', ')}`);
       }
 
-      console.log('Getting programs for mapping...');
-      const { data: programs } = await supabaseProspectService.getPrograms();
-      const programsMap = programs?.reduce((acc, program) => {
-        acc[program.title] = program.id;
-        return acc;
-      }, {} as Record<string, string>) || {};
-
-      console.log('Programs map:', programsMap);
-
-      const prospects = validData.map((row: any) => {
-        const programId = programsMap[row.product_type];
+      // Group data by program and process each group
+      const programGroups: Record<string, any[]> = {};
+      
+      fileData.forEach((row: any) => {
+        let programTitle = row.product_type;
         
-        if (!programId) {
-          throw new Error(`Program "${row.product_type}" not found in registration programs`);
+        // Translate product_id if present
+        if (row.product_id) {
+          programTitle = translateProductId(row.product_id);
         }
         
-        return {
-          program_id: programId,
+        if (!programTitle) {
+          throw new Error('Program information missing in data');
+        }
+        
+        if (!programGroups[programTitle]) {
+          programGroups[programTitle] = [];
+        }
+        
+        programGroups[programTitle].push({
           name: row.name,
           email: row.email,
           phone: row.phone || null,
           org: row.org || null,
           role: row.role || null,
-          payment: row.payment || null,
-          product_type: row.product_type,
-          product_id: row.product_id || null,
-          registration_status: 'Pending' as const
-        };
+          payment_status: normalizePaymentStatus(row.payment), // Apply normalization here
+          product_type: programTitle,
+          registration_status: 'Pending'
+        });
       });
 
-      console.log('Final prospects to upload:', prospects);
-      const { error } = await supabaseProspectService.bulkUploadProspects(prospects);
+      let totalInserted = 0;
+      
+      // Process each program group
+      for (const [programTitle, prospects] of Object.entries(programGroups)) {
+        // Get or create program
+        let programId;
+        const { data: existingProgram, error: fetchError } = await supabase
+          .from('programs')
+          .select('id')
+          .eq('title', programTitle)
+          .single();
 
-      if (error) {
-        console.error('Database error:', error);
-        throw new Error(`Database error: ${error.message}`);
+        if (fetchError && fetchError.code !== 'PGRST116') {
+          throw fetchError;
+        }
+
+        if (existingProgram) {
+          programId = existingProgram.id;
+        } else {
+          // Create new program if it doesn't exist
+          const { data: newProgram, error: createError } = await supabase
+            .from('programs')
+            .insert([{ title: programTitle }])
+            .select('id')
+            .single();
+
+          if (createError) throw createError;
+          programId = newProgram.id;
+        }
+
+        // Add program_id to prospects
+        const prospectsWithProgramId = prospects.map(prospect => ({
+          ...prospect,
+          program_id: programId
+        }));
+
+        // Insert prospects
+        const { error: insertError } = await supabase
+          .from('prospects')
+          .insert(prospectsWithProgramId);
+
+        if (insertError) throw insertError;
+        
+        totalInserted += prospects.length;
       }
       
       toast({
         title: "Success",
-        description: `Successfully uploaded ${prospects.length} prospects.`,
+        description: `Successfully uploaded ${totalInserted} prospects across ${Object.keys(programGroups).length} program(s). Payment statuses have been normalized to match database requirements.`,
       });
 
+      // Reset form
       setSelectedFile(null);
       const fileInput = document.getElementById('file') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
       
     } catch (error: any) {
-      console.error('Upload failed:', error);
       toast({
         title: "Upload failed",
-        description: error.message || "Failed to upload file. Please check the file format and data.",
+        description: error.message || "Failed to upload file. Please try again.",
         variant: "destructive",
       });
+      console.error('Upload failed:', error);
     } finally {
       setIsUploading(false);
     }
@@ -290,37 +270,27 @@ const BulkUploadForm = () => {
           </div>
 
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-medium text-blue-900 mb-2">File Format Requirements:</h4>
+            <h4 className="font-medium text-blue-900 mb-2">File Format Instructions:</h4>
             <p className="text-sm text-blue-700 mb-2">
-              Required columns (case-insensitive headers):
+              The file should have the following columns in the first row:
             </p>
             <ul className="text-sm text-blue-700 list-disc list-inside space-y-1">
-              <li><strong>name</strong> - Full name (required)</li>
-              <li><strong>email</strong> - Email address (required)</li>
-              <li><strong>phone</strong> - Phone number</li>
-              <li><strong>org</strong> - Organization</li>
-              <li><strong>role</strong> - Job role</li>
-              <li><strong>payment</strong> - ONLY "hrdc" or "individual" (case-insensitive)</li>
-              <li><strong>product_type</strong> - EXACT program name (see below)</li>
+              <li>name</li>
+              <li>email</li>
+              <li>phone</li>
+              <li>org</li>
+              <li>role</li>
+              <li>payment (accepts: paid/pending/failed and common variations)</li>
+              <li>product_type (program name)</li>
+              <li>product_id (optional - will be automatically translated to program titles)</li>
             </ul>
-            
-            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
-              <p className="text-xs text-red-800 font-medium">⚠️ CRITICAL REQUIREMENTS:</p>
-              <p className="text-xs text-red-700">
-                • Payment column: ONLY accepts "hrdc" or "individual"<br/>
-                • Program column (product_type): Must match exact program titles<br/>
-                • Check console logs for detailed validation errors
+            <div className="mt-3 p-3 bg-blue-100 rounded">
+              <p className="text-xs text-blue-800 font-medium">Auto Program Detection & Payment Status Normalization:</p>
+              <p className="text-xs text-blue-700">
+                Programs will be automatically detected from the product_type or product_id columns. 
+                Payment statuses will be automatically normalized (e.g., "Paid" → "paid", "Processing" → "pending").
+                No need to select a program manually - the system will create programs as needed.
               </p>
-            </div>
-            
-            <div className="mt-2 p-3 bg-blue-100 rounded">
-              <p className="text-xs text-blue-800 font-medium">Exact Program Titles (copy these exactly):</p>
-              <div className="text-xs text-blue-700 mt-1 space-y-1">
-                <div>• Business Writing with AI: 2-Day Masterclass</div>
-                <div>• The AI-Ready Leader: Win the Future with Strategic Action</div>
-                <div>• ChatGPT Skill Boost (Intermediate)</div>
-                <div>• AI and ChatGPT for HR Professionals - 2 Day Masterclass</div>
-              </div>
             </div>
           </div>
 
@@ -339,7 +309,7 @@ const BulkUploadForm = () => {
             disabled={isUploading || !selectedFile}
             className="w-full"
           >
-            {isUploading ? 'Processing and Uploading...' : 'Upload Prospects'}
+            {isUploading ? 'Uploading...' : 'Upload Prospects'}
           </Button>
         </form>
       </CardContent>

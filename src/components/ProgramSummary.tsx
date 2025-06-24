@@ -2,94 +2,150 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, UserCheck, Clock, XCircle, Pause, AlertCircle } from 'lucide-react';
-import { supabaseProspectService } from '@/services/supabaseProspectService';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-interface ProgramSummaryData {
-  program_title: string;
-  total_prospects: number;
-  approved: number;
+interface ProgramStats {
+  programName: string;
   pending: number;
+  approved: number;
   rejected: number;
   postponed: number;
-  on_hold: number;
+  onHold: number;
+  total: number;
 }
 
 const ProgramSummary = () => {
-  const [summaryData, setSummaryData] = useState<ProgramSummaryData[]>([]);
+  const [programStats, setProgramStats] = useState<ProgramStats[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
-    fetchSummaryData();
+    fetchProgramStats();
+    
+    // Set up real-time subscription for prospects table changes
+    const prospectsChannel = supabase
+      .channel('program-stats-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'prospects'
+        },
+        () => {
+          console.log('Prospect data changed, refreshing stats...');
+          fetchProgramStats();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(prospectsChannel);
+    };
   }, []);
 
-  const fetchSummaryData = async () => {
+  const fetchProgramStats = async () => {
     try {
       setLoading(true);
-      setError(null);
       
-      const { data, error } = await supabaseProspectService.getProgramSummary();
-      
-      if (error) throw error;
-      
-      setSummaryData(data || []);
-    } catch (err: any) {
-      console.error('Error fetching program summary:', err);
-      setError('Failed to load program summary');
+      // Fetch programs and prospects
+      const { data: programs, error: programsError } = await supabase
+        .from('programs')
+        .select('id, title')
+        .order('created_at', { ascending: false });
+
+      if (programsError) throw programsError;
+
+      const { data: prospects, error: prospectsError } = await supabase
+        .from('prospects')
+        .select('program_id, registration_status');
+
+      if (prospectsError) throw prospectsError;
+
+      // Calculate statistics
+      const stats = programs?.map(program => {
+        const programProspects = prospects?.filter(p => p.program_id === program.id) || [];
+        
+        const pending = programProspects.filter(p => p.registration_status === 'Pending').length;
+        const approved = programProspects.filter(p => p.registration_status === 'Approved').length;
+        const rejected = programProspects.filter(p => p.registration_status === 'Rejected').length;
+        const postponed = programProspects.filter(p => p.registration_status === 'Postponed').length;
+        const onHold = programProspects.filter(p => p.registration_status === 'On Hold').length;
+        const total = programProspects.length;
+
+        return {
+          programName: program.title,
+          pending,
+          approved,
+          rejected,
+          postponed,
+          onHold,
+          total
+        };
+      }).filter(stat => stat.total > 0) || []; // Only show programs with prospects
+
+      setProgramStats(stats);
+    } catch (error) {
+      console.error('Error fetching program stats:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load program statistics",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const getTotalProspects = () => {
-    return summaryData.reduce((total, program) => total + program.total_prospects, 0);
-  };
+  const chartData = programStats.map(stat => ({
+    name: stat.programName.length > 20 ? 
+      stat.programName.substring(0, 20) + '...' : 
+      stat.programName,
+    fullName: stat.programName,
+    pending: stat.pending,
+    approved: stat.approved,
+    rejected: stat.rejected,
+    postponed: stat.postponed,
+    onHold: stat.onHold
+  }));
 
-  const getTotalApproved = () => {
-    return summaryData.reduce((total, program) => total + program.approved, 0);
-  };
-
-  const getTotalPending = () => {
-    return summaryData.reduce((total, program) => total + program.pending, 0);
-  };
-
-  const getTotalRejected = () => {
-    return summaryData.reduce((total, program) => total + program.rejected, 0);
-  };
-
-  const getTotalPostponed = () => {
-    return summaryData.reduce((total, program) => total + program.postponed, 0);
-  };
-
-  const getTotalOnHold = () => {
-    return summaryData.reduce((total, program) => total + program.on_hold, 0);
-  };
+  const totalStats = programStats.reduce((acc, stat) => ({
+    pending: acc.pending + stat.pending,
+    approved: acc.approved + stat.approved,
+    rejected: acc.rejected + stat.rejected,
+    postponed: acc.postponed + stat.postponed,
+    onHold: acc.onHold + stat.onHold,
+    total: acc.total + stat.total
+  }), { pending: 0, approved: 0, rejected: 0, postponed: 0, onHold: 0, total: 0 });
 
   if (loading) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
-          <Card key={i}>
-            <CardContent className="p-6">
-              <div className="animate-pulse">
-                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                <div className="h-8 bg-gray-200 rounded w-1/2"></div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Program Summary</CardTitle>
+          <CardDescription>Loading program statistics...</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
-  if (error) {
+  if (programStats.length === 0) {
     return (
       <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center gap-2 text-red-600">
-            <AlertCircle className="w-5 h-5" />
-            <span>{error}</span>
+        <CardHeader>
+          <CardTitle>Program Summary</CardTitle>
+          <CardDescription>No prospect data available</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64 flex items-center justify-center text-gray-500">
+            <p>Add some prospects to see program statistics</p>
           </div>
         </CardContent>
       </Card>
@@ -99,111 +155,137 @@ const ProgramSummary = () => {
   return (
     <div className="space-y-6">
       {/* Overall Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Prospects</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{getTotalProspects()}</div>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold">{totalStats.total}</div>
+            <p className="text-sm text-muted-foreground">Total Prospects</p>
           </CardContent>
         </Card>
-
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Approved</CardTitle>
-            <UserCheck className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{getTotalApproved()}</div>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-yellow-600">{totalStats.pending}</div>
+            <p className="text-sm text-muted-foreground">Pending</p>
           </CardContent>
         </Card>
-
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending</CardTitle>
-            <Clock className="h-4 w-4 text-yellow-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{getTotalPending()}</div>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-green-600">{totalStats.approved}</div>
+            <p className="text-sm text-muted-foreground">Approved</p>
           </CardContent>
         </Card>
-
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Rejected</CardTitle>
-            <XCircle className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{getTotalRejected()}</div>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-red-600">{totalStats.rejected}</div>
+            <p className="text-sm text-muted-foreground">Rejected</p>
           </CardContent>
         </Card>
-
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Postponed</CardTitle>
-            <Pause className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{getTotalPostponed()}</div>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-blue-600">{totalStats.postponed}</div>
+            <p className="text-sm text-muted-foreground">Postponed</p>
           </CardContent>
         </Card>
-
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">On Hold</CardTitle>
-            <AlertCircle className="h-4 w-4 text-gray-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-600">{getTotalOnHold()}</div>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-orange-600">{totalStats.onHold}</div>
+            <p className="text-sm text-muted-foreground">On Hold</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Program-specific breakdown */}
+      {/* Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Programme Breakdown</CardTitle>
-          <CardDescription>Registration status by programme</CardDescription>
+          <CardTitle>Registration Status by Program</CardTitle>
+          <CardDescription>Visual breakdown of prospect statuses across all programs</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {summaryData.map((program) => (
-              <div key={program.program_title} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-sm">{program.program_title}</h4>
-                  <Badge variant="outline">{program.total_prospects} total</Badge>
-                </div>
-                <div className="flex gap-2 flex-wrap">
-                  {program.approved > 0 && (
-                    <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">
-                      {program.approved} Approved
-                    </Badge>
-                  )}
-                  {program.pending > 0 && (
-                    <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                      {program.pending} Pending
-                    </Badge>
-                  )}
-                  {program.rejected > 0 && (
-                    <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">
-                      {program.rejected} Rejected
-                    </Badge>
-                  )}
-                  {program.postponed > 0 && (
-                    <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
-                      {program.postponed} Postponed
-                    </Badge>
-                  )}
-                  {program.on_hold > 0 && (
-                    <Badge variant="secondary" className="bg-gray-100 text-gray-800 border-gray-200">
-                      {program.on_hold} On Hold
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            ))}
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="name" 
+                  angle={-45}
+                  textAnchor="end"
+                  height={100}
+                  fontSize={12}
+                />
+                <YAxis />
+                <Tooltip 
+                  labelFormatter={(label) => {
+                    const item = chartData.find(d => d.name === label);
+                    return item?.fullName || label;
+                  }}
+                />
+                <Bar dataKey="pending" stackId="a" fill="#eab308" name="Pending" />
+                <Bar dataKey="approved" stackId="a" fill="#22c55e" name="Approved" />
+                <Bar dataKey="rejected" stackId="a" fill="#ef4444" name="Rejected" />
+                <Bar dataKey="postponed" stackId="a" fill="#3b82f6" name="Postponed" />
+                <Bar dataKey="onHold" stackId="a" fill="#f97316" name="On Hold" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Program Details Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Program Details</CardTitle>
+          <CardDescription>Detailed breakdown by program</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left p-2">Program</th>
+                  <th className="text-center p-2">Total</th>
+                  <th className="text-center p-2">Pending</th>
+                  <th className="text-center p-2">Approved</th>
+                  <th className="text-center p-2">Rejected</th>
+                  <th className="text-center p-2">Postponed</th>
+                  <th className="text-center p-2">On Hold</th>
+                </tr>
+              </thead>
+              <tbody>
+                {programStats.map((stat, index) => (
+                  <tr key={index} className="border-b">
+                    <td className="p-2 font-medium">{stat.programName}</td>
+                    <td className="p-2 text-center">
+                      <Badge variant="outline">{stat.total}</Badge>
+                    </td>
+                    <td className="p-2 text-center">
+                      <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                        {stat.pending}
+                      </Badge>
+                    </td>
+                    <td className="p-2 text-center">
+                      <Badge variant="secondary" className="bg-green-100 text-green-800">
+                        {stat.approved}
+                      </Badge>
+                    </td>
+                    <td className="p-2 text-center">
+                      <Badge variant="secondary" className="bg-red-100 text-red-800">
+                        {stat.rejected}
+                      </Badge>
+                    </td>
+                    <td className="p-2 text-center">
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                        {stat.postponed}
+                      </Badge>
+                    </td>
+                    <td className="p-2 text-center">
+                      <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                        {stat.onHold}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </CardContent>
       </Card>

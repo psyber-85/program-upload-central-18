@@ -2,11 +2,11 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Phone } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import { supabaseProspectService } from '@/services/supabaseProspectService';
 
 interface LogCallModalProps {
   isOpen: boolean;
@@ -15,87 +15,92 @@ interface LogCallModalProps {
   onComplete: () => void;
 }
 
-const LogCallModal = ({ isOpen, onClose, prospectId, onComplete }: LogCallModalProps) => {
-  const [callDate, setCallDate] = useState(new Date().toISOString().split('T')[0]);
+const LogCallModal: React.FC<LogCallModalProps> = ({
+  isOpen,
+  onClose,
+  prospectId,
+  onComplete
+}) => {
   const [notes, setNotes] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLogging, setIsLogging] = useState(false);
   const { toast } = useToast();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    setIsSubmitting(true);
-
+  const handleLogCall = async () => {
+    if (!prospectId) return;
+    
+    setIsLogging(true);
     try {
-      const { error } = await supabaseProspectService.addCall(prospectId, {
-        call_date: new Date(callDate).toISOString(),
-        notes: notes || undefined
-      });
+      const { error } = await supabase
+        .from('prospect_calls')
+        .insert([
+          {
+            prospect_id: prospectId,
+            call_date: new Date().toISOString(),
+            notes: notes || null
+          }
+        ]);
 
       if (error) throw error;
 
       toast({
         title: "Success",
-        description: "Call logged successfully!",
+        description: "Call logged successfully",
       });
 
       onComplete();
       onClose();
-      setNotes('');
-      setCallDate(new Date().toISOString().split('T')[0]);
+      setNotes(''); // Reset form
     } catch (error) {
+      console.error('Failed to log call:', error);
       toast({
         title: "Error",
         description: "Failed to log call. Please try again.",
         variant: "destructive",
       });
-      console.error('Failed to log call:', error);
     } finally {
-      setIsSubmitting(false);
+      setIsLogging(false);
     }
   };
 
+  const handleClose = () => {
+    setNotes('');
+    onClose();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle>Log Call</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Phone className="w-5 h-5" />
+            Log Call
+          </DialogTitle>
           <DialogDescription>
-            Record details about your call with this prospect.
+            Record a call with this prospect
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="callDate">Call Date</Label>
-              <Input
-                id="callDate"
-                type="date"
-                value={callDate}
-                onChange={(e) => setCallDate(e.target.value)}
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                placeholder="Enter call notes..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={4}
-              />
-            </div>
+        
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="notes">Call Notes (Optional)</Label>
+            <Textarea
+              id="notes"
+              placeholder="Enter any notes about the call..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={4}
+            />
           </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Logging Call...' : 'Log Call'}
-            </Button>
-          </DialogFooter>
-        </form>
+        </div>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={handleClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleLogCall} disabled={isLogging}>
+            {isLogging ? 'Logging...' : 'Log Call'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

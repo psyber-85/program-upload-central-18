@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Mail, Paperclip } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -16,96 +16,69 @@ interface NotifyHRModalProps {
   onComplete: () => void;
 }
 
-interface ProspectData {
-  name: string;
-  email: string;
-  program_id: string;
-  hrContact?: {
-    name: string;
-    email: string;
-  };
-}
-
 const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
   isOpen,
   onClose,
   prospectId,
   onComplete
 }) => {
-  const [prospectData, setProspectData] = useState<ProspectData | null>(null);
-  const [programName, setProgramName] = useState('');
-  const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const [attachmentPlaceholder, setAttachmentPlaceholder] = useState('Course Brochure.pdf, Sign-Up Form.pdf');
+  const [prospectData, setProspectData] = useState<any>(null);
+  const [hrContact, setHrContact] = useState<any>(null);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen && prospectId) {
-      fetchProspectData();
+      loadProspectData();
     }
   }, [isOpen, prospectId]);
 
-  const fetchProspectData = async () => {
+  const loadProspectData = async () => {
     try {
-      // Fetch prospect data with HR contact
-      const { data: prospectData, error: prospectError } = await supabase
+      const { data: prospect, error: prospectError } = await supabase
         .from('prospects')
         .select(`
-          name,
-          email,
-          program_id,
-          hr_contacts(name, email)
+          *,
+          programs(title),
+          hr_contacts(*)
         `)
         .eq('id', prospectId)
         .single();
 
       if (prospectError) throw prospectError;
 
-      // Fetch program name
-      const { data: programData, error: programError } = await supabase
-        .from('programs')
-        .select('title')
-        .eq('id', prospectData.program_id)
-        .single();
-
-      if (programError) throw programError;
-
-      const hrContact = prospectData.hr_contacts?.[0];
+      setProspectData(prospect);
       
-      setProspectData({
-        ...prospectData,
-        hrContact: hrContact ? {
-          name: hrContact.name,
-          email: hrContact.email
-        } : undefined
-      });
+      if (prospect.hr_contacts && prospect.hr_contacts.length > 0) {
+        const hrContactData = prospect.hr_contacts[0];
+        setHrContact(hrContactData);
+        
+        // Set default email subject and body
+        const programTitle = prospect.programs?.title || 'Training Program';
+        setEmailSubject(`Training Registration Confirmation - ${prospect.name}`);
+        setEmailBody(`Dear ${hrContactData.name},
 
-      setProgramName(programData.title);
+I hope this message finds you well.
 
-      // Set default subject and body
-      const defaultSubject = `[AIHQ] Signing up for ${programData.title}`;
-      const defaultBody = `Dear ${hrContact?.name || '[HR Contact Name]'},
+I am writing to confirm the training registration for ${prospect.name} from your organization (${prospect.org || 'your company'}) for the "${programTitle}" program.
 
-As discussed, I am reaching out to provide the necessary details for the ${programData.title} that your employee, ${prospectData.name}, would like to attend.
+Participant Details:
+- Name: ${prospect.name}
+- Email: ${prospect.email}
+- Role: ${prospect.role || 'Not specified'}
+- Registration Status: ${prospect.registration_status}
 
-Attached you will find:
+Please review and confirm this registration at your earliest convenience. If you have any questions or need additional information, please don't hesitate to reach out.
 
-- The course brochure with a detailed outline of the program.
-- The Sign-Up Form for the registration process.
+Thank you for your time and cooperation.
 
-Please kindly review these documents for approval. Should you have any questions or require further clarification, feel free to contact me directly.
-
-We look forward to assisting your team in enhancing their future skills through AI upskilling through this innovative program.
-
-Warm regards,
-AIHQ`;
-
-      setSubject(defaultSubject);
-      setBody(defaultBody);
-
+Best regards,
+Training Administration Team`);
+      }
     } catch (error) {
-      console.error('Error fetching prospect data:', error);
+      console.error('Failed to load prospect data:', error);
       toast({
         title: "Error",
         description: "Failed to load prospect data",
@@ -114,159 +87,152 @@ AIHQ`;
     }
   };
 
-  const handleSendEmail = async () => {
-    if (!prospectData?.hrContact) {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!hrContact || !emailSubject.trim() || !emailBody.trim()) {
       toast({
         title: "Error",
-        description: "No HR contact found for this prospect",
+        description: "Please fill in all required fields",
         variant: "destructive",
       });
       return;
     }
 
-    setIsSending(true);
+    setIsSubmitting(true);
     try {
-      // Call the send-hr-notification Edge Function
+      // Call the SendGrid edge function
       const { data, error } = await supabase.functions.invoke('send-hr-notification', {
         body: {
-          hrContactEmail: prospectData.hrContact.email,
-          hrContactName: prospectData.hrContact.name,
-          prospectName: prospectData.name,
-          programName: programName,
-          subject: subject,
-          body: body,
-          attachments: attachmentPlaceholder.split(',').map(name => name.trim()).filter(name => name)
+          to_email: hrContact.email,
+          to_name: hrContact.name,
+          subject: emailSubject,
+          message: emailBody,
+          prospect_name: prospectData?.name,
+          program_title: prospectData?.programs?.title
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('SendGrid function error:', error);
+        throw new Error(error.message || 'Failed to send email');
+      }
 
       // Update HR contact to mark email as sent
       const { error: updateError } = await supabase
         .from('hr_contacts')
-        .update({ email_sent_at: new Date().toISOString() })
-        .eq('prospect_id', prospectId);
+        .update({ 
+          email_sent_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', hrContact.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Failed to update HR contact:', updateError);
+        // Don't throw here as the email was sent successfully
+      }
 
       toast({
         title: "Success",
-        description: "HR notification email sent successfully!",
+        description: `Email sent successfully to ${hrContact.name}`,
       });
 
       onComplete();
       onClose();
-    } catch (error) {
-      console.error('Failed to send HR notification:', error);
+    } catch (error: any) {
+      console.error('Failed to send email:', error);
       toast({
         title: "Error",
-        description: "Failed to send HR notification. Please try again.",
+        description: error.message || "Failed to send email. Please check your SendGrid configuration.",
         variant: "destructive",
       });
     } finally {
-      setIsSending(false);
+      setIsSubmitting(false);
     }
   };
 
   const handleClose = () => {
     setProspectData(null);
-    setProgramName('');
-    setSubject('');
-    setBody('');
-    setAttachmentPlaceholder('Course Brochure.pdf, Sign-Up Form.pdf');
+    setHrContact(null);
+    setEmailSubject('');
+    setEmailBody('');
     onClose();
   };
 
-  if (!prospectData) {
-    return null;
+  if (!hrContact) {
+    return (
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>No HR Contact</DialogTitle>
+            <DialogDescription>
+              No HR contact has been added for this prospect yet. Please add an HR contact first.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={handleClose}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mail className="w-5 h-5" />
             Send HR Notification
           </DialogTitle>
           <DialogDescription>
-            Send notification email to HR contact for {prospectData.name}
+            Send an email notification to {hrContact.name} ({hrContact.email})
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label className="text-sm font-medium">Participant</Label>
-              <p className="text-sm text-gray-600">{prospectData.name}</p>
+        <form onSubmit={handleSubmit}>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="subject">Email Subject</Label>
+              <Input
+                id="subject"
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+                required
+                placeholder="Enter email subject"
+              />
             </div>
-            <div>
-              <Label className="text-sm font-medium">Programme</Label>
-              <p className="text-sm text-gray-600">{programName}</p>
+
+            <div className="space-y-2">
+              <Label htmlFor="body">Email Message</Label>
+              <Textarea
+                id="body"
+                value={emailBody}
+                onChange={(e) => setEmailBody(e.target.value)}
+                required
+                className="min-h-[300px]"
+                placeholder="Enter your email message"
+              />
             </div>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label className="text-sm font-medium">HR Contact</Label>
-              <p className="text-sm text-gray-600">{prospectData.hrContact?.name || 'N/A'}</p>
-            </div>
-            <div>
-              <Label className="text-sm font-medium">HR Email</Label>
-              <p className="text-sm text-gray-600">{prospectData.hrContact?.email || 'N/A'}</p>
+
+            <div className="p-3 bg-gray-50 rounded text-sm">
+              <strong>Recipient:</strong> {hrContact.name} ({hrContact.email})
+              {hrContact.email_sent_at && (
+                <div className="mt-1 text-green-600">
+                  ✅ Previous email sent: {new Date(hrContact.email_sent_at).toLocaleString()}
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="subject">Email Subject</Label>
-            <Input
-              id="subject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="Email subject"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="body">Email Body</Label>
-            <Textarea
-              id="body"
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="Email body"
-              rows={12}
-              className="resize-none"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="attachments" className="flex items-center gap-2">
-              <Paperclip className="w-4 h-4" />
-              Attachments (Placeholder)
-            </Label>
-            <Input
-              id="attachments"
-              value={attachmentPlaceholder}
-              onChange={(e) => setAttachmentPlaceholder(e.target.value)}
-              placeholder="Attachment file names (comma-separated)"
-            />
-            <p className="text-xs text-gray-500">
-              Enter placeholder attachment names. Actual file attachments will be implemented in a future update.
-            </p>
-          </div>
-        </div>
-        
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleSendEmail} 
-            disabled={isSending || !prospectData.hrContact?.email || !subject.trim() || !body.trim()}
-          >
-            {isSending ? 'Sending...' : 'Send Email'}
-          </Button>
-        </DialogFooter>
+          <DialogFooter className="mt-6">
+            <Button type="button" variant="outline" onClick={handleClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Sending...' : 'Send Email'}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

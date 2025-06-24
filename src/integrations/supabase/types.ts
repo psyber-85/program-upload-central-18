@@ -163,6 +163,7 @@ export type Database = {
           program_id: string
           registration_status: string | null
           role: string | null
+          status_reason: string | null
           updated_at: string
         }
         Insert: {
@@ -177,6 +178,7 @@ export type Database = {
           program_id: string
           registration_status?: string | null
           role?: string | null
+          status_reason?: string | null
           updated_at?: string
         }
         Update: {
@@ -191,6 +193,7 @@ export type Database = {
           program_id?: string
           registration_status?: string | null
           role?: string | null
+          status_reason?: string | null
           updated_at?: string
         }
         Relationships: [

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -29,7 +30,9 @@ const UpdateStatusModal: React.FC<UpdateStatusModalProps> = ({
   onComplete
 }) => {
   const [selectedStatus, setSelectedStatus] = useState('');
+  const [statusReason, setStatusReason] = useState('');
   const [currentStatus, setCurrentStatus] = useState('');
+  const [currentReason, setCurrentReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
@@ -43,7 +46,7 @@ const UpdateStatusModal: React.FC<UpdateStatusModalProps> = ({
     try {
       const { data, error } = await supabase
         .from('prospects')
-        .select('registration_status')
+        .select('registration_status, status_reason')
         .eq('id', prospectId)
         .single();
 
@@ -51,7 +54,9 @@ const UpdateStatusModal: React.FC<UpdateStatusModalProps> = ({
 
       if (data) {
         setCurrentStatus(data.registration_status || 'Pending');
+        setCurrentReason(data.status_reason || '');
         setSelectedStatus(data.registration_status || 'Pending');
+        setStatusReason(data.status_reason || '');
       }
     } catch (error) {
       console.error('Failed to load current status:', error);
@@ -68,6 +73,7 @@ const UpdateStatusModal: React.FC<UpdateStatusModalProps> = ({
         .from('prospects')
         .update({
           registration_status: selectedStatus,
+          status_reason: statusReason || null,
           updated_at: new Date().toISOString()
         })
         .eq('id', prospectId);
@@ -95,13 +101,15 @@ const UpdateStatusModal: React.FC<UpdateStatusModalProps> = ({
 
   const handleClose = () => {
     setSelectedStatus('');
+    setStatusReason('');
     setCurrentStatus('');
+    setCurrentReason('');
     onClose();
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent>
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertCircle className="w-5 h-5" />
@@ -110,9 +118,12 @@ const UpdateStatusModal: React.FC<UpdateStatusModalProps> = ({
           <DialogDescription>
             Change the registration status for this prospect
             {currentStatus && (
-              <span className="block mt-1 text-sm">
-                Current status: <strong>{currentStatus}</strong>
-              </span>
+              <div className="mt-2 p-2 bg-gray-50 rounded text-sm">
+                <div><strong>Current Status:</strong> {currentStatus}</div>
+                {currentReason && (
+                  <div className="mt-1"><strong>Current Reason:</strong> {currentReason}</div>
+                )}
+              </div>
             )}
           </DialogDescription>
         </DialogHeader>
@@ -135,6 +146,20 @@ const UpdateStatusModal: React.FC<UpdateStatusModalProps> = ({
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="reason">Reason (Optional)</Label>
+              <Textarea
+                id="reason"
+                value={statusReason}
+                onChange={(e) => setStatusReason(e.target.value)}
+                placeholder="Provide a reason for this status change (e.g., rejection reason, postponement details)..."
+                className="min-h-[80px]"
+              />
+              <p className="text-xs text-gray-500">
+                This field is especially useful for rejected or postponed applications.
+              </p>
             </div>
           </div>
 

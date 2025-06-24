@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from '@/components/ui/pagination';
-import { Phone, Mail, User, Building, AlertCircle, Search, ChevronUp, ChevronDown, Eye, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Phone, Mail, User, Building, AlertCircle, Search, ChevronUp, ChevronDown, Eye, ChevronRight, ChevronLeft, Info } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import LogCallModal from './LogCallModal';
@@ -31,6 +30,7 @@ interface Prospect {
   payment_status: string | null;
   product_type: string | null;
   registration_status: 'Pending' | 'Approved' | 'Rejected' | 'Postponed' | 'On Hold';
+  status_reason?: string | null;
   lastCall?: string;
   hrContact?: HRContact;
   hasCallNotes?: boolean;
@@ -165,7 +165,7 @@ const ProspectTable = () => {
       
       setPrograms(programsMap);
 
-      // Fetch prospects with related data
+      // Fetch prospects with related data including status_reason
       const { data: prospectsData, error: prospectsError } = await supabase
         .from('prospects')
         .select(`
@@ -196,6 +196,7 @@ const ProspectTable = () => {
           payment_status: prospect.payment_status,
           product_type: prospect.product_type,
           registration_status: prospect.registration_status as Prospect['registration_status'],
+          status_reason: prospect.status_reason,
           lastCall: lastCall ? new Date(lastCall).toLocaleDateString() : undefined,
           hrContact: hrContact ? {
             name: hrContact.name,
@@ -245,10 +246,11 @@ const ProspectTable = () => {
   };
 
   const getPaymentBadgeVariant = (status: string | null) => {
-    switch (status?.toLowerCase()) {
-      case 'paid': return 'default';
-      case 'pending': return 'secondary';
-      case 'failed': return 'destructive';
+    switch (status) {
+      case 'HRDC': return 'default';
+      case 'Individual': return 'secondary';
+      case 'Paid': return 'default';
+      case 'Pending': return 'outline';
       default: return 'outline';
     }
   };
@@ -407,13 +409,23 @@ const ProspectTable = () => {
                   </TableCell>
                   <TableCell className="font-medium">{prospect.name}</TableCell>
                   <TableCell>
-                    <Badge variant={getStatusBadgeVariant(prospect.registration_status)}>
-                      {prospect.registration_status}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={getStatusBadgeVariant(prospect.registration_status)}>
+                        {prospect.registration_status}
+                      </Badge>
+                      {prospect.status_reason && (
+                        <div className="group relative">
+                          <Info className="w-4 h-4 text-gray-400 cursor-help" />
+                          <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap z-10 max-w-xs">
+                            {prospect.status_reason}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Badge variant={getPaymentBadgeVariant(prospect.payment_status)}>
-                      {prospect.payment_status || 'N/A'}
+                      {prospect.payment_status || 'Not Set'}
                     </Badge>
                   </TableCell>
                   {showSecondaryColumns && (

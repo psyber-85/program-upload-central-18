@@ -112,7 +112,7 @@ const AddProspectForm = () => {
           phone: formData.phone || null,
           org: formData.org || null,
           role: formData.role || null,
-          payment_status: formData.payment_status || null,
+          payment_status: formData.payment_status || 'Pending',
           product_type: formData.product_type || null,
           registration_status: formData.registration_status
         }]);
@@ -248,6 +248,7 @@ const AddProspectForm = () => {
               <option value="">Select payment status...</option>
               <option value="HRDC">HRDC</option>
               <option value="Individual">Individual</option>
+              <option value="Paid">Paid</option>
               <option value="Pending">Pending</option>
             </select>
           </div>

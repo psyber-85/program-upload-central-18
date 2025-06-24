@@ -1,111 +1,118 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.5.0";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 interface EmailRequest {
-  to: string;
+  to_email: string;
+  to_name: string;
   subject: string;
-  body: string;
-  hrContactId: string;
+  message: string;
+  prospect_name?: string;
+  program_title?: string;
 }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+const handler = async (req: Request): Promise<Response> => {
+  console.log('SendGrid function called');
+  
+  // Handle CORS preflight requests
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
-    );
+    const body: EmailRequest = await req.json();
+    console.log('Request body:', body);
+    
+    const { to_email, to_name, subject, message } = body;
 
-    const { to, subject, body, hrContactId }: EmailRequest = await req.json();
-    
-    const SENDGRID_API_KEY = Deno.env.get('SENDGRID_API_KEY');
-    
-    if (!SENDGRID_API_KEY) {
-      throw new Error('SENDGRID_API_KEY is not configured');
+    if (!to_email || !subject || !message) {
+      throw new Error("Missing required fields: to_email, subject, or message");
     }
 
-    // Send email via SendGrid API
-    const emailResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    // Get SendGrid API key from environment
+    const sendgridApiKey = Deno.env.get("SENDGRID_API_KEY");
+    if (!sendgridApiKey) {
+      throw new Error("SENDGRID_API_KEY environment variable is not set");
+    }
+
+    console.log('Sending email via SendGrid...');
+    
+    // SendGrid API request
+    const sendgridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${SENDGRID_API_KEY}`,
+        "Authorization": `Bearer ${sendgridApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         personalizations: [
           {
-            to: [{ email: to }],
+            to: [
+              {
+                email: to_email,
+                name: to_name || to_email,
+              },
+            ],
             subject: subject,
           },
         ],
         from: {
-          email: "info@theaihq.net",
-          name: "AIHQ - theaihq.net",
+          email: "noreply@yourcompany.com",
+          name: "Training Administration",
         },
         content: [
           {
-            type: "text/html",
-            value: body.replace(/\n/g, '<br>'),
+            type: "text/plain",
+            value: message,
           },
         ],
       }),
     });
 
-    if (!emailResponse.ok) {
-      const errorText = await emailResponse.text();
-      console.error(`SendGrid error ${emailResponse.status}: ${errorText}`);
-      throw new Error(`SendGrid error ${emailResponse.status}: ${errorText}`);
+    console.log('SendGrid response status:', sendgridResponse.status);
+    
+    if (!sendgridResponse.ok) {
+      const errorText = await sendgridResponse.text();
+      console.error('SendGrid error response:', errorText);
+      throw new Error(`SendGrid API error: ${sendgridResponse.status} - ${errorText}`);
     }
 
-    // Update HR contact to mark email as sent
-    const { error: updateError } = await supabaseClient
-      .from('hr_contacts')
-      .update({
-        email_sent_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', hrContactId);
-
-    if (updateError) {
-      console.error('Error updating HR contact:', updateError);
-    }
+    console.log('Email sent successfully');
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        message: 'Email sent successfully',
+      JSON.stringify({ 
+        success: true, 
+        message: "Email sent successfully",
+        recipient: to_email 
       }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders,
+        },
       }
     );
-  } catch (error) {
-    console.error('Error sending email:', error);
-
+  } catch (error: any) {
+    console.error("Error in send-hr-notification function:", error);
     return new Response(
-      JSON.stringify({
-        success: false,
-        message: error.message,
+      JSON.stringify({ 
+        error: error.message,
+        success: false 
       }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
+        headers: { 
+          "Content-Type": "application/json", 
+          ...corsHeaders 
+        },
       }
     );
   }
-});
+};
+
+serve(handler);

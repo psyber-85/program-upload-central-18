@@ -82,6 +82,20 @@ const BulkUploadForm = () => {
     });
   };
 
+  const validatePaymentTypes = (fileData: any[]): string[] => {
+    const invalidPayments: string[] = [];
+    const validPayments = ['hrdc', 'individual'];
+    
+    fileData.forEach((row, index) => {
+      const payment = row.payment?.toLowerCase().trim();
+      if (payment && !validPayments.includes(payment)) {
+        invalidPayments.push(`Row ${index + 2}: "${row.payment}" (must be "hrdc" or "individual")`);
+      }
+    });
+    
+    return invalidPayments;
+  };
+
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFile) return;
@@ -101,6 +115,12 @@ const BulkUploadForm = () => {
       
       if (missingColumns.length > 0) {
         throw new Error(`Missing required columns: ${missingColumns.join(', ')}`);
+      }
+
+      // Validate payment types
+      const invalidPayments = validatePaymentTypes(fileData);
+      if (invalidPayments.length > 0) {
+        throw new Error(`Invalid payment types found:\n${invalidPayments.slice(0, 5).join('\n')}${invalidPayments.length > 5 ? `\n... and ${invalidPayments.length - 5} more` : ''}\n\nOnly "hrdc" and "individual" are allowed.`);
       }
 
       const { data: programs } = await supabaseProspectService.getPrograms();
@@ -123,7 +143,7 @@ const BulkUploadForm = () => {
         const programId = programsMap[programTitle];
         
         if (!programId) {
-          throw new Error(`Program "${programTitle}" not found in registration programs`);
+          throw new Error(`Program "${programTitle}" not found in registration programs. Please use exact program titles.`);
         }
         
         return {
@@ -190,22 +210,31 @@ const BulkUploadForm = () => {
               The file should have the following columns in the first row:
             </p>
             <ul className="text-sm text-blue-700 list-disc list-inside space-y-1">
-              <li>id (optional - for tracking purposes)</li>
+              <li>id (optional - for tracking purposes, will be ignored)</li>
               <li>name</li>
               <li>email</li>
               <li>phone</li>
               <li>org</li>
               <li>role</li>
-              <li>payment (HRDC or Individual)</li>
-              <li>product_type (program name)</li>
+              <li><strong>payment (STRICT: only "hrdc" or "individual" - case insensitive)</strong></li>
+              <li><strong>product_type (EXACT full program name required)</strong></li>
               <li>product_id (optional - will be automatically translated to program titles)</li>
             </ul>
-            <div className="mt-3 p-3 bg-blue-100 rounded">
-              <p className="text-xs text-blue-800 font-medium">Auto Program Detection & Payment Normalization:</p>
+            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
+              <p className="text-xs text-red-800 font-medium">⚠️ STRICT REQUIREMENTS:</p>
+              <p className="text-xs text-red-700">
+                • Payment: ONLY "hrdc" or "individual" accepted (case-insensitive)<br/>
+                • Program: Must use EXACT full program titles from the system<br/>
+                • Upload will fail if these requirements are not met
+              </p>
+            </div>
+            <div className="mt-2 p-3 bg-blue-100 rounded">
+              <p className="text-xs text-blue-800 font-medium">Available Program Titles:</p>
               <p className="text-xs text-blue-700">
-                Programs will be automatically detected from the product_type or product_id columns. 
-                Payment types will be automatically normalized to HRDC or Individual format.
-                The ID column will be ignored during import but can be included for reference.
+                • Business Writing with AI: 2-Day Masterclass<br/>
+                • The AI-Ready Leader: Win the Future with Strategic Action<br/>
+                • ChatGPT Skill Boost (Intermediate)<br/>
+                • AI and ChatGPT for HR Professionals - 2 Day Masterclass
               </p>
             </div>
           </div>

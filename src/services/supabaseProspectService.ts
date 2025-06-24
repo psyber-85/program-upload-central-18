@@ -16,25 +16,21 @@ const PRODUCT_ID_TRANSLATIONS: Record<string, string> = {
   'ai-chatgpt-hr': 'AI and ChatGPT for HR Professionals - 2 Day Masterclass'
 };
 
-// Function to normalize payment values
+// Function to normalize payment values - ONLY accepts "hrdc" and "individual"
 const normalizePayment = (payment: string): string | null => {
   if (!payment || payment.trim() === '') return null;
   
   const normalized = payment.toLowerCase().trim();
   
-  switch (normalized) {
-    case 'hrdc':
-    case 'hrdf':
-    case 'human resource development corporation':
-      return 'HRDC';
-    case 'individual':
-    case 'self':
-    case 'personal':
-    case 'private':
-      return 'Individual';
-    default:
-      return payment;
+  // Only normalize these two specific values
+  if (normalized === 'hrdc') {
+    return 'HRDC';
+  } else if (normalized === 'individual') {
+    return 'Individual';
   }
+  
+  // Return the original value if it's not hrdc or individual
+  return payment;
 };
 
 export const supabaseProspectService = {

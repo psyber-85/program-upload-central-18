@@ -157,7 +157,7 @@ export type Database = {
           id: string
           name: string
           org: string | null
-          payment_status: string | null
+          payment: string | null
           phone: string | null
           product_id: string | null
           product_type: string | null
@@ -173,7 +173,7 @@ export type Database = {
           id?: string
           name: string
           org?: string | null
-          payment_status?: string | null
+          payment?: string | null
           phone?: string | null
           product_id?: string | null
           product_type?: string | null
@@ -189,7 +189,7 @@ export type Database = {
           id?: string
           name?: string
           org?: string | null
-          payment_status?: string | null
+          payment?: string | null
           phone?: string | null
           product_id?: string | null
           product_type?: string | null

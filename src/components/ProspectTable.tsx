@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -27,7 +28,7 @@ interface Prospect {
   phone: string | null;
   org: string | null;
   role: string | null;
-  payment_status: string | null;
+  payment: string | null;
   product_type: string | null;
   product_id: string | null;
   registration_status: 'Pending' | 'Approved' | 'Rejected' | 'Postponed' | 'On Hold';
@@ -37,7 +38,7 @@ interface Prospect {
   hasCallNotes?: boolean;
 }
 
-type SortField = 'name' | 'email' | 'org' | 'role' | 'program' | 'registration_status' | 'payment_status' | 'product_id' | 'lastCall';
+type SortField = 'name' | 'email' | 'org' | 'role' | 'program' | 'registration_status' | 'payment' | 'product_id' | 'lastCall';
 type SortDirection = 'asc' | 'desc';
 
 const ProspectTable = () => {
@@ -124,7 +125,7 @@ const ProspectTable = () => {
           phone: prospect.phone,
           org: prospect.org,
           role: prospect.role,
-          payment_status: prospect.payment_status,
+          payment: prospect.payment,
           product_type: prospect.product_type,
           product_id: prospect.product_id,
           registration_status: prospect.registration_status as Prospect['registration_status'],
@@ -285,9 +286,9 @@ const ProspectTable = () => {
                   Status {getSortIcon('registration_status')}
                 </div>
               </TableHead>
-              <TableHead className="cursor-pointer" onClick={() => handleSort('payment_status')}>
+              <TableHead className="cursor-pointer" onClick={() => handleSort('payment')}>
                 <div className="flex items-center gap-1">
-                  Payment {getSortIcon('payment_status')}
+                  Payment {getSortIcon('payment')}
                 </div>
               </TableHead>
               {showSecondaryColumns && (
@@ -358,8 +359,8 @@ const ProspectTable = () => {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={getPaymentBadgeVariant(prospect.payment_status)}>
-                      {prospect.payment_status || 'Not Set'}
+                    <Badge variant={getPaymentBadgeVariant(prospect.payment)}>
+                      {prospect.payment || 'Not Set'}
                     </Badge>
                   </TableCell>
                   {showSecondaryColumns && (

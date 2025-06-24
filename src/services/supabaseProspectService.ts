@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -65,7 +66,7 @@ export const supabaseProspectService = {
     phone?: string | null;
     org?: string | null;
     role?: string | null;
-    payment_status?: string | null;
+    payment?: string | null;
     product_type?: string | null;
     product_id?: string | null;
     registration_status: 'Pending' | 'Approved' | 'Rejected' | 'Postponed' | 'On Hold';
@@ -77,7 +78,7 @@ export const supabaseProspectService = {
       phone: prospectData.phone,
       org: prospectData.org,
       role: prospectData.role,
-      payment_status: normalizePayment(prospectData.payment_status || ''),
+      payment: normalizePayment(prospectData.payment || ''),
       product_type: prospectData.product_type,
       product_id: prospectData.product_id,
       registration_status: prospectData.registration_status
@@ -173,7 +174,7 @@ export const supabaseProspectService = {
     phone?: string | null;
     org?: string | null;
     role?: string | null;
-    payment_status?: string | null;
+    payment?: string | null;
     product_type?: string | null;
     product_id?: string | null;
     registration_status: 'Pending' | 'Approved' | 'Rejected' | 'Postponed' | 'On Hold';
@@ -185,7 +186,7 @@ export const supabaseProspectService = {
       phone: prospect.phone,
       org: prospect.org,
       role: prospect.role,
-      payment_status: normalizePayment(prospect.payment_status || ''),
+      payment: normalizePayment(prospect.payment || ''),
       product_type: prospect.product_type,
       product_id: prospect.product_id,
       registration_status: prospect.registration_status

@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
-import { Phone, Mail, User, Building, AlertCircle, Search, ChevronUp, ChevronDown, Eye } from 'lucide-react';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from '@/components/ui/pagination';
+import { Phone, Mail, User, Building, AlertCircle, Search, ChevronUp, ChevronDown, Eye, ChevronRight, ChevronLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import LogCallModal from './LogCallModal';
@@ -35,7 +36,7 @@ interface Prospect {
   hasCallNotes?: boolean;
 }
 
-type SortField = 'name' | 'email' | 'org' | 'role' | 'program' | 'registration_status' | 'lastCall';
+type SortField = 'name' | 'email' | 'org' | 'role' | 'program' | 'registration_status' | 'payment_status' | 'lastCall';
 type SortDirection = 'asc' | 'desc';
 
 const ProspectTable = () => {
@@ -50,6 +51,7 @@ const ProspectTable = () => {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [prospectsPerPage] = useState(10);
+  const [showSecondaryColumns, setShowSecondaryColumns] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -148,10 +150,11 @@ const ProspectTable = () => {
     try {
       setLoading(true);
       
-      // Fetch programs first
+      // Fetch programs first - ensure we get actual program names
       const { data: programsData, error: programsError } = await supabase
         .from('programs')
-        .select('id, title');
+        .select('id, title')
+        .order('title');
       
       if (programsError) throw programsError;
       
@@ -241,6 +244,15 @@ const ProspectTable = () => {
     }
   };
 
+  const getPaymentBadgeVariant = (status: string | null) => {
+    switch (status?.toLowerCase()) {
+      case 'paid': return 'default';
+      case 'pending': return 'secondary';
+      case 'failed': return 'destructive';
+      default: return 'outline';
+    }
+  };
+
   const handleModalOpen = (modalType: string, prospectId: string) => {
     setSelectedProspect(prospectId);
     setActiveModal(modalType);
@@ -255,11 +267,33 @@ const ProspectTable = () => {
     fetchProspects();
   };
 
-  // Pagination calculations
+  // Smart pagination calculations
   const totalPages = Math.ceil(filteredProspects.length / prospectsPerPage);
   const startIndex = (currentPage - 1) * prospectsPerPage;
   const endIndex = startIndex + prospectsPerPage;
   const currentProspects = filteredProspects.slice(startIndex, endIndex);
+
+  // Smart pagination page numbers
+  const getVisiblePages = () => {
+    const maxVisible = 5;
+    const pages = [];
+    
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 3) {
+        pages.push(1, 2, 3, 4, '...', totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+      }
+    }
+    
+    return pages;
+  };
 
   if (loading) {
     return (
@@ -274,16 +308,27 @@ const ProspectTable = () => {
 
   return (
     <div className="bg-white rounded-lg shadow">
-      {/* Search Bar */}
+      {/* Search Bar and Column Toggle */}
       <div className="p-4 border-b">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <Input
-            placeholder="Search prospects..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              placeholder="Search prospects..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowSecondaryColumns(!showSecondaryColumns)}
+            className="flex items-center gap-2"
+          >
+            {showSecondaryColumns ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            {showSecondaryColumns ? 'Hide Details' : 'Show Details'}
+          </Button>
         </div>
         <div className="mt-2 text-sm text-gray-600">
           Showing {filteredProspects.length} of {prospects.length} prospects
@@ -304,112 +349,154 @@ const ProspectTable = () => {
                   Name {getSortIcon('name')}
                 </div>
               </TableHead>
-              <TableHead className="hidden sm:table-cell cursor-pointer" onClick={() => handleSort('email')}>
-                <div className="flex items-center gap-1">
-                  Email {getSortIcon('email')}
-                </div>
-              </TableHead>
-              <TableHead className="hidden md:table-cell">Phone</TableHead>
-              <TableHead className="hidden lg:table-cell cursor-pointer" onClick={() => handleSort('org')}>
-                <div className="flex items-center gap-1">
-                  Company {getSortIcon('org')}
-                </div>
-              </TableHead>
-              <TableHead className="hidden lg:table-cell cursor-pointer" onClick={() => handleSort('role')}>
-                <div className="flex items-center gap-1">
-                  Job Role {getSortIcon('role')}
-                </div>
-              </TableHead>
-              <TableHead className="hidden md:table-cell cursor-pointer" onClick={() => handleSort('lastCall')}>
-                <div className="flex items-center gap-1">
-                  Last Call {getSortIcon('lastCall')}
-                </div>
-              </TableHead>
-              <TableHead className="hidden lg:table-cell">HR Contact</TableHead>
-              <TableHead className="hidden lg:table-cell">HR Email</TableHead>
-              <TableHead className="hidden md:table-cell">HR Email Sent</TableHead>
               <TableHead className="cursor-pointer" onClick={() => handleSort('registration_status')}>
                 <div className="flex items-center gap-1">
                   Status {getSortIcon('registration_status')}
                 </div>
               </TableHead>
+              <TableHead className="cursor-pointer" onClick={() => handleSort('payment_status')}>
+                <div className="flex items-center gap-1">
+                  Payment {getSortIcon('payment_status')}
+                </div>
+              </TableHead>
+              {showSecondaryColumns && (
+                <>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort('email')}>
+                    <div className="flex items-center gap-1">
+                      Email {getSortIcon('email')}
+                    </div>
+                  </TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort('org')}>
+                    <div className="flex items-center gap-1">
+                      Company {getSortIcon('org')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort('role')}>
+                    <div className="flex items-center gap-1">
+                      Job Role {getSortIcon('role')}
+                    </div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer" onClick={() => handleSort('lastCall')}>
+                    <div className="flex items-center gap-1">
+                      Last Call {getSortIcon('lastCall')}
+                    </div>
+                  </TableHead>
+                  <TableHead>HR Contact</TableHead>
+                  <TableHead>HR Email</TableHead>
+                  <TableHead>HR Email Sent</TableHead>
+                </>
+              )}
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {currentProspects.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={12} className="text-center py-6">
+                <TableCell colSpan={showSecondaryColumns ? 13 : 5} className="text-center py-6">
                   {searchTerm ? 'No prospects found matching your search.' : 'No prospects found. Add some prospects to get started.'}
                 </TableCell>
               </TableRow>
             ) : (
               currentProspects.map((prospect) => (
                 <TableRow key={prospect.id}>
-                  <TableCell className="font-medium">{prospect.program}</TableCell>
-                  <TableCell>{prospect.name}</TableCell>
-                  <TableCell className="hidden sm:table-cell">{prospect.email}</TableCell>
-                  <TableCell className="hidden md:table-cell">{prospect.phone || '—'}</TableCell>
-                  <TableCell className="hidden lg:table-cell">{prospect.org || '—'}</TableCell>
-                  <TableCell className="hidden lg:table-cell">{prospect.role || '—'}</TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <div className="flex items-center gap-2">
-                      {prospect.lastCall || '—'}
-                      {prospect.hasCallNotes && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleModalOpen('viewNotes', prospect.id)}
-                          className="p-1 h-auto"
-                        >
-                          <Eye className="w-3 h-3" />
-                        </Button>
-                      )}
+                  <TableCell className="font-medium max-w-xs">
+                    <div className="truncate" title={prospect.program}>
+                      {prospect.program}
                     </div>
                   </TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    {prospect.hrContact?.name || '—'}
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    {prospect.hrContact?.email || '—'}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {prospect.hrContact?.email_sent_at ? (
-                      <div className="flex items-center gap-1">
-                        <span className="text-green-600">✅</span>
-                        <span className="text-xs text-gray-500">
-                          {new Date(prospect.hrContact.email_sent_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    ) : '—'}
-                  </TableCell>
+                  <TableCell className="font-medium">{prospect.name}</TableCell>
                   <TableCell>
                     <Badge variant={getStatusBadgeVariant(prospect.registration_status)}>
                       {prospect.registration_status}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-col sm:flex-row gap-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleModalOpen('call', prospect.id)}
-                        className="text-xs"
-                      >
-                        <Phone className="w-3 h-3" />
-                        <span className="hidden sm:inline ml-1">Call</span>
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleModalOpen('hr', prospect.id)}
-                        className="text-xs"
-                      >
-                        <User className="w-3 h-3" />
-                        <span className="hidden sm:inline ml-1">
-                          {prospect.hrContact?.name ? 'Edit HR' : 'Add HR'}
-                        </span>
-                      </Button>
+                    <Badge variant={getPaymentBadgeVariant(prospect.payment_status)}>
+                      {prospect.payment_status || 'N/A'}
+                    </Badge>
+                  </TableCell>
+                  {showSecondaryColumns && (
+                    <>
+                      <TableCell className="max-w-xs">
+                        <div className="truncate" title={prospect.email}>
+                          {prospect.email}
+                        </div>
+                      </TableCell>
+                      <TableCell>{prospect.phone || '—'}</TableCell>
+                      <TableCell className="max-w-xs">
+                        <div className="truncate" title={prospect.org || ''}>
+                          {prospect.org || '—'}
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-xs">
+                        <div className="truncate" title={prospect.role || ''}>
+                          {prospect.role || '—'}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {prospect.lastCall || '—'}
+                          {prospect.hasCallNotes && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleModalOpen('viewNotes', prospect.id)}
+                              className="p-1 h-auto"
+                            >
+                              <Eye className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {prospect.hrContact?.name || '—'}
+                      </TableCell>
+                      <TableCell className="max-w-xs">
+                        <div className="truncate" title={prospect.hrContact?.email || ''}>
+                          {prospect.hrContact?.email || '—'}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {prospect.hrContact?.email_sent_at ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-green-600">✅</span>
+                            <span className="text-xs text-gray-500">
+                              {new Date(prospect.hrContact.email_sent_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                        ) : '—'}
+                      </TableCell>
+                    </>
+                  )}
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleModalOpen('call', prospect.id)}
+                          className="text-xs px-2"
+                        >
+                          <Phone className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleModalOpen('hr', prospect.id)}
+                          className="text-xs px-2"
+                        >
+                          <User className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleModalOpen('status', prospect.id)}
+                          className="text-xs px-2"
+                        >
+                          <AlertCircle className="w-3 h-3" />
+                        </Button>
+                      </div>
                       {prospect.hrContact?.email && (
                         <Button
                           size="sm"
@@ -417,19 +504,10 @@ const ProspectTable = () => {
                           onClick={() => handleModalOpen('notify', prospect.id)}
                           className="text-xs"
                         >
-                          <Mail className="w-3 h-3" />
-                          <span className="hidden sm:inline ml-1">Notify</span>
+                          <Mail className="w-3 h-3 mr-1" />
+                          Email HR
                         </Button>
                       )}
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleModalOpen('status', prospect.id)}
-                        className="text-xs"
-                      >
-                        <AlertCircle className="w-3 h-3" />
-                        <span className="hidden sm:inline ml-1">Status</span>
-                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -439,7 +517,7 @@ const ProspectTable = () => {
         </Table>
       </div>
 
-      {/* Pagination */}
+      {/* Smart Pagination */}
       {totalPages > 1 && (
         <div className="p-4 border-t">
           <Pagination>
@@ -451,15 +529,19 @@ const ProspectTable = () => {
                 />
               </PaginationItem>
               
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <PaginationItem key={page}>
-                  <PaginationLink
-                    onClick={() => setCurrentPage(page)}
-                    isActive={currentPage === page}
-                    className="cursor-pointer"
-                  >
-                    {page}
-                  </PaginationLink>
+              {getVisiblePages().map((page, index) => (
+                <PaginationItem key={index}>
+                  {page === '...' ? (
+                    <PaginationEllipsis />
+                  ) : (
+                    <PaginationLink
+                      onClick={() => setCurrentPage(page as number)}
+                      isActive={currentPage === page}
+                      className="cursor-pointer"
+                    >
+                      {page}
+                    </PaginationLink>
+                  )}
                 </PaginationItem>
               ))}
               

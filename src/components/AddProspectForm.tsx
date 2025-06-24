@@ -43,15 +43,20 @@ const AddProspectForm = () => {
 
   const fetchPrograms = async () => {
     try {
-      // First, ensure all masterclasses exist in the database
+      // Ensure all masterclasses exist in the database
       for (const masterclass of MASTERCLASSES) {
         const { data: existingProgram, error: fetchError } = await supabase
           .from('programs')
           .select('id')
           .eq('title', masterclass)
-          .single();
+          .maybeSingle();
 
-        if (fetchError && fetchError.code === 'PGRST116') {
+        if (fetchError) {
+          console.error('Error checking program:', fetchError);
+          continue;
+        }
+
+        if (!existingProgram) {
           // Program doesn't exist, create it
           const { error: createError } = await supabase
             .from('programs')
@@ -241,9 +246,9 @@ const AddProspectForm = () => {
               className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md"
             >
               <option value="">Select payment status...</option>
-              <option value="paid">Paid</option>
-              <option value="pending">Pending</option>
-              <option value="failed">Failed</option>
+              <option value="HRDC">HRDC</option>
+              <option value="Individual">Individual</option>
+              <option value="Pending">Pending</option>
             </select>
           </div>
 

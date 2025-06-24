@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { mockDataService } from '@/services/mockDataService';
 
 interface Program {
   id: string;
@@ -43,37 +42,7 @@ const AddProspectForm = () => {
 
   const fetchPrograms = async () => {
     try {
-      // Ensure all masterclasses exist in the database
-      for (const masterclass of MASTERCLASSES) {
-        const { data: existingProgram, error: fetchError } = await supabase
-          .from('programs')
-          .select('id')
-          .eq('title', masterclass)
-          .maybeSingle();
-
-        if (fetchError) {
-          console.error('Error checking program:', fetchError);
-          continue;
-        }
-
-        if (!existingProgram) {
-          // Program doesn't exist, create it
-          const { error: createError } = await supabase
-            .from('programs')
-            .insert([{ title: masterclass }]);
-
-          if (createError) {
-            console.error('Error creating program:', createError);
-          }
-        }
-      }
-
-      // Now fetch only the masterclasses
-      const { data, error } = await supabase
-        .from('programs')
-        .select('id, title')
-        .in('title', MASTERCLASSES)
-        .order('title', { ascending: true });
+      const { data, error } = await mockDataService.getPrograms();
 
       if (error) throw error;
       
@@ -103,19 +72,17 @@ const AddProspectForm = () => {
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase
-        .from('prospects')
-        .insert([{
-          program_id: formData.program_id,
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone || null,
-          org: formData.org || null,
-          role: formData.role || null,
-          payment_status: formData.payment_status || 'Pending',
-          product_type: formData.product_type || null,
-          registration_status: formData.registration_status
-        }]);
+      const { error } = await mockDataService.addProspect({
+        program_id: formData.program_id,
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone || null,
+        org: formData.org || null,
+        role: formData.role || null,
+        payment_status: formData.payment_status || 'Pending',
+        product_type: formData.product_type || null,
+        registration_status: formData.registration_status
+      });
 
       if (error) throw error;
       
@@ -168,7 +135,7 @@ const AddProspectForm = () => {
               className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md disabled:opacity-50"
             >
               <option value="">
-                {loading ? 'Loading masterclasses...' : 'Select a masterclass...'}
+                {loading ? 'Loading programs...' : 'Select a program...'}
               </option>
               {programmes.map((programme) => (
                 <option key={programme.id} value={programme.id}>
@@ -176,11 +143,6 @@ const AddProspectForm = () => {
                 </option>
               ))}
             </select>
-            {programmes.length === 0 && !loading && (
-              <p className="text-sm text-gray-500 mt-1">
-                Only the 4 core masterclasses are available for prospect registration.
-              </p>
-            )}
           </div>
 
           <div>

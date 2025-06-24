@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { Upload } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { mockDataService } from '@/services/mockDataService';
 import * as XLSX from 'xlsx';
 
 // Product ID to Program Title translation mapping
@@ -151,10 +150,15 @@ const BulkUploadForm = () => {
         throw new Error(`Missing required columns: ${missingColumns.join(', ')}`);
       }
 
-      // Group data by program and process each group
-      const programGroups: Record<string, any[]> = {};
-      
-      fileData.forEach((row: any) => {
+      // Get available programs from mock data
+      const { data: programs } = await mockDataService.getPrograms();
+      const programsMap = programs?.reduce((acc, program) => {
+        acc[program.title] = program.id;
+        return acc;
+      }, {} as Record<string, string>) || {};
+
+      // Process prospects
+      const prospects = fileData.map((row: any) => {
         let programTitle = row.product_type;
         
         // Translate product_id if present
@@ -165,72 +169,31 @@ const BulkUploadForm = () => {
         if (!programTitle) {
           throw new Error('Program information missing in data');
         }
+
+        // Get program ID, default to first available program if not found
+        const programId = programsMap[programTitle] || Object.values(programsMap)[0];
         
-        if (!programGroups[programTitle]) {
-          programGroups[programTitle] = [];
-        }
-        
-        programGroups[programTitle].push({
+        return {
+          program_id: programId,
           name: row.name,
           email: row.email,
           phone: row.phone || null,
           org: row.org || null,
           role: row.role || null,
-          payment_status: normalizePaymentStatus(row.payment), // Apply normalization here
+          payment_status: normalizePaymentStatus(row.payment),
           product_type: programTitle,
-          registration_status: 'Pending'
-        });
+          registration_status: 'Pending' as const
+        };
       });
 
-      let totalInserted = 0;
-      
-      // Process each program group
-      for (const [programTitle, prospects] of Object.entries(programGroups)) {
-        // Get or create program
-        let programId;
-        const { data: existingProgram, error: fetchError } = await supabase
-          .from('programs')
-          .select('id')
-          .eq('title', programTitle)
-          .single();
+      // Upload using mock data service
+      const { error } = await mockDataService.bulkUploadProspects(prospects);
 
-        if (fetchError && fetchError.code !== 'PGRST116') {
-          throw fetchError;
-        }
-
-        if (existingProgram) {
-          programId = existingProgram.id;
-        } else {
-          // Create new program if it doesn't exist
-          const { data: newProgram, error: createError } = await supabase
-            .from('programs')
-            .insert([{ title: programTitle }])
-            .select('id')
-            .single();
-
-          if (createError) throw createError;
-          programId = newProgram.id;
-        }
-
-        // Add program_id to prospects
-        const prospectsWithProgramId = prospects.map(prospect => ({
-          ...prospect,
-          program_id: programId
-        }));
-
-        // Insert prospects
-        const { error: insertError } = await supabase
-          .from('prospects')
-          .insert(prospectsWithProgramId);
-
-        if (insertError) throw insertError;
-        
-        totalInserted += prospects.length;
-      }
+      if (error) throw error;
       
       toast({
         title: "Success",
-        description: `Successfully uploaded ${totalInserted} prospects across ${Object.keys(programGroups).length} program(s). Payment statuses have been normalized to match database requirements.`,
+        description: `Successfully uploaded ${prospects.length} prospects. Payment statuses have been normalized to match database requirements.`,
       });
 
       // Reset form

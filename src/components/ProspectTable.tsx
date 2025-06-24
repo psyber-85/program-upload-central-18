@@ -5,13 +5,13 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from '@/components/ui/pagination';
 import { Phone, Mail, User, Building, AlertCircle, Search, ChevronUp, ChevronDown, Eye, ChevronRight, ChevronLeft, Info } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import LogCallModal from './LogCallModal';
+import MockLogCallModal from './MockLogCallModal';
 import AddHRContactModal from './AddHRContactModal';
 import NotifyHRModal from './NotifyHRModal';
-import UpdateStatusModal from './UpdateStatusModal';
+import MockUpdateStatusModal from './MockUpdateStatusModal';
 import ViewCallNotesModal from './ViewCallNotesModal';
+import { mockDataService } from '@/services/mockDataService';
 
 interface HRContact {
   name: string;
@@ -56,63 +56,6 @@ const ProspectTable = () => {
 
   useEffect(() => {
     fetchProspects();
-    
-    // Set up real-time subscription for prospects
-    const prospectsChannel = supabase
-      .channel('prospects-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'prospects'
-        },
-        () => {
-          console.log('Prospect data changed, refreshing...');
-          fetchProspects();
-        }
-      )
-      .subscribe();
-
-    // Set up real-time subscription for HR contacts
-    const hrChannel = supabase
-      .channel('hr-contacts-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'hr_contacts'
-        },
-        () => {
-          console.log('HR contact data changed, refreshing...');
-          fetchProspects();
-        }
-      )
-      .subscribe();
-
-    // Set up real-time subscription for calls
-    const callsChannel = supabase
-      .channel('calls-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'prospect_calls'
-        },
-        () => {
-          console.log('Call data changed, refreshing...');
-          fetchProspects();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(prospectsChannel);
-      supabase.removeChannel(hrChannel);
-      supabase.removeChannel(callsChannel);
-    };
   }, []);
 
   useEffect(() => {
@@ -151,10 +94,7 @@ const ProspectTable = () => {
       setLoading(true);
       
       // Fetch programs first - ensure we get actual program names
-      const { data: programsData, error: programsError } = await supabase
-        .from('programs')
-        .select('id, title')
-        .order('title');
+      const { data: programsData, error: programsError } = await mockDataService.getPrograms();
       
       if (programsError) throw programsError;
       
@@ -166,15 +106,8 @@ const ProspectTable = () => {
       setPrograms(programsMap);
 
       // Fetch prospects with related data including status_reason
-      const { data: prospectsData, error: prospectsError } = await supabase
-        .from('prospects')
-        .select(`
-          *,
-          prospect_calls(call_date, notes),
-          hr_contacts(name, email, email_sent_at)
-        `)
-        .order('created_at', { ascending: false });
-
+      const { data: prospectsData, error: prospectsError } = await mockDataService.getProspects();
+      
       if (prospectsError) throw prospectsError;
 
       const formattedProspects: Prospect[] = prospectsData?.map(prospect => {
@@ -569,7 +502,7 @@ const ProspectTable = () => {
       )}
 
       {/* Modals */}
-      <LogCallModal
+      <MockLogCallModal
         isOpen={activeModal === 'call'}
         onClose={handleModalClose}
         prospectId={selectedProspect || ''}
@@ -587,7 +520,7 @@ const ProspectTable = () => {
         prospectId={selectedProspect || ''}
         onComplete={refreshProspects}
       />
-      <UpdateStatusModal
+      <MockUpdateStatusModal
         isOpen={activeModal === 'status'}
         onClose={handleModalClose}
         prospectId={selectedProspect || ''}

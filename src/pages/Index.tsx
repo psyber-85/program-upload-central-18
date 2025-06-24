@@ -51,54 +51,58 @@ const Index = () => {
         description: `Processing ${parsedData.length} participants from ${fileNames.split(', ').length} file(s)...`,
       });
       
-      // First, get or create the program
-      let programId;
-      const { data: existingProgram, error: fetchError } = await supabase
-        .from('programs')
-        .select('id')
-        .eq('title', selectedProgram)
-        .single();
-
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        throw fetchError;
-      }
-
-      if (existingProgram) {
-        programId = existingProgram.id;
-      } else {
-        // Create new program if it doesn't exist
-        const { data: newProgram, error: createError } = await supabase
-          .from('programs')
-          .insert([{ title: selectedProgram }])
-          .select('id')
-          .single();
-
-        if (createError) throw createError;
-        programId = newProgram.id;
-      }
-
-      // Transform and insert participant data
-      const participantsData = parsedData.map((row: any) => ({
-        program_id: programId,
-        program_name: selectedProgram,
+      // Transform data to match edge function expectations
+      const transformedData = parsedData.map((row: any) => ({
         name: row.name,
         email: row.email,
         nric_number: row.nric_number,
-        phone: row.phone || null,
-        key_skills: row.key_skills || null,
-        email_sent: false
+        phone: row.phone || '',
+        keyskilllist: row.key_skills || '', // Transform key_skills to keyskilllist
+        program_name: selectedProgram
       }));
 
-      const { error: insertError } = await supabase
-        .from('participants')
-        .insert(participantsData);
-
-      if (insertError) throw insertError;
-
-      toast({
-        title: "Success",
-        description: `Successfully processed ${participantsData.length} participants`,
+      console.log('Calling process-participants edge function with data:', {
+        program: selectedProgram,
+        data: transformedData
       });
+
+      // Call the edge function instead of direct database insertion
+      const { data: result, error } = await supabase.functions.invoke('process-participants', {
+        body: {
+          program: selectedProgram,
+          data: transformedData
+        }
+      });
+
+      if (error) {
+        console.error('Edge function error:', error);
+        throw new Error(error.message || 'Failed to process participants');
+      }
+
+      console.log('Edge function response:', result);
+
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to process participants');
+      }
+
+      // Check results for any failures
+      const successCount = result.results?.filter(r => r.status === 'success').length || 0;
+      const errorCount = result.results?.filter(r => r.status === 'error').length || 0;
+      
+      if (errorCount > 0) {
+        console.error('Some participants failed processing:', result.results.filter(r => r.status === 'error'));
+        toast({
+          title: "Partial Success",
+          description: `${successCount} participants processed successfully, ${errorCount} failed. Check console for details.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: `Successfully processed ${successCount} participants and sent confirmation emails`,
+        });
+      }
+      
       handleReset();
     } catch (error: any) {
       console.error('Error submitting data:', error);

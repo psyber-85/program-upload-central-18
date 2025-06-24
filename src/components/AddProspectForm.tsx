@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,14 +12,6 @@ interface Program {
   title: string;
 }
 
-// Define the 4 masterclasses that should be available
-const MASTERCLASSES = [
-  'Business Writing with AI: 2-Day Masterclass',
-  'The AI-Ready Leader: Win the Future with Strategic Action',
-  'ChatGPT Skill Boost (Intermediate)',
-  'AI and ChatGPT for HR Professionals - 2 Day Masterclass'
-];
-
 const AddProspectForm = () => {
   const [programmes, setProgrammes] = useState<Program[]>([]);
   const [formData, setFormData] = useState({
@@ -28,8 +21,7 @@ const AddProspectForm = () => {
     phone: '',
     org: '',
     role: '',
-    payment_status: '',
-    product_type: '',
+    payment: '', // Changed from payment_status to payment
     registration_status: 'Pending' as const
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -72,6 +64,9 @@ const AddProspectForm = () => {
     setIsSubmitting(true);
 
     try {
+      // Get the selected program to use as product_type
+      const selectedProgram = programmes.find(p => p.id === formData.program_id);
+      
       const { error } = await mockDataService.addProspect({
         program_id: formData.program_id,
         name: formData.name,
@@ -79,8 +74,8 @@ const AddProspectForm = () => {
         phone: formData.phone || null,
         org: formData.org || null,
         role: formData.role || null,
-        payment_status: formData.payment_status || 'Pending',
-        product_type: formData.product_type || null,
+        payment_status: formData.payment || null, // Map payment to payment_status
+        product_type: selectedProgram?.title || null, // Use program title as product_type
         registration_status: formData.registration_status
       });
 
@@ -99,8 +94,7 @@ const AddProspectForm = () => {
         phone: '',
         org: '',
         role: '',
-        payment_status: '',
-        product_type: '',
+        payment: '',
         registration_status: 'Pending'
       });
     } catch (error) {
@@ -199,31 +193,18 @@ const AddProspectForm = () => {
           </div>
 
           <div>
-            <Label htmlFor="payment_status">Payment Status</Label>
+            <Label htmlFor="payment">Payment</Label>
             <select
-              id="payment_status"
-              name="payment_status"
-              value={formData.payment_status}
+              id="payment"
+              name="payment"
+              value={formData.payment}
               onChange={handleInputChange}
               className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md"
             >
-              <option value="">Select payment status...</option>
+              <option value="">Select payment type...</option>
               <option value="HRDC">HRDC</option>
               <option value="Individual">Individual</option>
-              <option value="Paid">Paid</option>
-              <option value="Pending">Pending</option>
             </select>
-          </div>
-
-          <div>
-            <Label htmlFor="product_type">Product Type</Label>
-            <Input
-              id="product_type"
-              name="product_type"
-              value={formData.product_type}
-              onChange={handleInputChange}
-              placeholder="e.g., masterclass, workshop"
-            />
           </div>
 
           <div className="md:col-span-2">

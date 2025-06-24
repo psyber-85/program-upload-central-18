@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,35 +26,27 @@ const BulkUploadForm = () => {
     return PRODUCT_ID_TRANSLATIONS[productId] || productId;
   };
 
-  // Function to normalize payment status values
-  const normalizePaymentStatus = (paymentStatus: string): string | null => {
-    if (!paymentStatus || paymentStatus.trim() === '') return null;
+  // Function to normalize payment values
+  const normalizePayment = (payment: string): string | null => {
+    if (!payment || payment.trim() === '') return null;
     
-    const normalized = paymentStatus.toLowerCase().trim();
+    const normalized = payment.toLowerCase().trim();
     
-    // Map common variations to our allowed values
+    // Map to HRDC or Individual
     switch (normalized) {
-      case 'paid':
-      case 'complete':
-      case 'completed':
-      case 'success':
-      case 'successful':
-        return 'paid';
-      case 'pending':
-      case 'processing':
-      case 'in progress':
-      case 'waiting':
-        return 'pending';
-      case 'failed':
-      case 'failure':
-      case 'unsuccessful':
-      case 'declined':
-      case 'rejected':
-        return 'failed';
+      case 'hrdc':
+      case 'hrdf':
+      case 'human resource development corporation':
+        return 'HRDC';
+      case 'individual':
+      case 'self':
+      case 'personal':
+      case 'private':
+        return 'Individual';
       default:
-        // If we can't map it, return null (which is allowed)
-        console.warn(`Unknown payment status: ${paymentStatus}, setting to null`);
-        return null;
+        // If we can't map it, return the original value
+        console.warn(`Unknown payment type: ${payment}, keeping original value`);
+        return payment;
     }
   };
 
@@ -141,7 +134,7 @@ const BulkUploadForm = () => {
         throw new Error('No data found in file');
       }
 
-      // Validate required columns
+      // Validate required columns - updated to match new structure
       const requiredColumns = ['name', 'email', 'phone', 'org', 'role', 'payment', 'product_type'];
       const firstRow = fileData[0] as any;
       const missingColumns = requiredColumns.filter(col => !(col in firstRow));
@@ -157,7 +150,7 @@ const BulkUploadForm = () => {
         return acc;
       }, {} as Record<string, string>) || {};
 
-      // Process prospects
+      // Process prospects - updated to handle new structure
       const prospects = fileData.map((row: any) => {
         let programTitle = row.product_type;
         
@@ -180,7 +173,7 @@ const BulkUploadForm = () => {
           phone: row.phone || null,
           org: row.org || null,
           role: row.role || null,
-          payment_status: normalizePaymentStatus(row.payment),
+          payment_status: normalizePayment(row.payment),
           product_type: programTitle,
           registration_status: 'Pending' as const
         };
@@ -193,7 +186,7 @@ const BulkUploadForm = () => {
       
       toast({
         title: "Success",
-        description: `Successfully uploaded ${prospects.length} prospects. Payment statuses have been normalized to match database requirements.`,
+        description: `Successfully uploaded ${prospects.length} prospects. Payment types have been normalized to HRDC/Individual format.`,
       });
 
       // Reset form
@@ -238,21 +231,22 @@ const BulkUploadForm = () => {
               The file should have the following columns in the first row:
             </p>
             <ul className="text-sm text-blue-700 list-disc list-inside space-y-1">
+              <li>id (optional - for tracking purposes)</li>
               <li>name</li>
               <li>email</li>
               <li>phone</li>
               <li>org</li>
               <li>role</li>
-              <li>payment (accepts: paid/pending/failed and common variations)</li>
+              <li>payment (HRDC or Individual)</li>
               <li>product_type (program name)</li>
               <li>product_id (optional - will be automatically translated to program titles)</li>
             </ul>
             <div className="mt-3 p-3 bg-blue-100 rounded">
-              <p className="text-xs text-blue-800 font-medium">Auto Program Detection & Payment Status Normalization:</p>
+              <p className="text-xs text-blue-800 font-medium">Auto Program Detection & Payment Normalization:</p>
               <p className="text-xs text-blue-700">
                 Programs will be automatically detected from the product_type or product_id columns. 
-                Payment statuses will be automatically normalized (e.g., "Paid" → "paid", "Processing" → "pending").
-                No need to select a program manually - the system will create programs as needed.
+                Payment types will be automatically normalized to HRDC or Individual format.
+                The ID column will be ignored during import but can be included for reference.
               </p>
             </div>
           </div>

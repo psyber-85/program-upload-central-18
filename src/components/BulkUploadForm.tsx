@@ -153,7 +153,7 @@ const BulkUploadForm = () => {
           phone: row.phone || null,
           org: row.org || null,
           role: row.role || null,
-          payment_status: row.payment || null,
+          payment: row.payment || null,
           product_type: programTitle,
           product_id: row.product_id || null,
           registration_status: 'Pending' as const

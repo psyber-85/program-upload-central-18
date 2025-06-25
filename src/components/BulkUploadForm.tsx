@@ -33,6 +33,15 @@ const BulkUploadForm = () => {
     
     // Map common variations to our allowed values
     switch (normalized) {
+      // Standard business payment types
+      case 'hrdc':
+      case 'hrdf':
+        return 'hrdc';
+      case 'individual':
+      case 'self-funded':
+      case 'personal':
+        return 'individual';
+      // Standard payment statuses
       case 'paid':
       case 'complete':
       case 'completed':
@@ -51,9 +60,9 @@ const BulkUploadForm = () => {
       case 'rejected':
         return 'failed';
       default:
-        // If we can't map it, return null (which is allowed)
-        console.warn(`Unknown payment status: ${payment}, setting to null`);
-        return null;
+        // If we can't map it, return the original value (lowercased)
+        console.warn(`Unknown payment status: ${payment}, keeping as: ${normalized}`);
+        return normalized;
     }
   };
 
@@ -175,7 +184,7 @@ const BulkUploadForm = () => {
           phone: row.phone || null,
           org: row.org || null,
           role: row.role || null,
-          payment: normalizePayment(row.payment), // Fixed: use 'payment' instead of 'payment_status'
+          payment: normalizePayment(row.payment),
           product_type: programTitle,
           registration_status: 'Pending'
         });
@@ -229,7 +238,7 @@ const BulkUploadForm = () => {
       
       toast({
         title: "Success",
-        description: `Successfully uploaded ${totalInserted} prospects across ${Object.keys(programGroups).length} program(s). Payment statuses have been normalized to match database requirements.`,
+        description: `Successfully uploaded ${totalInserted} prospects across ${Object.keys(programGroups).length} program(s). Payment values have been normalized and stored correctly.`,
       });
 
       // Reset form
@@ -279,16 +288,16 @@ const BulkUploadForm = () => {
               <li>phone</li>
               <li>org</li>
               <li>role</li>
-              <li>payment (accepts: paid/pending/failed and common variations)</li>
+              <li>payment (accepts: hrdc/individual for payment types, or paid/pending/failed for status)</li>
               <li>product_type (program name)</li>
               <li>product_id (optional - will be automatically translated to program titles)</li>
             </ul>
             <div className="mt-3 p-3 bg-blue-100 rounded">
-              <p className="text-xs text-blue-800 font-medium">Auto Program Detection & Payment Normalization:</p>
+              <p className="text-xs text-blue-800 font-medium">Auto Program Detection & Payment Handling:</p>
               <p className="text-xs text-blue-700">
                 Programs will be automatically detected from the product_type or product_id columns. 
-                Payment values will be automatically normalized (e.g., "Paid" → "paid", "Processing" → "pending").
-                No need to select a program manually - the system will create programs as needed.
+                Payment values will be automatically normalized - "HRDC"/"HRDF" → "hrdc", "Individual"/"Self-funded" → "individual".
+                Common payment status variations are also supported (e.g., "Paid" → "paid", "Processing" → "pending").
               </p>
             </div>
           </div>

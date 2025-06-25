@@ -157,10 +157,11 @@ export type Database = {
           id: string
           name: string
           org: string | null
-          payment_status: string | null
+          payment: string | null
           phone: string | null
+          product_id: string | null
           product_type: string | null
-          program_id: string
+          program_id: string | null
           registration_status: string | null
           role: string | null
           status_reason: string | null
@@ -172,10 +173,11 @@ export type Database = {
           id?: string
           name: string
           org?: string | null
-          payment_status?: string | null
+          payment?: string | null
           phone?: string | null
+          product_id?: string | null
           product_type?: string | null
-          program_id: string
+          program_id?: string | null
           registration_status?: string | null
           role?: string | null
           status_reason?: string | null
@@ -187,24 +189,41 @@ export type Database = {
           id?: string
           name?: string
           org?: string | null
-          payment_status?: string | null
+          payment?: string | null
           phone?: string | null
+          product_id?: string | null
           product_type?: string | null
-          program_id?: string
+          program_id?: string | null
           registration_status?: string | null
           role?: string | null
           status_reason?: string | null
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "prospects_program_id_fkey"
-            columns: ["program_id"]
-            isOneToOne: false
-            referencedRelation: "programs"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
+      }
+      registration_programs: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {

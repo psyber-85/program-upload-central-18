@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,11 +25,11 @@ const BulkUploadForm = () => {
     return PRODUCT_ID_TRANSLATIONS[productId] || productId;
   };
 
-  // Function to normalize payment status values
-  const normalizePaymentStatus = (paymentStatus: string): string | null => {
-    if (!paymentStatus || paymentStatus.trim() === '') return null;
+  // Function to normalize payment values
+  const normalizePayment = (payment: string): string | null => {
+    if (!payment || payment.trim() === '') return null;
     
-    const normalized = paymentStatus.toLowerCase().trim();
+    const normalized = payment.toLowerCase().trim();
     
     // Map common variations to our allowed values
     switch (normalized) {
@@ -53,7 +52,7 @@ const BulkUploadForm = () => {
         return 'failed';
       default:
         // If we can't map it, return null (which is allowed)
-        console.warn(`Unknown payment status: ${paymentStatus}, setting to null`);
+        console.warn(`Unknown payment status: ${payment}, setting to null`);
         return null;
     }
   };
@@ -176,7 +175,7 @@ const BulkUploadForm = () => {
           phone: row.phone || null,
           org: row.org || null,
           role: row.role || null,
-          payment_status: normalizePaymentStatus(row.payment), // Apply normalization here
+          payment: normalizePayment(row.payment), // Fixed: use 'payment' instead of 'payment_status'
           product_type: programTitle,
           registration_status: 'Pending'
         });
@@ -285,10 +284,10 @@ const BulkUploadForm = () => {
               <li>product_id (optional - will be automatically translated to program titles)</li>
             </ul>
             <div className="mt-3 p-3 bg-blue-100 rounded">
-              <p className="text-xs text-blue-800 font-medium">Auto Program Detection & Payment Status Normalization:</p>
+              <p className="text-xs text-blue-800 font-medium">Auto Program Detection & Payment Normalization:</p>
               <p className="text-xs text-blue-700">
                 Programs will be automatically detected from the product_type or product_id columns. 
-                Payment statuses will be automatically normalized (e.g., "Paid" → "paid", "Processing" → "pending").
+                Payment values will be automatically normalized (e.g., "Paid" → "paid", "Processing" → "pending").
                 No need to select a program manually - the system will create programs as needed.
               </p>
             </div>

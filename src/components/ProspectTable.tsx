@@ -246,13 +246,23 @@ const ProspectTable = () => {
   };
 
   const getPaymentBadgeVariant = (status: string | null) => {
-    switch (status) {
-      case 'HRDC': return 'default';
-      case 'Individual': return 'secondary';
-      case 'Paid': return 'default';
-      case 'Pending': return 'outline';
+    if (!status) return 'outline';
+    
+    const normalizedStatus = status.toLowerCase();
+    switch (normalizedStatus) {
+      case 'hrdc': return 'default';
+      case 'individual': return 'secondary';
+      case 'paid': return 'default';
+      case 'pending': return 'outline';
       default: return 'outline';
     }
+  };
+
+  const formatPaymentDisplay = (payment: string | null) => {
+    if (!payment) return 'Not Set';
+    
+    // Capitalize first letter for display
+    return payment.charAt(0).toUpperCase() + payment.slice(1).toLowerCase();
   };
 
   const handleModalOpen = (modalType: string, prospectId: string) => {
@@ -425,7 +435,7 @@ const ProspectTable = () => {
                   </TableCell>
                   <TableCell>
                     <Badge variant={getPaymentBadgeVariant(prospect.payment)}>
-                      {prospect.payment || 'Not Set'}
+                      {formatPaymentDisplay(prospect.payment)}
                     </Badge>
                   </TableCell>
                   {showSecondaryColumns && (

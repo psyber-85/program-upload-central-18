@@ -23,6 +23,7 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
   onComplete
 }) => {
   const [prospectData, setProspectData] = useState<any>(null);
+  const [programData, setProgramData] = useState<any>(null);
   const [hrContact, setHrContact] = useState<any>(null);
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
@@ -37,11 +38,11 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
 
   const loadProspectData = async () => {
     try {
+      // First fetch the prospect data
       const { data: prospect, error: prospectError } = await supabase
         .from('prospects')
         .select(`
           *,
-          programs(title),
           hr_contacts(*)
         `)
         .eq('id', prospectId)
@@ -51,12 +52,27 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
 
       setProspectData(prospect);
       
+      // Then fetch the program data separately if program_id exists
+      if (prospect.program_id) {
+        const { data: program, error: programError } = await supabase
+          .from('programs')
+          .select('*')
+          .eq('id', prospect.program_id)
+          .single();
+
+        if (programError) {
+          console.error('Program fetch error:', programError);
+        } else {
+          setProgramData(program);
+        }
+      }
+      
       if (prospect.hr_contacts && prospect.hr_contacts.length > 0) {
         const hrContactData = prospect.hr_contacts[0];
         setHrContact(hrContactData);
         
         // Set default email subject and body
-        const programTitle = prospect.programs?.title || 'Training Program';
+        const programTitle = programData?.title || 'Training Program';
         setEmailSubject(`Training Registration Confirmation - ${prospect.name}`);
         setEmailBody(`Dear ${hrContactData.name},
 
@@ -108,7 +124,7 @@ Training Administration Team`);
           subject: emailSubject,
           message: emailBody,
           prospect_name: prospectData?.name,
-          program_title: prospectData?.programs?.title
+          program_title: programData?.title || 'Training Program'
         }
       });
 
@@ -152,6 +168,7 @@ Training Administration Team`);
 
   const handleClose = () => {
     setProspectData(null);
+    setProgramData(null);
     setHrContact(null);
     setEmailSubject('');
     setEmailBody('');

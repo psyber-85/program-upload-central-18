@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ProspectTable from '@/components/ProspectTable';
 import BulkUploadForm from '@/components/BulkUploadForm';
-import AddProspectForm from '@/components/AddProspectForm';
 import ProgramSummary from '@/components/ProgramSummary';
 import AddProgramForm from '@/components/AddProgramForm';
 
@@ -26,10 +25,9 @@ const RegisterTracker = () => {
         </div>
         
         <Tabs defaultValue="prospects" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="prospects">Prospect List</TabsTrigger>
             <TabsTrigger value="upload">Bulk Upload</TabsTrigger>
-            <TabsTrigger value="add">Add Prospect</TabsTrigger>
             <TabsTrigger value="programs">Manage Programs</TabsTrigger>
           </TabsList>
           
@@ -39,10 +37,6 @@ const RegisterTracker = () => {
           
           <TabsContent value="upload" className="mt-4">
             <BulkUploadForm key={refreshKey} />
-          </TabsContent>
-          
-          <TabsContent value="add" className="mt-4">
-            <AddProspectForm key={refreshKey} />
           </TabsContent>
           
           <TabsContent value="programs" className="mt-4">

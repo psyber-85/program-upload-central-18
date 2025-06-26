@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from '@/components/ui/pagination';
-import { Phone, Mail, User, Building, AlertCircle, Search, ChevronUp, ChevronDown, Eye, ChevronRight, ChevronLeft, Info } from 'lucide-react';
+import { Phone, Mail, User, Building, AlertCircle, Search, ChevronUp, ChevronDown, Eye, ChevronRight, ChevronLeft, Info, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import LogCallModal from './LogCallModal';
@@ -12,6 +12,7 @@ import AddHRContactModal from './AddHRContactModal';
 import NotifyHRModal from './NotifyHRModal';
 import UpdateStatusModal from './UpdateStatusModal';
 import ViewCallNotesModal from './ViewCallNotesModal';
+import AddProspectModal from './AddProspectModal';
 
 interface HRContact {
   name: string;
@@ -52,6 +53,7 @@ const ProspectTable = () => {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [prospectsPerPage] = useState(10);
   const [showSecondaryColumns, setShowSecondaryColumns] = useState(false);
+  const [addProspectModalOpen, setAddProspectModalOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -320,7 +322,7 @@ const ProspectTable = () => {
 
   return (
     <div className="bg-white rounded-lg shadow">
-      {/* Search Bar and Column Toggle */}
+      {/* Search Bar, Column Toggle, and Add Prospect Button */}
       <div className="p-4 border-b">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div className="relative max-w-md">
@@ -332,15 +334,24 @@ const ProspectTable = () => {
               className="pl-10"
             />
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowSecondaryColumns(!showSecondaryColumns)}
-            className="flex items-center gap-2"
-          >
-            {showSecondaryColumns ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-            {showSecondaryColumns ? 'Hide Details' : 'Show Details'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setAddProspectModalOpen(true)}
+              className="flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Add Prospect
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowSecondaryColumns(!showSecondaryColumns)}
+              className="flex items-center gap-2"
+            >
+              {showSecondaryColumns ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              {showSecondaryColumns ? 'Hide Details' : 'Show Details'}
+            </Button>
+          </div>
         </div>
         <div className="mt-2 text-sm text-gray-600">
           Showing {filteredProspects.length} of {prospects.length} prospects
@@ -607,6 +618,11 @@ const ProspectTable = () => {
         isOpen={activeModal === 'viewNotes'}
         onClose={handleModalClose}
         prospectId={selectedProspect || ''}
+      />
+      <AddProspectModal
+        isOpen={addProspectModalOpen}
+        onClose={() => setAddProspectModalOpen(false)}
+        onComplete={refreshProspects}
       />
     </div>
   );

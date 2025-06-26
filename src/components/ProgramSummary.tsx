@@ -63,7 +63,10 @@ const ProgramSummary = () => {
 
       if (prospectsError) throw prospectsError;
 
-      // Calculate statistics
+      console.log('Programs:', programs);
+      console.log('Prospects:', prospects);
+
+      // Calculate statistics for each program
       const stats = programs?.map(program => {
         const programProspects = prospects?.filter(p => p.program_id === program.id) || [];
         
@@ -74,6 +77,8 @@ const ProgramSummary = () => {
         const onHold = programProspects.filter(p => p.registration_status === 'On Hold').length;
         const total = programProspects.length;
 
+        console.log(`Program ${program.title}: ${total} prospects`);
+
         return {
           programName: program.title,
           pending,
@@ -83,8 +88,9 @@ const ProgramSummary = () => {
           onHold,
           total
         };
-      }).filter(stat => stat.total > 0) || []; // Only show programs with prospects
+      }) || [];
 
+      // Show all programs, even those with 0 prospects
       setProgramStats(stats);
     } catch (error) {
       console.error('Error fetching program stats:', error);
@@ -140,11 +146,11 @@ const ProgramSummary = () => {
       <Card>
         <CardHeader>
           <CardTitle>Program Summary</CardTitle>
-          <CardDescription>No prospect data available</CardDescription>
+          <CardDescription>No programs available</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-64 flex items-center justify-center text-gray-500">
-            <p>Add some prospects to see program statistics</p>
+            <p>No programs found in the system</p>
           </div>
         </CardContent>
       </Card>

@@ -23,10 +23,9 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
   onComplete
 }) => {
   const [prospectData, setProspectData] = useState<any>(null);
-  const [programData, setProgramData] = useState<any>(null);
   const [hrContact, setHrContact] = useState<any>(null);
   const [emailSubject, setEmailSubject] = useState('');
-  const [emailBody, setEmailBody] = useState('');
+  const [emailPreview, setEmailPreview] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
@@ -38,7 +37,7 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
 
   const loadProspectData = async () => {
     try {
-      // First fetch the prospect data
+      // Fetch the prospect data
       const { data: prospect, error: prospectError } = await supabase
         .from('prospects')
         .select(`
@@ -52,46 +51,16 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
 
       setProspectData(prospect);
       
-      // Then fetch the program data separately if program_id exists
-      if (prospect.program_id) {
-        const { data: program, error: programError } = await supabase
-          .from('programs')
-          .select('*')
-          .eq('id', prospect.program_id)
-          .single();
-
-        if (programError) {
-          console.error('Program fetch error:', programError);
-        } else {
-          setProgramData(program);
-        }
-      }
-      
       if (prospect.hr_contacts && prospect.hr_contacts.length > 0) {
         const hrContactData = prospect.hr_contacts[0];
         setHrContact(hrContactData);
         
-        // Set default email subject and body
-        const programTitle = programData?.title || 'Training Program';
-        setEmailSubject(`Training Registration Confirmation - ${prospect.name}`);
-        setEmailBody(`Dear ${hrContactData.name},
-
-I hope this message finds you well.
-
-I am writing to confirm the training registration for ${prospect.name} from your organization (${prospect.org || 'your company'}) for the "${programTitle}" program.
-
-Participant Details:
-- Name: ${prospect.name}
-- Email: ${prospect.email}
-- Role: ${prospect.role || 'Not specified'}
-- Registration Status: ${prospect.registration_status}
-
-Please review and confirm this registration at your earliest convenience. If you have any questions or need additional information, please don't hesitate to reach out.
-
-Thank you for your time and cooperation.
-
-Best regards,
-Training Administration Team`);
+        // Set default email subject
+        const courseName = prospect.product_type || 'Training Program';
+        setEmailSubject(`Training Registration for ${courseName}`);
+        
+        // Generate email preview
+        generateEmailPreview(hrContactData.name, prospect.name, courseName, prospect.product_type);
       }
     } catch (error) {
       console.error('Failed to load prospect data:', error);
@@ -103,12 +72,71 @@ Training Administration Team`);
     }
   };
 
+  const generateEmailPreview = (hrName: string, staffName: string, courseName: string, productType: string) => {
+    // Program-specific links mapping
+    const programLinks: Record<string, { signupForm: string; courseBrochure: string }> = {
+      "Business Writing with AI: 2-Day Masterclass": {
+        signupForm: "https://drive.google.com/file/d/1i8os64_0YWr0nlJns88-i3IT1hNaepaN/view?usp=drive_link",
+        courseBrochure: "https://drive.google.com/file/d/1f0-Nyg0zXxJ2-4c4OBzAduQr7Lk9QWmU/view?usp=drive_link"
+      },
+      "ChatGPT Skill Boost (Intermediate)": {
+        signupForm: "https://drive.google.com/file/d/14xHGHHjbpXKo37D0Rp12mPKxJGxfJWP3/view?usp=drive_link",
+        courseBrochure: "https://drive.google.com/file/d/16L7LfiuwFIIlJoY8HsMYql9pMSn372LX/view?usp=drive_link"
+      },
+      "AI and ChatGPT for HR Professionals - 2 Day Masterclass": {
+        signupForm: "www.example.com",
+        courseBrochure: "https://drive.google.com/file/d/1GWc2tUZfsUR8FSZxuGuBR8T34iVv9fFy/view"
+      },
+      "The AI-Ready Leader: Win the Future with Strategic Action": {
+        signupForm: "www.example.com",
+        courseBrochure: "https://drive.google.com/file/d/1silb4DtDCHv04r_eriODS6nn-QWZmkrs/view"
+      }
+    };
+
+    const links = programLinks[productType] || {
+      signupForm: "www.example.com",
+      courseBrochure: "www.example.com"
+    };
+
+    const preview = `Dear ${hrName},
+
+I hope this message finds you well.
+
+I am writing to facilitate the registration of ${staffName} from your organization for the upcoming training program, ${courseName}, conducted by AIHQ.
+
+Attached are the following documents for your review:
+
+- Course Brochure: ${links.courseBrochure}
+- Sign-Up Form: ${links.signupForm}
+
+The fee for this 2-day program is RM2,850, as stated in the sign-up form. Please note that this course is 100% HRDC Claimable. We kindly ask you to review the enclosed materials for HRD levy approval and confirm the registration at your earliest convenience.
+
+For more information on AIHQ's expertise and track record, feel free to explore:
+
+AIHQ's Profile & Portfolio: https://theaihq.net/AIHQ_&_Pang%20-%20Detailed%20Profile__.pdf
+
+Our Website: http://theaihq.net
+
+Our 4.9-Star Google Reviews: [Google Reviews Link]
+
+Should you have any questions or need further assistance, please feel free to contact me directly.
+
+Thank you for your attention and support. We look forward to welcoming ${staffName} to the program.
+
+Best regards,
+AIHQ Training and Consultancy
+
+_______`;
+
+    setEmailPreview(preview);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hrContact || !emailSubject.trim() || !emailBody.trim()) {
+    if (!hrContact || !emailSubject.trim() || !prospectData) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
+        description: "Missing required information",
         variant: "destructive",
       });
       return;
@@ -116,15 +144,16 @@ Training Administration Team`);
 
     setIsSubmitting(true);
     try {
-      // Call the SendGrid edge function
+      // Call the SendGrid edge function with product_type
       const { data, error } = await supabase.functions.invoke('send-hr-notification', {
         body: {
           to_email: hrContact.email,
           to_name: hrContact.name,
           subject: emailSubject,
-          message: emailBody,
+          message: emailPreview, // This won't be used in the new template system
           prospect_name: prospectData?.name,
-          program_title: programData?.title || 'Training Program'
+          program_title: prospectData?.product_type || 'Training Program',
+          product_type: prospectData?.product_type
         }
       });
 
@@ -168,10 +197,9 @@ Training Administration Team`);
 
   const handleClose = () => {
     setProspectData(null);
-    setProgramData(null);
     setHrContact(null);
     setEmailSubject('');
-    setEmailBody('');
+    setEmailPreview('');
     onClose();
   };
 
@@ -195,14 +223,14 @@ Training Administration Team`);
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mail className="w-5 h-5" />
             Send HR Notification
           </DialogTitle>
           <DialogDescription>
-            Send an email notification to {hrContact.name} ({hrContact.email})
+            Send a professional training registration email to {hrContact.name} ({hrContact.email})
           </DialogDescription>
         </DialogHeader>
         
@@ -220,24 +248,37 @@ Training Administration Team`);
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="body">Email Message</Label>
+              <Label htmlFor="preview">Email Preview</Label>
+              <div className="text-sm text-gray-600 mb-2">
+                This is a preview of the email that will be sent. The actual email will be formatted with proper HTML styling and clickable links.
+              </div>
               <Textarea
-                id="body"
-                value={emailBody}
-                onChange={(e) => setEmailBody(e.target.value)}
-                required
-                className="min-h-[300px]"
-                placeholder="Enter your email message"
+                id="preview"
+                value={emailPreview}
+                readOnly
+                className="min-h-[400px] bg-gray-50 font-mono text-sm"
+                placeholder="Email preview will appear here"
               />
             </div>
 
-            <div className="p-3 bg-gray-50 rounded text-sm">
-              <strong>Recipient:</strong> {hrContact.name} ({hrContact.email})
-              {hrContact.email_sent_at && (
-                <div className="mt-1 text-green-600">
-                  ✅ Previous email sent: {new Date(hrContact.email_sent_at).toLocaleString()}
+            <div className="p-4 bg-blue-50 rounded-lg">
+              <div className="flex items-start gap-2">
+                <Mail className="w-5 h-5 text-blue-600 mt-0.5" />
+                <div>
+                  <div className="font-medium text-blue-900">Email Details</div>
+                  <div className="text-sm text-blue-700 mt-1">
+                    <div><strong>To:</strong> {hrContact.name} ({hrContact.email})</div>
+                    <div><strong>From:</strong> AIHQ Training and Consultancy (wani@theaihq.net)</div>
+                    <div><strong>Program:</strong> {prospectData?.product_type}</div>
+                    <div><strong>Participant:</strong> {prospectData?.name}</div>
+                  </div>
+                  {hrContact.email_sent_at && (
+                    <div className="mt-2 text-green-600 text-sm">
+                      ✅ Previous email sent: {new Date(hrContact.email_sent_at).toLocaleString()}
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
 

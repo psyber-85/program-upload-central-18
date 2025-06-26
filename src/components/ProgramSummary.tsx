@@ -49,48 +49,99 @@ const ProgramSummary = () => {
     try {
       setLoading(true);
       
-      // Fetch programs from registration_programs table
-      const { data: programs, error: programsError } = await supabase
+      // Fetch programs and prospects with a join to get program titles
+      const { data: programData, error: programError } = await supabase
+        .from('prospects')
+        .select(`
+          registration_status,
+          registration_programs!inner(
+            id,
+            title
+          )
+        `);
+
+      if (programError) {
+        console.error('Error fetching program data:', programError);
+        throw programError;
+      }
+
+      // Also fetch all programs to ensure we show programs with 0 prospects
+      const { data: allPrograms, error: allProgramsError } = await supabase
         .from('registration_programs')
         .select('id, title')
         .order('created_at', { ascending: false });
 
-      if (programsError) throw programsError;
+      if (allProgramsError) {
+        console.error('Error fetching all programs:', allProgramsError);
+        throw allProgramsError;
+      }
 
-      const { data: prospects, error: prospectsError } = await supabase
-        .from('prospects')
-        .select('program_id, registration_status');
+      console.log('Program data with prospects:', programData);
+      console.log('All programs:', allPrograms);
 
-      if (prospectsError) throw prospectsError;
+      // Create a map to count statistics for each program
+      const programStatsMap = new Map();
 
-      console.log('Programs:', programs);
-      console.log('Prospects:', prospects);
-
-      // Calculate statistics for each program
-      const stats = programs?.map(program => {
-        const programProspects = prospects?.filter(p => p.program_id === program.id) || [];
-        
-        const pending = programProspects.filter(p => p.registration_status === 'Pending').length;
-        const approved = programProspects.filter(p => p.registration_status === 'Approved').length;
-        const rejected = programProspects.filter(p => p.registration_status === 'Rejected').length;
-        const postponed = programProspects.filter(p => p.registration_status === 'Postponed').length;
-        const onHold = programProspects.filter(p => p.registration_status === 'On Hold').length;
-        const total = programProspects.length;
-
-        console.log(`Program ${program.title}: ${total} prospects`);
-
-        return {
+      // Initialize all programs with zero counts
+      allPrograms?.forEach(program => {
+        programStatsMap.set(program.id, {
           programName: program.title,
-          pending,
-          approved,
-          rejected,
-          postponed,
-          onHold,
-          total
-        };
-      }) || [];
+          pending: 0,
+          approved: 0,
+          rejected: 0,
+          postponed: 0,
+          onHold: 0,
+          total: 0
+        });
+      });
 
-      // Show all programs, even those with 0 prospects
+      // Count prospects for each program
+      programData?.forEach(prospect => {
+        const programId = prospect.registration_programs.id;
+        const programTitle = prospect.registration_programs.title;
+        const status = prospect.registration_status;
+
+        if (!programStatsMap.has(programId)) {
+          programStatsMap.set(programId, {
+            programName: programTitle,
+            pending: 0,
+            approved: 0,
+            rejected: 0,
+            postponed: 0,
+            onHold: 0,
+            total: 0
+          });
+        }
+
+        const stats = programStatsMap.get(programId);
+        stats.total += 1;
+
+        switch (status) {
+          case 'Pending':
+            stats.pending += 1;
+            break;
+          case 'Approved':
+            stats.approved += 1;
+            break;
+          case 'Rejected':
+            stats.rejected += 1;
+            break;
+          case 'Postponed':
+            stats.postponed += 1;
+            break;
+          case 'On Hold':
+            stats.onHold += 1;
+            break;
+        }
+      });
+
+      const stats = Array.from(programStatsMap.values());
+      
+      // Log the results for debugging
+      stats.forEach(stat => {
+        console.log(`Program ${stat.programName}: ${stat.total} prospects (Pending: ${stat.pending}, Approved: ${stat.approved}, Rejected: ${stat.rejected}, Postponed: ${stat.postponed}, On Hold: ${stat.onHold})`);
+      });
+
       setProgramStats(stats);
     } catch (error) {
       console.error('Error fetching program stats:', error);
@@ -203,7 +254,7 @@ const ProgramSummary = () => {
       <Card>
         <CardHeader>
           <CardTitle>Registration Status by Program</CardTitle>
-          <CardDescription>Visual breakdown of prospect statuses across all programs</CardDescription>
+          <CardDescription>Total number of prospects that participate in each program</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-80">

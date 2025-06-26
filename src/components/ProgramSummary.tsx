@@ -49,23 +49,7 @@ const ProgramSummary = () => {
     try {
       setLoading(true);
       
-      // Fetch programs and prospects with a join to get program titles
-      const { data: programData, error: programError } = await supabase
-        .from('prospects')
-        .select(`
-          registration_status,
-          registration_programs!inner(
-            id,
-            title
-          )
-        `);
-
-      if (programError) {
-        console.error('Error fetching program data:', programError);
-        throw programError;
-      }
-
-      // Also fetch all programs to ensure we show programs with 0 prospects
+      // Fetch all programs
       const { data: allPrograms, error: allProgramsError } = await supabase
         .from('registration_programs')
         .select('id, title')
@@ -76,8 +60,18 @@ const ProgramSummary = () => {
         throw allProgramsError;
       }
 
-      console.log('Program data with prospects:', programData);
+      // Fetch all prospects
+      const { data: allProspects, error: prospectsError } = await supabase
+        .from('prospects')
+        .select('program_id, registration_status');
+
+      if (prospectsError) {
+        console.error('Error fetching prospects:', prospectsError);
+        throw prospectsError;
+      }
+
       console.log('All programs:', allPrograms);
+      console.log('All prospects:', allProspects);
 
       // Create a map to count statistics for each program
       const programStatsMap = new Map();
@@ -96,42 +90,34 @@ const ProgramSummary = () => {
       });
 
       // Count prospects for each program
-      programData?.forEach(prospect => {
-        const programId = prospect.registration_programs.id;
-        const programTitle = prospect.registration_programs.title;
+      allProspects?.forEach(prospect => {
+        if (!prospect.program_id) return; // Skip prospects without program_id
+        
+        const programId = prospect.program_id;
         const status = prospect.registration_status;
 
-        if (!programStatsMap.has(programId)) {
-          programStatsMap.set(programId, {
-            programName: programTitle,
-            pending: 0,
-            approved: 0,
-            rejected: 0,
-            postponed: 0,
-            onHold: 0,
-            total: 0
-          });
-        }
+        // Only count prospects that belong to existing programs
+        if (programStatsMap.has(programId)) {
+          const stats = programStatsMap.get(programId);
+          stats.total += 1;
 
-        const stats = programStatsMap.get(programId);
-        stats.total += 1;
-
-        switch (status) {
-          case 'Pending':
-            stats.pending += 1;
-            break;
-          case 'Approved':
-            stats.approved += 1;
-            break;
-          case 'Rejected':
-            stats.rejected += 1;
-            break;
-          case 'Postponed':
-            stats.postponed += 1;
-            break;
-          case 'On Hold':
-            stats.onHold += 1;
-            break;
+          switch (status) {
+            case 'Pending':
+              stats.pending += 1;
+              break;
+            case 'Approved':
+              stats.approved += 1;
+              break;
+            case 'Rejected':
+              stats.rejected += 1;
+              break;
+            case 'Postponed':
+              stats.postponed += 1;
+              break;
+            case 'On Hold':
+              stats.onHold += 1;
+              break;
+          }
         }
       });
 

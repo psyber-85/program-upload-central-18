@@ -24,14 +24,6 @@ interface AddProspectModalProps {
   onComplete: () => void;
 }
 
-// Define the 4 masterclasses that should be available
-const MASTERCLASSES = [
-  'Business Writing with AI: 2-Day Masterclass',
-  'The AI-Ready Leader: Win the Future with Strategic Action',
-  'ChatGPT Skill Boost (Intermediate)',
-  'AI and ChatGPT for HR Professionals - 2 Day Masterclass'
-];
-
 const AddProspectModal = ({ isOpen, onClose, onComplete }: AddProspectModalProps) => {
   const [programmes, setProgrammes] = useState<Program[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,36 +49,10 @@ const AddProspectModal = ({ isOpen, onClose, onComplete }: AddProspectModalProps
     try {
       setLoading(true);
       
-      // Ensure all masterclasses exist in the database
-      for (const masterclass of MASTERCLASSES) {
-        const { data: existingProgram, error: fetchError } = await supabase
-          .from('programs')
-          .select('id')
-          .eq('title', masterclass)
-          .maybeSingle();
-
-        if (fetchError) {
-          console.error('Error checking program:', fetchError);
-          continue;
-        }
-
-        if (!existingProgram) {
-          // Program doesn't exist, create it
-          const { error: createError } = await supabase
-            .from('programs')
-            .insert([{ title: masterclass }]);
-
-          if (createError) {
-            console.error('Error creating program:', createError);
-          }
-        }
-      }
-
-      // Now fetch only the masterclasses
+      // Fetch programs from registration_programs table
       const { data, error } = await supabase
-        .from('programs')
+        .from('registration_programs')
         .select('id, title')
-        .in('title', MASTERCLASSES)
         .order('title', { ascending: true });
 
       if (error) throw error;
@@ -197,7 +163,7 @@ const AddProspectModal = ({ isOpen, onClose, onComplete }: AddProspectModalProps
               className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md disabled:opacity-50"
             >
               <option value="">
-                {loading ? 'Loading masterclasses...' : 'Select a masterclass...'}
+                {loading ? 'Loading programs...' : 'Select a program...'}
               </option>
               {programmes.map((programme) => (
                 <option key={programme.id} value={programme.id}>
@@ -272,8 +238,6 @@ const AddProspectModal = ({ isOpen, onClose, onComplete }: AddProspectModalProps
               <option value="">Select payment type...</option>
               <option value="hrdc">HRDC</option>
               <option value="individual">Individual</option>
-              <option value="paid">Paid</option>
-              <option value="pending">Pending</option>
             </select>
           </div>
 

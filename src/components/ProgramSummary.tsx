@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -50,9 +49,9 @@ const ProgramSummary = () => {
     try {
       setLoading(true);
       
-      // Fetch programs and prospects
+      // Fetch programs from registration_programs table
       const { data: programs, error: programsError } = await supabase
-        .from('programs')
+        .from('registration_programs')
         .select('id, title')
         .order('created_at', { ascending: false });
 

@@ -20,6 +20,14 @@ const ProgramSummary = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  // Define the allowed product types
+  const allowedProductTypes = [
+    'Business Writing with AI: 2-Day Masterclass',
+    'The AI-Ready Leader: Win the Future with Strategic Action',
+    'ChatGPT Skill Boost (Intermediate)',
+    'AI and ChatGPT for HR Professionals - 2 Day Masterclass'
+  ];
+
   useEffect(() => {
     fetchProgramStats();
     
@@ -49,37 +57,26 @@ const ProgramSummary = () => {
     try {
       setLoading(true);
       
-      // Fetch all programs
-      const { data: allPrograms, error: allProgramsError } = await supabase
-        .from('registration_programs')
-        .select('id, title')
-        .order('created_at', { ascending: false });
-
-      if (allProgramsError) {
-        console.error('Error fetching all programs:', allProgramsError);
-        throw allProgramsError;
-      }
-
-      // Fetch all prospects
-      const { data: allProspects, error: prospectsError } = await supabase
+      // Fetch prospects filtered by the allowed product types
+      const { data: filteredProspects, error: prospectsError } = await supabase
         .from('prospects')
-        .select('program_id, registration_status');
+        .select('product_type, registration_status')
+        .in('product_type', allowedProductTypes);
 
       if (prospectsError) {
         console.error('Error fetching prospects:', prospectsError);
         throw prospectsError;
       }
 
-      console.log('All programs:', allPrograms);
-      console.log('All prospects:', allProspects);
+      console.log('Filtered prospects:', filteredProspects);
 
-      // Create a map to count statistics for each program
-      const programStatsMap = new Map();
+      // Create a map to count statistics for each product type
+      const productStatsMap = new Map();
 
-      // Initialize all programs with zero counts
-      allPrograms?.forEach(program => {
-        programStatsMap.set(program.id, {
-          programName: program.title,
+      // Initialize all allowed product types with zero counts
+      allowedProductTypes.forEach(productType => {
+        productStatsMap.set(productType, {
+          programName: productType,
           pending: 0,
           approved: 0,
           rejected: 0,
@@ -89,16 +86,16 @@ const ProgramSummary = () => {
         });
       });
 
-      // Count prospects for each program
-      allProspects?.forEach(prospect => {
-        if (!prospect.program_id) return; // Skip prospects without program_id
+      // Count prospects for each product type
+      filteredProspects?.forEach(prospect => {
+        if (!prospect.product_type) return; // Skip prospects without product_type
         
-        const programId = prospect.program_id;
+        const productType = prospect.product_type;
         const status = prospect.registration_status;
 
-        // Only count prospects that belong to existing programs
-        if (programStatsMap.has(programId)) {
-          const stats = programStatsMap.get(programId);
+        // Only count prospects that have the allowed product types
+        if (productStatsMap.has(productType)) {
+          const stats = productStatsMap.get(productType);
           stats.total += 1;
 
           switch (status) {
@@ -121,7 +118,7 @@ const ProgramSummary = () => {
         }
       });
 
-      const stats = Array.from(programStatsMap.values());
+      const stats = Array.from(productStatsMap.values());
       
       // Log the results for debugging
       stats.forEach(stat => {

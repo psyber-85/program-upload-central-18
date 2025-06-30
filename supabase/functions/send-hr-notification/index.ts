@@ -27,11 +27,11 @@ const programLinks = {
     courseBrochure: "https://drive.google.com/file/d/16L7LfiuwFIIlJoY8HsMYql9pMSn372LX/view?usp=drive_link"
   },
   "AI and ChatGPT for HR Professionals - 2 Day Masterclass": {
-    signupForm: "www.example.com",
+    signupForm: "https://drive.google.com/file/d/1IG9gOVe65C__6KTjJCd_RZqj_nAFlob_/view",
     courseBrochure: "https://drive.google.com/file/d/1GWc2tUZfsUR8FSZxuGuBR8T34iVv9fFy/view"
   },
   "The AI-Ready Leader: Win the Future with Strategic Action": {
-    signupForm: "www.example.com",
+    signupForm: "https://drive.google.com/file/d/1KEE95XsMiSMgV8YseUX2db7eV0qtI5AY/view?usp=drive_link",
     courseBrochure: "https://drive.google.com/file/d/1silb4DtDCHv04r_eriODS6nn-QWZmkrs/view"
   }
 };

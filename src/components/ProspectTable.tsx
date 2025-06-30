@@ -3,8 +3,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from '@/components/ui/pagination';
-import { Phone, Mail, User, Building, AlertCircle, Search, ChevronUp, ChevronDown, Eye, ChevronRight, ChevronLeft, Info, Plus } from 'lucide-react';
+import { Phone, Mail, User, Building, AlertCircle, Search, ChevronUp, ChevronDown, Eye, ChevronRight, ChevronLeft, Info, Plus, Filter } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import LogCallModal from './LogCallModal';
@@ -48,6 +49,8 @@ const ProspectTable = () => {
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [programFilter, setProgramFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -119,13 +122,18 @@ const ProspectTable = () => {
 
   useEffect(() => {
     // Filter and sort prospects
-    let filtered = prospects.filter(prospect => 
-      prospect.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prospect.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prospect.program.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (prospect.org && prospect.org.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (prospect.role && prospect.role.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+    let filtered = prospects.filter(prospect => {
+      const matchesSearch = prospect.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        prospect.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        prospect.program.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (prospect.org && prospect.org.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (prospect.role && prospect.role.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      const matchesStatus = statusFilter === 'all' || prospect.registration_status === statusFilter;
+      const matchesProgram = programFilter === 'all' || prospect.program === programFilter;
+      
+      return matchesSearch && matchesStatus && matchesProgram;
+    });
 
     // Sort prospects
     filtered.sort((a, b) => {
@@ -146,7 +154,7 @@ const ProspectTable = () => {
 
     setFilteredProspects(filtered);
     setCurrentPage(1); // Reset to first page when filtering
-  }, [searchTerm, prospects, sortField, sortDirection]);
+  }, [searchTerm, statusFilter, programFilter, prospects, sortField, sortDirection]);
 
   const fetchProspects = async () => {
     try {
@@ -309,6 +317,9 @@ const ProspectTable = () => {
     return pages;
   };
 
+  // Get unique programs for filter dropdown
+  const uniquePrograms = Array.from(new Set(prospects.map(p => p.program))).sort();
+
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow p-6">
@@ -322,39 +333,99 @@ const ProspectTable = () => {
 
   return (
     <div className="bg-white rounded-lg shadow">
-      {/* Search Bar, Column Toggle, and Add Prospect Button */}
+      {/* Search Bar, Filters, Column Toggle, and Add Prospect Button */}
       <div className="p-4 border-b">
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              placeholder="Search prospects..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+        <div className="flex flex-col gap-4">
+          {/* First Row: Search and Add Prospect */}
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                placeholder="Search prospects..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setAddProspectModalOpen(true)}
+                className="flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Add Prospect
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSecondaryColumns(!showSecondaryColumns)}
+                className="flex items-center gap-2"
+              >
+                {showSecondaryColumns ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                {showSecondaryColumns ? 'Hide Details' : 'Show Details'}
+              </Button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <Button
-              onClick={() => setAddProspectModalOpen(true)}
-              className="flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Add Prospect
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowSecondaryColumns(!showSecondaryColumns)}
-              className="flex items-center gap-2"
-            >
-              {showSecondaryColumns ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-              {showSecondaryColumns ? 'Hide Details' : 'Show Details'}
-            </Button>
+          
+          {/* Second Row: Filters */}
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-gray-500" />
+              <span className="text-sm font-medium text-gray-700">Filters:</span>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="Pending">Pending</SelectItem>
+                  <SelectItem value="Approved">Approved</SelectItem>
+                  <SelectItem value="Rejected">Rejected</SelectItem>
+                  <SelectItem value="On Hold">On Hold</SelectItem>
+                  <SelectItem value="Postponed">Postponed</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={programFilter} onValueChange={setProgramFilter}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filter by Programme" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Programmes</SelectItem>
+                  {uniquePrograms.map((program) => (
+                    <SelectItem key={program} value={program}>
+                      {program}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              {(statusFilter !== 'all' || programFilter !== 'all') && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setStatusFilter('all');
+                    setProgramFilter('all');
+                  }}
+                  className="text-xs"
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </div>
           </div>
         </div>
+        
         <div className="mt-2 text-sm text-gray-600">
           Showing {filteredProspects.length} of {prospects.length} prospects
+          {(statusFilter !== 'all' || programFilter !== 'all') && (
+            <span className="ml-2 text-blue-600">
+              (filtered by {statusFilter !== 'all' ? `status: ${statusFilter}` : ''}{statusFilter !== 'all' && programFilter !== 'all' ? ', ' : ''}{programFilter !== 'all' ? `programme: ${programFilter}` : ''})
+            </span>
+          )}
         </div>
       </div>
 
@@ -417,7 +488,9 @@ const ProspectTable = () => {
             {currentProspects.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={showSecondaryColumns ? 13 : 5} className="text-center py-6">
-                  {searchTerm ? 'No prospects found matching your search.' : 'No prospects found. Add some prospects to get started.'}
+                  {searchTerm || statusFilter !== 'all' || programFilter !== 'all' 
+                    ? 'No prospects found matching your filters.' 
+                    : 'No prospects found. Add some prospects to get started.'}
                 </TableCell>
               </TableRow>
             ) : (

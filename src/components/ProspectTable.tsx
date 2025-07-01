@@ -153,8 +153,18 @@ const ProspectTable = () => {
     });
 
     setFilteredProspects(filtered);
-    setCurrentPage(1); // Reset to first page when filtering
-  }, [searchTerm, statusFilter, programFilter, prospects, sortField, sortDirection]);
+    
+    // Only reset to first page when filters change, not when data updates
+    const newTotalPages = Math.ceil(filtered.length / prospectsPerPage);
+    if (currentPage > newTotalPages && newTotalPages > 0) {
+      setCurrentPage(newTotalPages);
+    }
+  }, [searchTerm, statusFilter, programFilter, prospects, sortField, sortDirection, prospectsPerPage]);
+
+  // Separate useEffect to handle filter changes that should reset page
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, programFilter]);
 
   const fetchProspects = async () => {
     try {

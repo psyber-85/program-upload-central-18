@@ -170,9 +170,9 @@ const ProspectTable = () => {
     try {
       setLoading(true);
       
-      // Fetch programs first - ensure we get actual program names
+      // Fetch programs first - ensure we get actual program names from registration_programs
       const { data: programsData, error: programsError } = await supabase
-        .from('programs')
+        .from('registration_programs')
         .select('id, title')
         .order('title');
       

@@ -70,7 +70,7 @@ const generateEmailTemplate = (hrName: string, staffName: string, courseName: st
       <ul>
         <li><a href="https://theaihq.net/AIHQ_&_Pang%20-%20Detailed%20Profile__.pdf" style="color: #2754C5; text-decoration: none;">AIHQ's Profile & Portfolio</a></li>
         <li><a href="http://theaihq.net" style="color: #2754C5; text-decoration: none;">Our Website</a></li>
-        <li><a href="https://www.google.com/search?sca_esv=0e58669465c64ea2&sxsrf=AE3TifO01M1ZnuMUGy1ZOYy7cKB3BSmg_Q:1750924007883&si=AMgyJEtREmoPL4P1I5IDCfuA8gybfVI2d5Uj7QMwYCZHKDZ-E8ss9ZAsrmkP2SnQ13k5Q1slVi9Okp1e3MtSGzQ-A-qiOCtAkpQyLE2q_z62UrP3t8xZxayiwjuBCszv6GjHWAAj1U9IqF7fgfSx9Q-7DIJQXGoJXg%3D%3D&q=AIHQ+Training+and+Consultancy+Reviews&sa=X&ved=2ahUKEwiLtZKczI6OAxWIS2wGHYSsHcMQ0bkNegQINRAE&biw=1536&bih=730&dpr=1.25" style="color: #2754C5; text-decoration: none;">Our 4.9-Star Google Reviews</a></li>
+        <li><a href="https://g.page/r/CTdQY7uIwOd3EB0/review" style="color: #2754C5; text-decoration: none;">Our 4.9-Star Google Reviews</a></li>
       </ul>
       
       <p>Should you have any questions or need further assistance, please feel free to contact me directly.</p>
@@ -104,7 +104,7 @@ AIHQ's Profile & Portfolio: https://theaihq.net/AIHQ_&_Pang%20-%20Detailed%20Pro
 
 Our Website: http://theaihq.net
 
-Our 4.9-Star Google Reviews: https://www.google.com/search?sca_esv=0e58669465c64ea2&sxsrf=AE3TifO01M1ZnuMUGy1ZOYy7cKB3BSmg_Q:1750924007883&si=AMgyJEtREmoPL4P1I5IDCfuA8gybfVI2d5Uj7QMwYCZHKDZ-E8ss9ZAsrmkP2SnQ13k5Q1slVi9Okp1e3MtSGzQ-A-qiOCtAkpQyLE2q_z62UrP3t8xZxayiwjuBCszv6GjHWAAj1U9IqF7fgfSx9Q-7DIJQXGoJXg%3D%3D&q=AIHQ+Training+and+Consultancy+Reviews&sa=X&ved=2ahUKEwiLtZKczI6OAxWIS2wGHYSsHcMQ0bkNegQINRAE&biw=1536&bih=730&dpr=1.25
+Our 4.9-Star Google Reviews: https://g.page/r/CTdQY7uIwOd3EB0/review
 
 Should you have any questions or need further assistance, please feel free to contact me directly.
 

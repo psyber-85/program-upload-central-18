@@ -49,9 +49,9 @@ const AddProspectModal = ({ isOpen, onClose, onComplete }: AddProspectModalProps
     try {
       setLoading(true);
       
-      // Fetch programs from registration_programs table
+      // Fetch programs from programs table
       const { data, error } = await supabase
-        .from('registration_programs')
+        .from('programs')
         .select('id, title')
         .order('title', { ascending: true });
 

@@ -49,18 +49,33 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
 
       if (prospectError) throw prospectError;
 
-      setProspectData(prospect);
+      // Fetch program title if program_id exists
+      let programTitle = prospect.product_type || 'Training Program';
+      if (prospect.program_id) {
+        const { data: program } = await supabase
+          .from('programs')
+          .select('title')
+          .eq('id', prospect.program_id)
+          .single();
+        
+        if (program) {
+          programTitle = program.title;
+        }
+      }
+
+      // Add program title to prospect data
+      const prospectWithProgram = { ...prospect, programTitle };
+      setProspectData(prospectWithProgram);
       
       if (prospect.hr_contacts && prospect.hr_contacts.length > 0) {
         const hrContactData = prospect.hr_contacts[0];
         setHrContact(hrContactData);
         
-        // Set default email subject
-        const courseName = prospect.product_type || 'Training Program';
-        setEmailSubject(`Training Registration for ${courseName}`);
+        // Set default email subject using program title
+        setEmailSubject(`Training Registration for ${programTitle}`);
         
         // Generate email preview
-        generateEmailPreview(hrContactData.name, prospect.name, courseName, prospect.product_type);
+        generateEmailPreview(hrContactData.name, prospect.name, programTitle, prospect.product_type);
       }
     } catch (error) {
       console.error('Failed to load prospect data:', error);
@@ -152,7 +167,7 @@ _______`;
           subject: emailSubject,
           message: emailPreview, // This won't be used in the new template system
           prospect_name: prospectData?.name,
-          program_title: prospectData?.product_type || 'Training Program',
+          program_title: prospectData?.programTitle || prospectData?.product_type || 'Training Program',
           product_type: prospectData?.product_type
         }
       });

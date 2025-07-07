@@ -135,7 +135,7 @@ serve(async (req) => {
                     <p>You have been successfully registered for the <strong>${participant.program_name || program}</strong> training program.</p>
                     <p>To access your program materials, please visit the link and select the correct NTW programme. You will get an automated link to the program access:</p>
                     <div style="text-align: center; margin: 20px 0;">
-                      <a href="https://theaihq.net/shop-new/" style="${buttonStyle}">Access Program Link</a>
+                      <a href="https://theaihq.net/shop" style="${buttonStyle}">Access Program Link</a>
                     </div>
                     <p>After completing the program, your certificate will be issued from the NTW site.</p>
                     <p>Best regards,<br>AIHQ - National Training Week Team</p>
@@ -147,7 +147,7 @@ serve(async (req) => {
                     <p>Anda telah berjaya didaftarkan untuk program latihan <strong>${participant.program_name || program}</strong>.</p>
                     <p>Untuk mengakses bahan program anda, sila layari:</p>
                     <div style="text-align: center; margin: 20px 0;">
-                      <a href="https://theaihq.net/shop-new/" style="${buttonStyle}">Akses Program</a>
+                      <a href="https://theaihq.net/shop" style="${buttonStyle}">Akses Program</a>
                     </div>
                     <p>Selepas menyelesaikan program, sijil anda akan dikeluarkan dari laman NTW.</p>
                     <p>Salam hormat,<br>AIHQ - Pasukan Minggu Latihan Nasional</p>

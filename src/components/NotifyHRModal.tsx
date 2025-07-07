@@ -62,6 +62,12 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
         }
       }
 
+      console.log('Prospect data loaded:', { 
+        programTitle, 
+        productType: prospect.product_type,
+        programId: prospect.program_id 
+      });
+
       // Add program title to prospect data
       const prospectWithProgram = { ...prospect, programTitle };
       setProspectData(prospectWithProgram);
@@ -89,7 +95,7 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
   const generateEmailPreview = (hrName: string, staffName: string, courseName: string, programKey: string) => {
     console.log('Generating email preview for program:', programKey);
     
-    // Enhanced program-specific links mapping using exact program titles
+    // Program-specific links mapping using exact program titles
     const programLinks: Record<string, { signupForm: string; courseBrochure: string }> = {
       "Business Writing with AI: 2-Day Masterclass": {
         signupForm: "https://drive.google.com/file/d/1i8os64_0YWr0nlJns88-i3IT1hNaepaN/view?usp=drive_link",
@@ -109,7 +115,7 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
       }
     };
 
-    // Try exact match first, then try partial matching
+    // Try exact match first
     let links = programLinks[programKey];
     
     if (!links) {
@@ -117,7 +123,7 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
       const programKeys = Object.keys(programLinks);
       const matchedKey = programKeys.find(key => 
         key.toLowerCase().includes(programKey.toLowerCase()) || 
-        programKey.toLowerCase().includes(key.toLowerCase())
+        programKey.toLowerCase().includes(key.toLowerCase().replace(/[^\w\s]/g, '').trim())
       );
       
       if (matchedKey) {
@@ -129,10 +135,10 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
     if (!links) {
       console.error('No links found for program:', programKey);
       console.log('Available program keys:', Object.keys(programLinks));
-      // Show error in preview for debugging
+      // Use placeholder links that clearly indicate the issue
       links = {
-        signupForm: "[ERROR: Sign-up form link not found for this program]",
-        courseBrochure: "[ERROR: Course brochure link not found for this program]"
+        signupForm: "https://drive.google.com/file/d/[SIGN_UP_FORM_NOT_FOUND]",
+        courseBrochure: "https://drive.google.com/file/d/[COURSE_BROCHURE_NOT_FOUND]"
       };
     } else {
       console.log('Found links for program:', programKey, links);
@@ -184,18 +190,28 @@ _______`;
 
     setIsSubmitting(true);
     try {
+      console.log('Sending email with data:', {
+        to_email: hrContact.email,
+        to_name: hrContact.name,
+        prospect_name: prospectData?.name,
+        program_title: prospectData?.programTitle || prospectData?.product_type,
+        product_type: prospectData?.programTitle || prospectData?.product_type
+      });
+
       // Call the SendGrid edge function with program title for better matching
       const { data, error } = await supabase.functions.invoke('send-hr-notification', {
         body: {
           to_email: hrContact.email,
           to_name: hrContact.name,
           subject: emailSubject,
-          message: emailPreview, // This won't be used in the new template system
+          message: emailPreview,
           prospect_name: prospectData?.name,
           program_title: prospectData?.programTitle || prospectData?.product_type || 'Training Program',
           product_type: prospectData?.programTitle || prospectData?.product_type // Use program title for better matching
         }
       });
+
+      console.log('Edge function response:', { data, error });
 
       if (error) {
         console.error('SendGrid function error:', error);

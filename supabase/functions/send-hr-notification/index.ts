@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 
 const corsHeaders = {
@@ -18,7 +19,7 @@ interface EmailRequest {
 const generateEmailTemplate = (hrName: string, staffName: string, courseName: string, productType: string) => {
   console.log('Generating email template for program:', productType);
   
-  // Enhanced program-specific links mapping using exact program titles
+  // Program-specific links mapping using exact program titles
   const programLinks = {
     "Business Writing with AI: 2-Day Masterclass": {
       signupForm: "https://drive.google.com/file/d/1i8os64_0YWr0nlJns88-i3IT1hNaepaN/view?usp=drive_link",
@@ -38,7 +39,7 @@ const generateEmailTemplate = (hrName: string, staffName: string, courseName: st
     }
   };
 
-  // Try exact match first, then try partial matching
+  // Try exact match first
   let links = programLinks[productType as keyof typeof programLinks];
   
   if (!links) {
@@ -46,7 +47,7 @@ const generateEmailTemplate = (hrName: string, staffName: string, courseName: st
     const programKeys = Object.keys(programLinks);
     const matchedKey = programKeys.find(key => 
       key.toLowerCase().includes(productType.toLowerCase()) || 
-      productType.toLowerCase().includes(key.toLowerCase())
+      productType.toLowerCase().includes(key.toLowerCase().replace(/[^\w\s]/g, '').trim())
     );
     
     if (matchedKey) {
@@ -60,8 +61,8 @@ const generateEmailTemplate = (hrName: string, staffName: string, courseName: st
     console.log('Available program keys:', Object.keys(programLinks));
     // Fallback to default links with error indication
     links = {
-      signupForm: "[ERROR: Sign-up form link not found for this program]",
-      courseBrochure: "[ERROR: Course brochure link not found for this program]"
+      signupForm: "https://drive.google.com/[SIGN_UP_FORM_NOT_FOUND]",
+      courseBrochure: "https://drive.google.com/[COURSE_BROCHURE_NOT_FOUND]"
     };
   } else {
     console.log('Found links for program:', productType, links);
@@ -103,8 +104,7 @@ const generateEmailTemplate = (hrName: string, staffName: string, courseName: st
     </div>
   `;
 
-  const plainTextTemplate = `
-Dear ${hrName},
+  const plainTextTemplate = `Dear ${hrName},
 
 I hope this message finds you well.
 
@@ -132,8 +132,7 @@ Thank you for your attention and support. We look forward to welcoming ${staffNa
 Best regards,
 AIHQ Training and Consultancy
 
-_______
-  `;
+_______`;
 
   return { htmlTemplate, plainTextTemplate };
 };
@@ -152,13 +151,15 @@ const handler = async (req: Request): Promise<Response> => {
     
     const { to_email, to_name, prospect_name, program_title, product_type } = body;
 
-    if (!to_email || !prospect_name || !program_title || !product_type) {
-      throw new Error("Missing required fields: to_email, prospect_name, program_title, or product_type");
+    if (!to_email || !prospect_name || !program_title) {
+      console.error('Missing required fields:', { to_email, prospect_name, program_title });
+      throw new Error("Missing required fields: to_email, prospect_name, or program_title");
     }
 
     // Get SendGrid API key from environment
     const sendgridApiKey = Deno.env.get("SENDGRID_API_KEY");
     if (!sendgridApiKey) {
+      console.error('SENDGRID_API_KEY not found in environment');
       throw new Error("SENDGRID_API_KEY environment variable is not set");
     }
 
@@ -167,14 +168,14 @@ const handler = async (req: Request): Promise<Response> => {
       to_name || to_email,
       prospect_name,
       program_title,
-      product_type
+      program_title // Use program_title for matching instead of product_type
     );
 
     const emailSubject = `Training Registration for ${program_title}`;
 
     console.log('Sending email via SendGrid...');
     console.log('Email subject:', emailSubject);
-    console.log('Product type:', product_type);
+    console.log('Program title:', program_title);
     
     // SendGrid API request
     const sendgridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
@@ -220,7 +221,8 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error(`SendGrid API error: ${sendgridResponse.status} - ${errorText}`);
     }
 
-    console.log('Email sent successfully');
+    const responseText = await sendgridResponse.text();
+    console.log('Email sent successfully, response:', responseText);
 
     return new Response(
       JSON.stringify({ 

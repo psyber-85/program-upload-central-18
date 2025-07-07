@@ -27,7 +27,7 @@ const programLinks = {
     courseBrochure: "https://drive.google.com/file/d/16L7LfiuwFIIlJoY8HsMYql9pMSn372LX/view?usp=drive_link"
   },
   "AI and ChatGPT for HR Professionals - 2 Day Masterclass": {
-    signupForm: "https://drive.google.com/file/d/1IG9gOVe65C__6KTjJCd_RZqj_nAFlob_/view",
+    signupForm: "https://drive.google.com/file/d/1IG9gOVe65C__6KTjJCd_RZqj_nAFlob_/view?usp=drive_link",
     courseBrochure: "https://drive.google.com/file/d/1GWc2tUZfsUR8FSZxuGuBR8T34iVv9fFy/view"
   },
   "The AI-Ready Leader: Win the Future with Strategic Action": {
@@ -42,10 +42,80 @@ const generateEmailTemplate = (hrName: string, staffName: string, courseName: st
   if (!links) {
     console.error('No links found for product type:', productType);
     // Fallback to default links
-    links = {
+    const fallbackLinks = {
       signupForm: "www.example.com",
       courseBrochure: "www.example.com"
     };
+    
+    const htmlTemplate = `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <p>Dear ${hrName},</p>
+        
+        <p>I hope this message finds you well.</p>
+        
+        <p>I am writing to facilitate the registration of <strong>${staffName}</strong> from your organization for the upcoming training program, <strong>${courseName}</strong>, conducted by AIHQ.</p>
+        
+        <p>Attached are the following documents for your review:</p>
+        
+        <ul>
+          <li><a href="${fallbackLinks.courseBrochure}" style="color: #2754C5; text-decoration: none;">Course Brochure</a></li>
+          <li><a href="${fallbackLinks.signupForm}" style="color: #2754C5; text-decoration: none;">Sign-Up Form</a></li>
+        </ul>
+        
+        <p>The fee for this 2-day program is <strong>RM2,850</strong>, as stated in the sign-up form. However, this course is <strong>100% HRDC Claimable</strong>. We kindly ask you to review the enclosed materials for HRD levy approval and confirm the registration at your earliest convenience.</p>
+        
+        <p>For more information on AIHQ's expertise and track record, feel free to explore:</p>
+        
+        <ul>
+          <li><a href="https://theaihq.net/AIHQ_&_Pang%20-%20Detailed%20Profile__.pdf" style="color: #2754C5; text-decoration: none;">AIHQ's Profile & Portfolio</a></li>
+          <li><a href="http://theaihq.net" style="color: #2754C5; text-decoration: none;">Our Website</a></li>
+          <li><a href="https://www.google.com/search?sca_esv=0e58669465c64ea2&sxsrf=AE3TifO01M1ZnuMUGy1ZOYy7cKB3BSmg_Q:1750924007883&si=AMgyJEtREmoPL4P1I5IDCfuA8gybfVI2d5Uj7QMwYCZHKDZ-E8ss9ZAsrmkP2SnQ13k5Q1slVi9Okp1e3MtSGzQ-A-qiOCtAkpQyLE2q_z62UrP3t8xZxayiwjuBCszv6GjHWAAj1U9IqF7fgfSx9Q-7DIJQXGoJXg%3D%3D&q=AIHQ+Training+and+Consultancy+Reviews&sa=X&ved=2ahUKEwiLtZKczI6OAxWIS2wGHYSsHcMQ0bkNegQINRAE&biw=1536&bih=730&dpr=1.25" style="color: #2754C5; text-decoration: none;">Our 4.8-Star Google Reviews</a></li>
+        </ul>
+        
+        <p>Should you have any questions or need further assistance, please feel free to contact me directly.</p>
+        
+        <p>Thank you for your attention and support. We look forward to welcoming <strong>${staffName}</strong> to the program.</p>
+        
+        <p>Best regards,<br>
+        <strong>AIHQ Training and Consultancy</strong></p>
+        
+        <hr style="border: none; border-top: 1px solid #ccc; margin: 20px 0;">
+      </div>
+    `;
+
+    const plainTextTemplate = `
+Dear ${hrName},
+
+I hope this message finds you well.
+
+I am writing to facilitate the registration of ${staffName} from your organization for the upcoming training program, ${courseName}, conducted by AIHQ.
+
+Attached are the following documents for your review:
+
+- Course Brochure: ${fallbackLinks.courseBrochure}
+- Sign-Up Form: ${fallbackLinks.signupForm}
+
+The fee for this 2-day program is RM2,850, as stated in the sign-up form. However, this course is 100% HRDC Claimable. We kindly ask you to review the enclosed materials for HRD levy approval and confirm the registration at your earliest convenience.
+
+For more information on AIHQ's expertise and track record, feel free to explore:
+
+AIHQ's Profile & Portfolio: https://theaihq.net/AIHQ_&_Pang%20-%20Detailed%20Profile__.pdf
+
+Our Website: http://theaihq.net
+
+Our 4.8-Star Google Reviews: https://www.google.com/search?sca_esv=0e58669465c64ea2&sxsrf=AE3TifO01M1ZnuMUGy1ZOYy7cKB3BSmg_Q:1750924007883&si=AMgyJEtREmoPL4P1I5IDCfuA8gybfVI2d5Uj7QMwYCZHKDZ-E8ss9ZAsrmkP2SnQ13k5Q1slVi9Okp1e3MtSGzQ-A-qiOCtAkpQyLE2q_z62UrP3t8xZxayiwjuBCszv6GjHWAAj1U9IqF7fgfSx9Q-7DIJQXGoJXg%3D%3D&q=AIHQ+Training+and+Consultancy+Reviews&sa=X&ved=2ahUKEwiLtZKczI6OAxWIS2wGHYSsHcMQ0bkNegQINRAE&biw=1536&bih=730&dpr=1.25
+
+Should you have any questions or need further assistance, please feel free to contact me directly.
+
+Thank you for your attention and support. We look forward to welcoming ${staffName} to the program.
+
+Best regards,
+AIHQ Training and Consultancy
+
+_______
+    `;
+
+    return { htmlTemplate, plainTextTemplate };
   }
 
   const htmlTemplate = `
@@ -63,14 +133,14 @@ const generateEmailTemplate = (hrName: string, staffName: string, courseName: st
         <li><a href="${links.signupForm}" style="color: #2754C5; text-decoration: none;">Sign-Up Form</a></li>
       </ul>
       
-      <p>The fee for this 2-day program is <strong>RM2,850</strong>, as stated in the sign-up form. Please note that this course is <strong>100% HRDC Claimable</strong>. We kindly ask you to review the enclosed materials for HRD levy approval and confirm the registration at your earliest convenience.</p>
+      <p>The fee for this 2-day program is <strong>RM2,850</strong>, as stated in the sign-up form. However, this course is <strong>100% HRDC Claimable</strong>. We kindly ask you to review the enclosed materials for HRD levy approval and confirm the registration at your earliest convenience.</p>
       
       <p>For more information on AIHQ's expertise and track record, feel free to explore:</p>
       
       <ul>
         <li><a href="https://theaihq.net/AIHQ_&_Pang%20-%20Detailed%20Profile__.pdf" style="color: #2754C5; text-decoration: none;">AIHQ's Profile & Portfolio</a></li>
         <li><a href="http://theaihq.net" style="color: #2754C5; text-decoration: none;">Our Website</a></li>
-        <li><a href="https://www.google.com/search?sca_esv=0e58669465c64ea2&sxsrf=AE3TifO01M1ZnuMUGy1ZOYy7cKB3BSmg_Q:1750924007883&si=AMgyJEtREmoPL4P1I5IDCfuA8gybfVI2d5Uj7QMwYCZHKDZ-E8ss9ZAsrmkP2SnQ13k5Q1slVi9Okp1e3MtSGzQ-A-qiOCtAkpQyLE2q_z62UrP3t8xZxayiwjuBCszv6GjHWAAj1U9IqF7fgfSx9Q-7DIJQXGoJXg%3D%3D&q=AIHQ+Training+and+Consultancy+Reviews&sa=X&ved=2ahUKEwiLtZKczI6OAxWIS2wGHYSsHcMQ0bkNegQINRAE&biw=1536&bih=730&dpr=1.25" style="color: #2754C5; text-decoration: none;">Our 4.9-Star Google Reviews</a></li>
+        <li><a href="https://www.google.com/search?sca_esv=0e58669465c64ea2&sxsrf=AE3TifO01M1ZnuMUGy1ZOYy7cKB3BSmg_Q:1750924007883&si=AMgyJEtREmoPL4P1I5IDCfuA8gybfVI2d5Uj7QMwYCZHKDZ-E8ss9ZAsrmkP2SnQ13k5Q1slVi9Okp1e3MtSGzQ-A-qiOCtAkpQyLE2q_z62UrP3t8xZxayiwjuBCszv6GjHWAAj1U9IqF7fgfSx9Q-7DIJQXGoJXg%3D%3D&q=AIHQ+Training+and+Consultancy+Reviews&sa=X&ved=2ahUKEwiLtZKczI6OAxWIS2wGHYSsHcMQ0bkNegQINRAE&biw=1536&bih=730&dpr=1.25" style="color: #2754C5; text-decoration: none;">Our 4.8-Star Google Reviews</a></li>
       </ul>
       
       <p>Should you have any questions or need further assistance, please feel free to contact me directly.</p>
@@ -96,7 +166,7 @@ Attached are the following documents for your review:
 - Course Brochure: ${links.courseBrochure}
 - Sign-Up Form: ${links.signupForm}
 
-The fee for this 2-day program is RM2,850, as stated in the sign-up form. Please note that this course is 100% HRDC Claimable. We kindly ask you to review the enclosed materials for HRD levy approval and confirm the registration at your earliest convenience.
+The fee for this 2-day program is RM2,850, as stated in the sign-up form. However, this course is 100% HRDC Claimable. We kindly ask you to review the enclosed materials for HRD levy approval and confirm the registration at your earliest convenience.
 
 For more information on AIHQ's expertise and track record, feel free to explore:
 
@@ -104,7 +174,7 @@ AIHQ's Profile & Portfolio: https://theaihq.net/AIHQ_&_Pang%20-%20Detailed%20Pro
 
 Our Website: http://theaihq.net
 
-Our 4.9-Star Google Reviews: https://www.google.com/search?sca_esv=0e58669465c64ea2&sxsrf=AE3TifO01M1ZnuMUGy1ZOYy7cKB3BSmg_Q:1750924007883&si=AMgyJEtREmoPL4P1I5IDCfuA8gybfVI2d5Uj7QMwYCZHKDZ-E8ss9ZAsrmkP2SnQ13k5Q1slVi9Okp1e3MtSGzQ-A-qiOCtAkpQyLE2q_z62UrP3t8xZxayiwjuBCszv6GjHWAAj1U9IqF7fgfSx9Q-7DIJQXGoJXg%3D%3D&q=AIHQ+Training+and+Consultancy+Reviews&sa=X&ved=2ahUKEwiLtZKczI6OAxWIS2wGHYSsHcMQ0bkNegQINRAE&biw=1536&bih=730&dpr=1.25
+Our 4.8-Star Google Reviews: https://www.google.com/search?sca_esv=0e58669465c64ea2&sxsrf=AE3TifO01M1ZnuMUGy1ZOYy7cKB3BSmg_Q:1750924007883&si=AMgyJEtREmoPL4P1I5IDCfuA8gybfVI2d5Uj7QMwYCZHKDZ-E8ss9ZAsrmkP2SnQ13k5Q1slVi9Okp1e3MtSGzQ-A-qiOCtAkpQyLE2q_z62UrP3t8xZxayiwjuBCszv6GjHWAAj1U9IqF7fgfSx9Q-7DIJQXGoJXg%3D%3D&q=AIHQ+Training+and+Consultancy+Reviews&sa=X&ved=2ahUKEwiLtZKczI6OAxWIS2wGHYSsHcMQ0bkNegQINRAE&biw=1536&bih=730&dpr=1.25
 
 Should you have any questions or need further assistance, please feel free to contact me directly.
 

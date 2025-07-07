@@ -74,7 +74,7 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
         // Set default email subject using program title
         setEmailSubject(`Training Registration for ${programTitle}`);
         
-        // Generate email preview
+        // Generate email preview using product_type for template mapping
         generateEmailPreview(hrContactData.name, prospect.name, programTitle, prospect.product_type);
       }
     } catch (error) {
@@ -99,11 +99,11 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
         courseBrochure: "https://drive.google.com/file/d/16L7LfiuwFIIlJoY8HsMYql9pMSn372LX/view?usp=drive_link"
       },
       "AI and ChatGPT for HR Professionals - 2 Day Masterclass": {
-        signupForm: "www.example.com",
+        signupForm: "https://drive.google.com/file/d/1IG9gOVe65C__6KTjJCd_RZqj_nAFlob_/view?usp=drive_link",
         courseBrochure: "https://drive.google.com/file/d/1GWc2tUZfsUR8FSZxuGuBR8T34iVv9fFy/view"
       },
       "The AI-Ready Leader: Win the Future with Strategic Action": {
-        signupForm: "www.example.com",
+        signupForm: "https://drive.google.com/file/d/1KEE95XsMiSMgV8YseUX2db7eV0qtI5AY/view?usp=drive_link",
         courseBrochure: "https://drive.google.com/file/d/1silb4DtDCHv04r_eriODS6nn-QWZmkrs/view"
       }
     };
@@ -124,7 +124,7 @@ Attached are the following documents for your review:
 - Course Brochure: ${links.courseBrochure}
 - Sign-Up Form: ${links.signupForm}
 
-The fee for this 2-day program is RM2,850, as stated in the sign-up form. Please note that this course is 100% HRDC Claimable. We kindly ask you to review the enclosed materials for HRD levy approval and confirm the registration at your earliest convenience.
+The fee for this 2-day program is RM2,850, as stated in the sign-up form. However, this course is 100% HRDC Claimable. We kindly ask you to review the enclosed materials for HRD levy approval and confirm the registration at your earliest convenience.
 
 For more information on AIHQ's expertise and track record, feel free to explore:
 
@@ -132,7 +132,7 @@ AIHQ's Profile & Portfolio: https://theaihq.net/AIHQ_&_Pang%20-%20Detailed%20Pro
 
 Our Website: http://theaihq.net
 
-Our 4.9-Star Google Reviews: [Google Reviews Link]
+Our 4.8-Star Google Reviews: https://www.google.com/search?sca_esv=0e58669465c64ea2&sxsrf=AE3TifO01M1ZnuMUGy1ZOYy7cKB3BSmg_Q:1750924007883&si=AMgyJEtREmoPL4P1I5IDCfuA8gybfVI2d5Uj7QMwYCZHKDZ-E8ss9ZAsrmkP2SnQ13k5Q1slVi9Okp1e3MtSGzQ-A-qiOCtAkpQyLE2q_z62UrP3t8xZxayiwjuBCszv6GjHWAAj1U9IqF7fgfSx9Q-7DIJQXGoJXg%3D%3D&q=AIHQ+Training+and+Consultancy+Reviews&sa=X&ved=2ahUKEwiLtZKczI6OAxWIS2wGHYSsHcMQ0bkNegQINRAE&biw=1536&bih=730&dpr=1.25
 
 Should you have any questions or need further assistance, please feel free to contact me directly.
 

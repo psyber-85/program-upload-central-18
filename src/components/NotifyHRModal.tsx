@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -74,8 +73,8 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
         // Set default email subject using program title
         setEmailSubject(`Training Registration for ${programTitle}`);
         
-        // Generate email preview using product_type for template mapping
-        generateEmailPreview(hrContactData.name, prospect.name, programTitle, prospect.product_type);
+        // Generate email preview using program title for better matching
+        generateEmailPreview(hrContactData.name, prospect.name, programTitle, programTitle);
       }
     } catch (error) {
       console.error('Failed to load prospect data:', error);
@@ -87,8 +86,10 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
     }
   };
 
-  const generateEmailPreview = (hrName: string, staffName: string, courseName: string, productType: string) => {
-    // Program-specific links mapping
+  const generateEmailPreview = (hrName: string, staffName: string, courseName: string, programKey: string) => {
+    console.log('Generating email preview for program:', programKey);
+    
+    // Enhanced program-specific links mapping using exact program titles
     const programLinks: Record<string, { signupForm: string; courseBrochure: string }> = {
       "Business Writing with AI: 2-Day Masterclass": {
         signupForm: "https://drive.google.com/file/d/1i8os64_0YWr0nlJns88-i3IT1hNaepaN/view?usp=drive_link",
@@ -108,10 +109,34 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
       }
     };
 
-    const links = programLinks[productType] || {
-      signupForm: "www.example.com",
-      courseBrochure: "www.example.com"
-    };
+    // Try exact match first, then try partial matching
+    let links = programLinks[programKey];
+    
+    if (!links) {
+      // Try to find partial matches for flexibility
+      const programKeys = Object.keys(programLinks);
+      const matchedKey = programKeys.find(key => 
+        key.toLowerCase().includes(programKey.toLowerCase()) || 
+        programKey.toLowerCase().includes(key.toLowerCase())
+      );
+      
+      if (matchedKey) {
+        links = programLinks[matchedKey];
+        console.log(`Found partial match: ${matchedKey} for ${programKey}`);
+      }
+    }
+
+    if (!links) {
+      console.error('No links found for program:', programKey);
+      console.log('Available program keys:', Object.keys(programLinks));
+      // Show error in preview for debugging
+      links = {
+        signupForm: "[ERROR: Sign-up form link not found for this program]",
+        courseBrochure: "[ERROR: Course brochure link not found for this program]"
+      };
+    } else {
+      console.log('Found links for program:', programKey, links);
+    }
 
     const preview = `Dear ${hrName},
 
@@ -159,7 +184,7 @@ _______`;
 
     setIsSubmitting(true);
     try {
-      // Call the SendGrid edge function with product_type
+      // Call the SendGrid edge function with program title for better matching
       const { data, error } = await supabase.functions.invoke('send-hr-notification', {
         body: {
           to_email: hrContact.email,
@@ -168,7 +193,7 @@ _______`;
           message: emailPreview, // This won't be used in the new template system
           prospect_name: prospectData?.name,
           program_title: prospectData?.programTitle || prospectData?.product_type || 'Training Program',
-          product_type: prospectData?.product_type
+          product_type: prospectData?.programTitle || prospectData?.product_type // Use program title for better matching
         }
       });
 
@@ -284,7 +309,7 @@ _______`;
                   <div className="text-sm text-blue-700 mt-1">
                     <div><strong>To:</strong> {hrContact.name} ({hrContact.email})</div>
                     <div><strong>From:</strong> AIHQ Training and Consultancy (wani@theaihq.net)</div>
-                    <div><strong>Program:</strong> {prospectData?.product_type}</div>
+                    <div><strong>Program:</strong> {prospectData?.programTitle || prospectData?.product_type}</div>
                     <div><strong>Participant:</strong> {prospectData?.name}</div>
                   </div>
                   {hrContact.email_sent_at && (

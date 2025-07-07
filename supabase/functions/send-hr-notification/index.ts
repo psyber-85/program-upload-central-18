@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 
 const corsHeaders = {
@@ -16,106 +15,56 @@ interface EmailRequest {
   product_type?: string;
 }
 
-// Program-specific links mapping
-const programLinks = {
-  "Business Writing with AI: 2-Day Masterclass": {
-    signupForm: "https://drive.google.com/file/d/1i8os64_0YWr0nlJns88-i3IT1hNaepaN/view?usp=drive_link",
-    courseBrochure: "https://drive.google.com/file/d/1f0-Nyg0zXxJ2-4c4OBzAduQr7Lk9QWmU/view?usp=drive_link"
-  },
-  "ChatGPT Skill Boost (Intermediate)": {
-    signupForm: "https://drive.google.com/file/d/14xHGHHjbpXKo37D0Rp12mPKxJGxfJWP3/view?usp=drive_link",
-    courseBrochure: "https://drive.google.com/file/d/16L7LfiuwFIIlJoY8HsMYql9pMSn372LX/view?usp=drive_link"
-  },
-  "AI and ChatGPT for HR Professionals - 2 Day Masterclass": {
-    signupForm: "https://drive.google.com/file/d/1IG9gOVe65C__6KTjJCd_RZqj_nAFlob_/view?usp=drive_link",
-    courseBrochure: "https://drive.google.com/file/d/1GWc2tUZfsUR8FSZxuGuBR8T34iVv9fFy/view"
-  },
-  "The AI-Ready Leader: Win the Future with Strategic Action": {
-    signupForm: "https://drive.google.com/file/d/1KEE95XsMiSMgV8YseUX2db7eV0qtI5AY/view?usp=drive_link",
-    courseBrochure: "https://drive.google.com/file/d/1silb4DtDCHv04r_eriODS6nn-QWZmkrs/view"
-  }
-};
-
 const generateEmailTemplate = (hrName: string, staffName: string, courseName: string, productType: string) => {
-  const links = programLinks[productType as keyof typeof programLinks];
+  console.log('Generating email template for program:', productType);
+  
+  // Enhanced program-specific links mapping using exact program titles
+  const programLinks = {
+    "Business Writing with AI: 2-Day Masterclass": {
+      signupForm: "https://drive.google.com/file/d/1i8os64_0YWr0nlJns88-i3IT1hNaepaN/view?usp=drive_link",
+      courseBrochure: "https://drive.google.com/file/d/1f0-Nyg0zXxJ2-4c4OBzAduQr7Lk9QWmU/view?usp=drive_link"
+    },
+    "ChatGPT Skill Boost (Intermediate)": {
+      signupForm: "https://drive.google.com/file/d/14xHGHHjbpXKo37D0Rp12mPKxJGxfJWP3/view?usp=drive_link",
+      courseBrochure: "https://drive.google.com/file/d/16L7LfiuwFIIlJoY8HsMYql9pMSn372LX/view?usp=drive_link"
+    },
+    "AI and ChatGPT for HR Professionals - 2 Day Masterclass": {
+      signupForm: "https://drive.google.com/file/d/1IG9gOVe65C__6KTjJCd_RZqj_nAFlob_/view?usp=drive_link",
+      courseBrochure: "https://drive.google.com/file/d/1GWc2tUZfsUR8FSZxuGuBR8T34iVv9fFy/view"
+    },
+    "The AI-Ready Leader: Win the Future with Strategic Action": {
+      signupForm: "https://drive.google.com/file/d/1KEE95XsMiSMgV8YseUX2db7eV0qtI5AY/view?usp=drive_link",
+      courseBrochure: "https://drive.google.com/file/d/1silb4DtDCHv04r_eriODS6nn-QWZmkrs/view"
+    }
+  };
+
+  // Try exact match first, then try partial matching
+  let links = programLinks[productType as keyof typeof programLinks];
+  
+  if (!links) {
+    // Try to find partial matches for flexibility
+    const programKeys = Object.keys(programLinks);
+    const matchedKey = programKeys.find(key => 
+      key.toLowerCase().includes(productType.toLowerCase()) || 
+      productType.toLowerCase().includes(key.toLowerCase())
+    );
+    
+    if (matchedKey) {
+      links = programLinks[matchedKey as keyof typeof programLinks];
+      console.log(`Found partial match: ${matchedKey} for ${productType}`);
+    }
+  }
   
   if (!links) {
     console.error('No links found for product type:', productType);
-    // Fallback to default links
-    const fallbackLinks = {
-      signupForm: "www.example.com",
-      courseBrochure: "www.example.com"
+    console.log('Available program keys:', Object.keys(programLinks));
+    // Fallback to default links with error indication
+    links = {
+      signupForm: "[ERROR: Sign-up form link not found for this program]",
+      courseBrochure: "[ERROR: Course brochure link not found for this program]"
     };
-    
-    const htmlTemplate = `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <p>Dear ${hrName},</p>
-        
-        <p>I hope this message finds you well.</p>
-        
-        <p>I am writing to facilitate the registration of <strong>${staffName}</strong> from your organization for the upcoming training program, <strong>${courseName}</strong>, conducted by AIHQ.</p>
-        
-        <p>Attached are the following documents for your review:</p>
-        
-        <ul>
-          <li><a href="${fallbackLinks.courseBrochure}" style="color: #2754C5; text-decoration: none;">Course Brochure</a></li>
-          <li><a href="${fallbackLinks.signupForm}" style="color: #2754C5; text-decoration: none;">Sign-Up Form</a></li>
-        </ul>
-        
-        <p>The fee for this 2-day program is <strong>RM2,850</strong>, as stated in the sign-up form. However, this course is <strong>100% HRDC Claimable</strong>. We kindly ask you to review the enclosed materials for HRD levy approval and confirm the registration at your earliest convenience.</p>
-        
-        <p>For more information on AIHQ's expertise and track record, feel free to explore:</p>
-        
-        <ul>
-          <li><a href="https://theaihq.net/AIHQ_&_Pang%20-%20Detailed%20Profile__.pdf" style="color: #2754C5; text-decoration: none;">AIHQ's Profile & Portfolio</a></li>
-          <li><a href="http://theaihq.net" style="color: #2754C5; text-decoration: none;">Our Website</a></li>
-          <li><a href="https://www.google.com/search?sca_esv=0e58669465c64ea2&sxsrf=AE3TifO01M1ZnuMUGy1ZOYy7cKB3BSmg_Q:1750924007883&si=AMgyJEtREmoPL4P1I5IDCfuA8gybfVI2d5Uj7QMwYCZHKDZ-E8ss9ZAsrmkP2SnQ13k5Q1slVi9Okp1e3MtSGzQ-A-qiOCtAkpQyLE2q_z62UrP3t8xZxayiwjuBCszv6GjHWAAj1U9IqF7fgfSx9Q-7DIJQXGoJXg%3D%3D&q=AIHQ+Training+and+Consultancy+Reviews&sa=X&ved=2ahUKEwiLtZKczI6OAxWIS2wGHYSsHcMQ0bkNegQINRAE&biw=1536&bih=730&dpr=1.25" style="color: #2754C5; text-decoration: none;">Our 4.8-Star Google Reviews</a></li>
-        </ul>
-        
-        <p>Should you have any questions or need further assistance, please feel free to contact me directly.</p>
-        
-        <p>Thank you for your attention and support. We look forward to welcoming <strong>${staffName}</strong> to the program.</p>
-        
-        <p>Best regards,<br>
-        <strong>AIHQ Training and Consultancy</strong></p>
-        
-        <hr style="border: none; border-top: 1px solid #ccc; margin: 20px 0;">
-      </div>
-    `;
-
-    const plainTextTemplate = `
-Dear ${hrName},
-
-I hope this message finds you well.
-
-I am writing to facilitate the registration of ${staffName} from your organization for the upcoming training program, ${courseName}, conducted by AIHQ.
-
-Attached are the following documents for your review:
-
-- Course Brochure: ${fallbackLinks.courseBrochure}
-- Sign-Up Form: ${fallbackLinks.signupForm}
-
-The fee for this 2-day program is RM2,850, as stated in the sign-up form. However, this course is 100% HRDC Claimable. We kindly ask you to review the enclosed materials for HRD levy approval and confirm the registration at your earliest convenience.
-
-For more information on AIHQ's expertise and track record, feel free to explore:
-
-AIHQ's Profile & Portfolio: https://theaihq.net/AIHQ_&_Pang%20-%20Detailed%20Profile__.pdf
-
-Our Website: http://theaihq.net
-
-Our 4.8-Star Google Reviews: https://www.google.com/search?sca_esv=0e58669465c64ea2&sxsrf=AE3TifO01M1ZnuMUGy1ZOYy7cKB3BSmg_Q:1750924007883&si=AMgyJEtREmoPL4P1I5IDCfuA8gybfVI2d5Uj7QMwYCZHKDZ-E8ss9ZAsrmkP2SnQ13k5Q1slVi9Okp1e3MtSGzQ-A-qiOCtAkpQyLE2q_z62UrP3t8xZxayiwjuBCszv6GjHWAAj1U9IqF7fgfSx9Q-7DIJQXGoJXg%3D%3D&q=AIHQ+Training+and+Consultancy+Reviews&sa=X&ved=2ahUKEwiLtZKczI6OAxWIS2wGHYSsHcMQ0bkNegQINRAE&biw=1536&bih=730&dpr=1.25
-
-Should you have any questions or need further assistance, please feel free to contact me directly.
-
-Thank you for your attention and support. We look forward to welcoming ${staffName} to the program.
-
-Best regards,
-AIHQ Training and Consultancy
-
-_______
-    `;
-
-    return { htmlTemplate, plainTextTemplate };
+  } else {
+    console.log('Found links for program:', productType, links);
   }
 
   const htmlTemplate = `

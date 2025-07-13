@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
   const [hrContact, setHrContact] = useState<any>(null);
   const [emailSubject, setEmailSubject] = useState('');
   const [emailPreview, setEmailPreview] = useState('');
+  const [pricing, setPricing] = useState<number>(2850);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
@@ -62,15 +64,33 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
         }
       }
 
+      // Fetch pricing from registration_programs table
+      let programPricing = 2850; // Default
+      try {
+        const { data: registrationProgram } = await supabase
+          .from('registration_programs')
+          .select('pricing')
+          .eq('title', programTitle)
+          .single();
+        
+        if (registrationProgram?.pricing) {
+          programPricing = registrationProgram.pricing;
+        }
+      } catch (error) {
+        console.log('No pricing found in registration_programs, using default');
+      }
+
       console.log('Prospect data loaded:', { 
         programTitle, 
         productType: prospect.product_type,
-        programId: prospect.program_id 
+        programId: prospect.program_id,
+        pricing: programPricing
       });
 
-      // Add program title to prospect data
-      const prospectWithProgram = { ...prospect, programTitle };
+      // Add program title and pricing to prospect data
+      const prospectWithProgram = { ...prospect, programTitle, pricing: programPricing };
       setProspectData(prospectWithProgram);
+      setPricing(programPricing);
       
       if (prospect.hr_contacts && prospect.hr_contacts.length > 0) {
         const hrContactData = prospect.hr_contacts[0];
@@ -80,7 +100,7 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
         setEmailSubject(`Training Registration for ${programTitle}`);
         
         // Generate email preview using program title for better matching
-        generateEmailPreview(hrContactData.name, prospect.name, programTitle, programTitle);
+        generateEmailPreview(hrContactData.name, prospect.name, programTitle, programTitle, programPricing);
       }
     } catch (error) {
       console.error('Failed to load prospect data:', error);
@@ -92,7 +112,7 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
     }
   };
 
-  const generateEmailPreview = (hrName: string, staffName: string, courseName: string, programKey: string) => {
+  const generateEmailPreview = (hrName: string, staffName: string, courseName: string, programKey: string, programPricing: number) => {
     console.log('Generating email preview for program:', programKey);
     
     // Program-specific links mapping using exact program titles
@@ -155,11 +175,11 @@ Attached are the following documents for your review:
 - Course Brochure: ${links.courseBrochure}
 - Sign-Up Form: ${links.signupForm}
 
-The fee for this 2-day program is RM2,850, as stated in the sign-up form. However, this course is 100% HRDC Claimable. We kindly ask you to review the enclosed materials for HRD levy approval and confirm the registration at your earliest convenience.
+The fee for this 2-day program is RM${programPricing}, as stated in the sign-up form. However, this course is 100% HRDC Claimable. We kindly ask you to review the enclosed materials for HRD levy approval and confirm the registration at your earliest convenience.
 
 For more information on AIHQ's expertise and track record, feel free to explore:
 
-AIHQ's Profile & Portfolio: https://theaihq.net/AIHQ_&_Pang%20-%20Detailed%20Profile__.pdf
+AIHQ's Profile & Portfolio: https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms//AIHQ_Profile.pdf
 
 Our Website: http://theaihq.net
 
@@ -193,16 +213,18 @@ _______`;
       console.log('Sending email with data:', {
         to_email: hrContact.email,
         to_name: hrContact.name,
+        participant_email: prospectData.email,
         prospect_name: prospectData?.name,
         program_title: prospectData?.programTitle || prospectData?.product_type,
         product_type: prospectData?.programTitle || prospectData?.product_type
       });
 
-      // Call the SendGrid edge function with program title for better matching
+      // Call the SendGrid edge function with participant email and program title for better matching
       const { data, error } = await supabase.functions.invoke('send-hr-notification', {
         body: {
           to_email: hrContact.email,
           to_name: hrContact.name,
+          participant_email: prospectData.email, // Add participant email
           subject: emailSubject,
           message: emailPreview,
           prospect_name: prospectData?.name,
@@ -234,7 +256,7 @@ _______`;
 
       toast({
         title: "Success",
-        description: `Email sent successfully to ${hrContact.name}`,
+        description: `Email sent successfully to HR, participant, and CC'd to AIHQ`,
       });
 
       onComplete();
@@ -256,6 +278,7 @@ _______`;
     setHrContact(null);
     setEmailSubject('');
     setEmailPreview('');
+    setPricing(2850);
     onClose();
   };
 
@@ -286,7 +309,7 @@ _______`;
             Send HR Notification
           </DialogTitle>
           <DialogDescription>
-            Send a professional training registration email to {hrContact.name} ({hrContact.email})
+            Send a professional training registration email to multiple recipients
           </DialogDescription>
         </DialogHeader>
         
@@ -321,11 +344,14 @@ _______`;
               <div className="flex items-start gap-2">
                 <Mail className="w-5 h-5 text-blue-600 mt-0.5" />
                 <div>
-                  <div className="font-medium text-blue-900">Email Details</div>
+                  <div className="font-medium text-blue-900">Email Recipients</div>
                   <div className="text-sm text-blue-700 mt-1">
                     <div><strong>To:</strong> {hrContact.name} ({hrContact.email})</div>
+                    <div><strong>To:</strong> {prospectData?.name} ({prospectData?.email})</div>
+                    <div><strong>CC:</strong> AIHQ Training and Consultancy (wani@theaihq.net)</div>
                     <div><strong>From:</strong> AIHQ Training and Consultancy (wani@theaihq.net)</div>
                     <div><strong>Program:</strong> {prospectData?.programTitle || prospectData?.product_type}</div>
+                    <div><strong>Pricing:</strong> RM{pricing}</div>
                     <div><strong>Participant:</strong> {prospectData?.name}</div>
                   </div>
                   {hrContact.email_sent_at && (

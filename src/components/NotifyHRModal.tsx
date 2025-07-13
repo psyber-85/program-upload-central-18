@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -26,7 +25,6 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
   const [hrContact, setHrContact] = useState<any>(null);
   const [emailSubject, setEmailSubject] = useState('');
   const [emailPreview, setEmailPreview] = useState('');
-  const [pricing, setPricing] = useState<number>(2850);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
@@ -50,34 +48,29 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
 
       if (prospectError) throw prospectError;
 
-      // Fetch program title and pricing if program_id exists
+      // Fetch program title if program_id exists
       let programTitle = prospect.product_type || 'Training Program';
-      let programPricing = 2850; // Default pricing
-
       if (prospect.program_id) {
         const { data: program } = await supabase
           .from('programs')
-          .select('title, pricing')
+          .select('title')
           .eq('id', prospect.program_id)
           .single();
         
         if (program) {
           programTitle = program.title;
-          programPricing = program.pricing || 2850; // Use default if null
         }
       }
 
       console.log('Prospect data loaded:', { 
         programTitle, 
         productType: prospect.product_type,
-        programId: prospect.program_id,
-        pricing: programPricing
+        programId: prospect.program_id 
       });
 
-      // Add program title and pricing to prospect data
-      const prospectWithProgram = { ...prospect, programTitle, programPricing };
+      // Add program title to prospect data
+      const prospectWithProgram = { ...prospect, programTitle };
       setProspectData(prospectWithProgram);
-      setPricing(programPricing);
       
       if (prospect.hr_contacts && prospect.hr_contacts.length > 0) {
         const hrContactData = prospect.hr_contacts[0];
@@ -87,7 +80,7 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
         setEmailSubject(`Training Registration for ${programTitle}`);
         
         // Generate email preview using program title for better matching
-        generateEmailPreview(hrContactData.name, prospect.name, programTitle, programTitle, programPricing);
+        generateEmailPreview(hrContactData.name, prospect.name, programTitle, programTitle);
       }
     } catch (error) {
       console.error('Failed to load prospect data:', error);
@@ -99,7 +92,7 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
     }
   };
 
-  const generateEmailPreview = (hrName: string, staffName: string, courseName: string, programKey: string, pricing: number) => {
+  const generateEmailPreview = (hrName: string, staffName: string, courseName: string, programKey: string) => {
     console.log('Generating email preview for program:', programKey);
     
     // Program-specific links mapping using exact program titles
@@ -151,9 +144,6 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
       console.log('Found links for program:', programKey, links);
     }
 
-    // Format pricing
-    const formattedPricing = `RM${pricing.toLocaleString()}`;
-
     const preview = `Dear ${hrName},
 
 I hope this message finds you well.
@@ -165,11 +155,11 @@ Attached are the following documents for your review:
 - Course Brochure: ${links.courseBrochure}
 - Sign-Up Form: ${links.signupForm}
 
-The fee for this 2-day program is ${formattedPricing}, as stated in the sign-up form. However, this course is 100% HRDC Claimable. We kindly ask you to review the enclosed materials for HRD levy approval and confirm the registration at your earliest convenience.
+The fee for this 2-day program is RM2,850, as stated in the sign-up form. However, this course is 100% HRDC Claimable. We kindly ask you to review the enclosed materials for HRD levy approval and confirm the registration at your earliest convenience.
 
 For more information on AIHQ's expertise and track record, feel free to explore:
 
-AIHQ's Profile & Portfolio: https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms//AIHQ_Profile.pdf
+AIHQ's Profile & Portfolio: https://theaihq.net/AIHQ_&_Pang%20-%20Detailed%20Profile__.pdf
 
 Our Website: http://theaihq.net
 
@@ -205,8 +195,7 @@ _______`;
         to_name: hrContact.name,
         prospect_name: prospectData?.name,
         program_title: prospectData?.programTitle || prospectData?.product_type,
-        program_id: prospectData?.program_id,
-        participant_email: prospectData?.email
+        product_type: prospectData?.programTitle || prospectData?.product_type
       });
 
       // Call the SendGrid edge function with program title for better matching
@@ -218,8 +207,7 @@ _______`;
           message: emailPreview,
           prospect_name: prospectData?.name,
           program_title: prospectData?.programTitle || prospectData?.product_type || 'Training Program',
-          program_id: prospectData?.program_id,
-          participant_email: prospectData?.email
+          product_type: prospectData?.programTitle || prospectData?.product_type // Use program title for better matching
         }
       });
 
@@ -246,7 +234,7 @@ _______`;
 
       toast({
         title: "Success",
-        description: `Email sent successfully to ${hrContact.name}, ${prospectData.name}, and wani@theaihq.net`,
+        description: `Email sent successfully to ${hrContact.name}`,
       });
 
       onComplete();
@@ -268,7 +256,6 @@ _______`;
     setHrContact(null);
     setEmailSubject('');
     setEmailPreview('');
-    setPricing(2850);
     onClose();
   };
 
@@ -299,7 +286,7 @@ _______`;
             Send HR Notification
           </DialogTitle>
           <DialogDescription>
-            Send a professional training registration email to HR, participant, and CC wani@theaihq.net
+            Send a professional training registration email to {hrContact.name} ({hrContact.email})
           </DialogDescription>
         </DialogHeader>
         
@@ -336,11 +323,9 @@ _______`;
                 <div>
                   <div className="font-medium text-blue-900">Email Details</div>
                   <div className="text-sm text-blue-700 mt-1">
-                    <div><strong>To:</strong> {hrContact.name} ({hrContact.email}), {prospectData?.name} ({prospectData?.email})</div>
-                    <div><strong>CC:</strong> wani@theaihq.net</div>
+                    <div><strong>To:</strong> {hrContact.name} ({hrContact.email})</div>
                     <div><strong>From:</strong> AIHQ Training and Consultancy (wani@theaihq.net)</div>
                     <div><strong>Program:</strong> {prospectData?.programTitle || prospectData?.product_type}</div>
-                    <div><strong>Pricing:</strong> RM{pricing.toLocaleString()}</div>
                     <div><strong>Participant:</strong> {prospectData?.name}</div>
                   </div>
                   {hrContact.email_sent_at && (

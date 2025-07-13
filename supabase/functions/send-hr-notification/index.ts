@@ -1,6 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.5.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,11 +14,9 @@ interface EmailRequest {
   prospect_name?: string;
   program_title?: string;
   product_type?: string;
-  program_id?: string;
-  participant_email?: string;
 }
 
-const generateEmailTemplate = async (hrName: string, staffName: string, courseName: string, productType: string, pricing: number) => {
+const generateEmailTemplate = (hrName: string, staffName: string, courseName: string, productType: string) => {
   console.log('Generating email template for program:', productType);
   
   // Program-specific links mapping using exact program titles
@@ -71,9 +68,6 @@ const generateEmailTemplate = async (hrName: string, staffName: string, courseNa
     console.log('Found links for program:', productType, links);
   }
 
-  // Format pricing
-  const formattedPricing = `RM${pricing.toLocaleString()}`;
-
   const htmlTemplate = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
       <p>Dear ${hrName},</p>
@@ -89,12 +83,12 @@ const generateEmailTemplate = async (hrName: string, staffName: string, courseNa
         <li><a href="${links.signupForm}" style="color: #2754C5; text-decoration: none;">Sign-Up Form</a></li>
       </ul>
       
-      <p>The fee for this 2-day program is <strong>${formattedPricing}</strong>, as stated in the sign-up form. However, this course is <strong>100% HRDC Claimable</strong>. We kindly ask you to review the enclosed materials for HRD levy approval and confirm the registration at your earliest convenience.</p>
+      <p>The fee for this 2-day program is <strong>RM2,850</strong>, as stated in the sign-up form. However, this course is <strong>100% HRDC Claimable</strong>. We kindly ask you to review the enclosed materials for HRD levy approval and confirm the registration at your earliest convenience.</p>
       
       <p>For more information on AIHQ's expertise and track record, feel free to explore:</p>
       
       <ul>
-        <li><a href="https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms//AIHQ_Profile.pdf" style="color: #2754C5; text-decoration: none;">AIHQ's Profile & Portfolio</a></li>
+        <li><a href="https://theaihq.net/AIHQ_&_Pang%20-%20Detailed%20Profile__.pdf" style="color: #2754C5; text-decoration: none;">AIHQ's Profile & Portfolio</a></li>
         <li><a href="http://theaihq.net" style="color: #2754C5; text-decoration: none;">Our Website</a></li>
         <li><a href="https://www.google.com/search?sca_esv=0e58669465c64ea2&sxsrf=AE3TifO01M1ZnuMUGy1ZOYy7cKB3BSmg_Q:1750924007883&si=AMgyJEtREmoPL4P1I5IDCfuA8gybfVI2d5Uj7QMwYCZHKDZ-E8ss9ZAsrmkP2SnQ13k5Q1slVi9Okp1e3MtSGzQ-A-qiOCtAkpQyLE2q_z62UrP3t8xZxayiwjuBCszv6GjHWAAj1U9IqF7fgfSx9Q-7DIJQXGoJXg%3D%3D&q=AIHQ+Training+and+Consultancy+Reviews&sa=X&ved=2ahUKEwiLtZKczI6OAxWIS2wGHYSsHcMQ0bkNegQINRAE&biw=1536&bih=730&dpr=1.25" style="color: #2754C5; text-decoration: none;">Our 4.8-Star Google Reviews</a></li>
       </ul>
@@ -121,11 +115,11 @@ Attached are the following documents for your review:
 - Course Brochure: ${links.courseBrochure}
 - Sign-Up Form: ${links.signupForm}
 
-The fee for this 2-day program is ${formattedPricing}, as stated in the sign-up form. However, this course is 100% HRDC Claimable. We kindly ask you to review the enclosed materials for HRD levy approval and confirm the registration at your earliest convenience.
+The fee for this 2-day program is RM2,850, as stated in the sign-up form. However, this course is 100% HRDC Claimable. We kindly ask you to review the enclosed materials for HRD levy approval and confirm the registration at your earliest convenience.
 
 For more information on AIHQ's expertise and track record, feel free to explore:
 
-AIHQ's Profile & Portfolio: https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms//AIHQ_Profile.pdf
+AIHQ's Profile & Portfolio: https://theaihq.net/AIHQ_&_Pang%20-%20Detailed%20Profile__.pdf
 
 Our Website: http://theaihq.net
 
@@ -155,7 +149,7 @@ const handler = async (req: Request): Promise<Response> => {
     const body: EmailRequest = await req.json();
     console.log('Request body:', body);
     
-    const { to_email, to_name, prospect_name, program_title, program_id, participant_email } = body;
+    const { to_email, to_name, prospect_name, program_title, product_type } = body;
 
     if (!to_email || !prospect_name || !program_title) {
       console.error('Missing required fields:', { to_email, prospect_name, program_title });
@@ -169,41 +163,12 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("SENDGRID_API_KEY environment variable is not set");
     }
 
-    // Initialize Supabase client
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    // Fetch pricing from programs table
-    let pricing = 2850; // Default pricing
-    if (program_id) {
-      console.log('Fetching pricing for program_id:', program_id);
-      const { data: program, error: programError } = await supabaseClient
-        .from('programs')
-        .select('pricing')
-        .eq('id', program_id)
-        .single();
-
-      if (programError) {
-        console.error('Error fetching program pricing:', programError);
-      } else if (program?.pricing && program.pricing > 0) {
-        pricing = program.pricing;
-        console.log('Using program pricing:', pricing);
-      } else {
-        console.log('Using default pricing (program pricing is null or 0):', pricing);
-      }
-    } else {
-      console.log('No program_id provided, using default pricing:', pricing);
-    }
-
     // Generate the email template based on the program
-    const { htmlTemplate, plainTextTemplate } = await generateEmailTemplate(
+    const { htmlTemplate, plainTextTemplate } = generateEmailTemplate(
       to_name || to_email,
       prospect_name,
       program_title,
-      program_title,
-      pricing
+      program_title // Use program_title for matching instead of product_type
     );
 
     const emailSubject = `Training Registration for ${program_title}`;
@@ -211,25 +176,6 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('Sending email via SendGrid...');
     console.log('Email subject:', emailSubject);
     console.log('Program title:', program_title);
-    console.log('Pricing used:', pricing);
-    
-    // Prepare recipients
-    const recipients = [
-      {
-        email: to_email,
-        name: to_name || to_email,
-      }
-    ];
-
-    // Add participant email if provided
-    if (participant_email) {
-      recipients.push({
-        email: participant_email,
-        name: prospect_name,
-      });
-    }
-
-    console.log('Recipients:', recipients);
     
     // SendGrid API request
     const sendgridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
@@ -241,11 +187,10 @@ const handler = async (req: Request): Promise<Response> => {
       body: JSON.stringify({
         personalizations: [
           {
-            to: recipients,
-            cc: [
+            to: [
               {
-                email: "wani@theaihq.net",
-                name: "Wani - AIHQ",
+                email: to_email,
+                name: to_name || to_email,
               },
             ],
             subject: emailSubject,
@@ -283,10 +228,8 @@ const handler = async (req: Request): Promise<Response> => {
       JSON.stringify({ 
         success: true, 
         message: "Email sent successfully",
-        recipients: recipients.map(r => r.email),
-        cc: ["wani@theaihq.net"],
-        subject: emailSubject,
-        pricing_used: pricing
+        recipient: to_email,
+        subject: emailSubject
       }),
       {
         status: 200,

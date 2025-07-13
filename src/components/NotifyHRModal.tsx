@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -50,39 +49,27 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
 
       if (prospectError) throw prospectError;
 
-      // Fetch program title if program_id exists
-      let programTitle = prospect.product_type || 'Training Program';
+      // Fetch program title and pricing from registration_programs using program_id
+      let programTitle = 'Training Program';
+      let programPricing = 2850; // Default
+      
       if (prospect.program_id) {
         const { data: program } = await supabase
-          .from('programs')
-          .select('title')
+          .from('registration_programs')
+          .select('title, pricing')
           .eq('id', prospect.program_id)
           .single();
         
         if (program) {
           programTitle = program.title;
+          if (program.pricing) {
+            programPricing = program.pricing;
+          }
         }
-      }
-
-      // Fetch pricing from registration_programs table
-      let programPricing = 2850; // Default
-      try {
-        const { data: registrationProgram } = await supabase
-          .from('registration_programs')
-          .select('pricing')
-          .eq('title', programTitle)
-          .single();
-        
-        if (registrationProgram?.pricing) {
-          programPricing = registrationProgram.pricing;
-        }
-      } catch (error) {
-        console.log('No pricing found in registration_programs, using default');
       }
 
       console.log('Prospect data loaded:', { 
         programTitle, 
-        productType: prospect.product_type,
         programId: prospect.program_id,
         pricing: programPricing
       });
@@ -99,7 +86,7 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
         // Set default email subject using program title
         setEmailSubject(`Training Registration for ${programTitle}`);
         
-        // Generate email preview using program title for better matching
+        // Generate email preview using program title
         generateEmailPreview(hrContactData.name, prospect.name, programTitle, programTitle, programPricing);
       }
     } catch (error) {
@@ -215,21 +202,20 @@ _______`;
         to_name: hrContact.name,
         participant_email: prospectData.email,
         prospect_name: prospectData?.name,
-        program_title: prospectData?.programTitle || prospectData?.product_type,
-        product_type: prospectData?.programTitle || prospectData?.product_type
+        program_title: prospectData?.programTitle
       });
 
-      // Call the SendGrid edge function with participant email and program title for better matching
+      // Call the SendGrid edge function with program title
       const { data, error } = await supabase.functions.invoke('send-hr-notification', {
         body: {
           to_email: hrContact.email,
           to_name: hrContact.name,
-          participant_email: prospectData.email, // Add participant email
+          participant_email: prospectData.email,
           subject: emailSubject,
           message: emailPreview,
           prospect_name: prospectData?.name,
-          program_title: prospectData?.programTitle || prospectData?.product_type || 'Training Program',
-          product_type: prospectData?.programTitle || prospectData?.product_type // Use program title for better matching
+          program_title: prospectData?.programTitle || 'Training Program',
+          product_type: prospectData?.programTitle // Use program title for edge function compatibility
         }
       });
 
@@ -251,7 +237,6 @@ _______`;
 
       if (updateError) {
         console.error('Failed to update HR contact:', updateError);
-        // Don't throw here as the email was sent successfully
       }
 
       toast({
@@ -350,7 +335,7 @@ _______`;
                     <div><strong>To:</strong> {prospectData?.name} ({prospectData?.email})</div>
                     <div><strong>CC:</strong> AIHQ Training and Consultancy (wani@theaihq.net)</div>
                     <div><strong>From:</strong> AIHQ Training and Consultancy (wani@theaihq.net)</div>
-                    <div><strong>Program:</strong> {prospectData?.programTitle || prospectData?.product_type}</div>
+                    <div><strong>Program:</strong> {prospectData?.programTitle}</div>
                     <div><strong>Pricing:</strong> RM{pricing}</div>
                     <div><strong>Participant:</strong> {prospectData?.name}</div>
                   </div>

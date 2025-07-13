@@ -12,14 +12,6 @@ interface Program {
   title: string;
 }
 
-// Define the 4 masterclasses that should be available
-const MASTERCLASSES = [
-  'Business Writing with AI: 2-Day Masterclass',
-  'The AI-Ready Leader: Win the Future with Strategic Action',
-  'ChatGPT Skill Boost (Intermediate)',
-  'AI and ChatGPT for HR Professionals - 2 Day Masterclass'
-];
-
 const AddProspectForm = () => {
   const [programmes, setProgrammes] = useState<Program[]>([]);
   const [formData, setFormData] = useState({
@@ -30,7 +22,6 @@ const AddProspectForm = () => {
     org: '',
     role: '',
     payment_status: '',
-    product_type: '',
     registration_status: 'Pending' as const
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,36 +34,10 @@ const AddProspectForm = () => {
 
   const fetchPrograms = async () => {
     try {
-      // Ensure all masterclasses exist in the database
-      for (const masterclass of MASTERCLASSES) {
-        const { data: existingProgram, error: fetchError } = await supabase
-          .from('programs')
-          .select('id')
-          .eq('title', masterclass)
-          .maybeSingle();
-
-        if (fetchError) {
-          console.error('Error checking program:', fetchError);
-          continue;
-        }
-
-        if (!existingProgram) {
-          // Program doesn't exist, create it
-          const { error: createError } = await supabase
-            .from('programs')
-            .insert([{ title: masterclass }]);
-
-          if (createError) {
-            console.error('Error creating program:', createError);
-          }
-        }
-      }
-
-      // Now fetch only the masterclasses
+      // Fetch all programs from registration_programs
       const { data, error } = await supabase
-        .from('programs')
+        .from('registration_programs')
         .select('id, title')
-        .in('title', MASTERCLASSES)
         .order('title', { ascending: true });
 
       if (error) throw error;
@@ -112,8 +77,7 @@ const AddProspectForm = () => {
           phone: formData.phone || null,
           org: formData.org || null,
           role: formData.role || null,
-          payment_status: formData.payment_status || 'Pending',
-          product_type: formData.product_type || null,
+          payment: formData.payment_status || 'Pending',
           registration_status: formData.registration_status
         }]);
 
@@ -133,7 +97,6 @@ const AddProspectForm = () => {
         org: '',
         role: '',
         payment_status: '',
-        product_type: '',
         registration_status: 'Pending'
       });
     } catch (error) {
@@ -168,7 +131,7 @@ const AddProspectForm = () => {
               className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md disabled:opacity-50"
             >
               <option value="">
-                {loading ? 'Loading masterclasses...' : 'Select a masterclass...'}
+                {loading ? 'Loading programs...' : 'Select a program...'}
               </option>
               {programmes.map((programme) => (
                 <option key={programme.id} value={programme.id}>
@@ -178,7 +141,7 @@ const AddProspectForm = () => {
             </select>
             {programmes.length === 0 && !loading && (
               <p className="text-sm text-gray-500 mt-1">
-                Only the 4 core masterclasses are available for prospect registration.
+                No programs found. Please add programs to the registration_programs table first.
               </p>
             )}
           </div>
@@ -251,17 +214,6 @@ const AddProspectForm = () => {
               <option value="Paid">Paid</option>
               <option value="Pending">Pending</option>
             </select>
-          </div>
-
-          <div>
-            <Label htmlFor="product_type">Product Type</Label>
-            <Input
-              id="product_type"
-              name="product_type"
-              value={formData.product_type}
-              onChange={handleInputChange}
-              placeholder="e.g., masterclass, workshop"
-            />
           </div>
 
           <div className="md:col-span-2">

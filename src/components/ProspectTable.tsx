@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -171,7 +170,7 @@ const ProspectTable = () => {
     try {
       setLoading(true);
       
-      // Fetch registration programs - now using registration_programs as the authoritative source
+      // Fetch registration programs as the authoritative source
       const { data: programsData, error: programsError } = await supabase
         .from('registration_programs')
         .select('id, title')
@@ -186,7 +185,7 @@ const ProspectTable = () => {
       
       setPrograms(programsMap);
 
-      // Fetch prospects with related data including status_reason
+      // Fetch prospects with related data
       const { data: prospectsData, error: prospectsError } = await supabase
         .from('prospects')
         .select(`
@@ -206,9 +205,9 @@ const ProspectTable = () => {
         const hrContact = prospect.hr_contacts?.length > 0 ? prospect.hr_contacts[0] : undefined;
         const hasCallNotes = prospect.prospect_calls?.some((call: any) => call.notes && call.notes.trim() !== '') || false;
 
-        // Use program from registration_programs, fallback to product_type if program not found
+        // Use program from registration_programs only via program_id
         const programName = prospect.program_id ? programsMap[prospect.program_id] : null;
-        const displayProgram = programName || prospect.product_type || 'Unknown Program';
+        const displayProgram = programName || 'No Program Assigned';
 
         return {
           id: prospect.id,
@@ -332,7 +331,7 @@ const ProspectTable = () => {
     return pages;
   };
 
-  // Get unique programs for filter dropdown
+  // Get unique programs for filter dropdown - now from programs map
   const uniquePrograms = Array.from(new Set(prospects.map(p => p.program))).sort();
 
   if (loading) {

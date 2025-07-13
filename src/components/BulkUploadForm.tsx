@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -185,7 +186,6 @@ const BulkUploadForm = () => {
           org: row.org || null,
           role: row.role || null,
           payment: normalizePayment(row.payment),
-          product_type: programTitle,
           registration_status: 'Pending'
         });
       });
@@ -194,10 +194,9 @@ const BulkUploadForm = () => {
       
       // Process each program group
       for (const [programTitle, prospects] of Object.entries(programGroups)) {
-        // Get or create program
-        let programId;
+        // Get program_id from registration_programs
         const { data: existingProgram, error: fetchError } = await supabase
-          .from('programs')
+          .from('registration_programs')
           .select('id')
           .eq('title', programTitle)
           .single();
@@ -206,24 +205,14 @@ const BulkUploadForm = () => {
           throw fetchError;
         }
 
-        if (existingProgram) {
-          programId = existingProgram.id;
-        } else {
-          // Create new program if it doesn't exist
-          const { data: newProgram, error: createError } = await supabase
-            .from('programs')
-            .insert([{ title: programTitle }])
-            .select('id')
-            .single();
-
-          if (createError) throw createError;
-          programId = newProgram.id;
+        if (!existingProgram) {
+          throw new Error(`Program "${programTitle}" not found in registration_programs. Please add it first.`);
         }
 
-        // Add program_id to prospects
+        // Add program_id to prospects (remove product_type)
         const prospectsWithProgramId = prospects.map(prospect => ({
           ...prospect,
-          program_id: programId
+          program_id: existingProgram.id
         }));
 
         // Insert prospects
@@ -238,7 +227,7 @@ const BulkUploadForm = () => {
       
       toast({
         title: "Success",
-        description: `Successfully uploaded ${totalInserted} prospects across ${Object.keys(programGroups).length} program(s). Payment values have been normalized and stored correctly.`,
+        description: `Successfully uploaded ${totalInserted} prospects across ${Object.keys(programGroups).length} program(s). All prospects are now linked to programs via program_id.`,
       });
 
       // Reset form
@@ -289,13 +278,14 @@ const BulkUploadForm = () => {
               <li>org</li>
               <li>role</li>
               <li>payment (accepts: hrdc/individual for payment types, or paid/pending/failed for status)</li>
-              <li>product_type (program name)</li>
+              <li>product_type (program name - must match exactly with programs in registration_programs table)</li>
               <li>product_id (optional - will be automatically translated to program titles)</li>
             </ul>
             <div className="mt-3 p-3 bg-blue-100 rounded">
-              <p className="text-xs text-blue-800 font-medium">Auto Program Detection & Payment Handling:</p>
+              <p className="text-xs text-blue-800 font-medium">Program Matching & Payment Handling:</p>
               <p className="text-xs text-blue-700">
-                Programs will be automatically detected from the product_type or product_id columns. 
+                Program names must match exactly with those in the registration_programs table. 
+                Each prospect will be assigned a program_id based on the program name match.
                 Payment values will be automatically normalized - "HRDC"/"HRDF" → "hrdc", "Individual"/"Self-funded" → "individual".
                 Common payment status variations are also supported (e.g., "Paid" → "paid", "Processing" → "pending").
               </p>

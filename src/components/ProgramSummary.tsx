@@ -49,26 +49,7 @@ const ProgramSummary = () => {
     try {
       setLoading(true);
       
-      // Fetch prospects with program information via JOIN with registration_programs
-      const { data: prospectsWithPrograms, error: prospectsError } = await supabase
-        .from('prospects')
-        .select(`
-          registration_status,
-          registration_programs!inner(
-            id,
-            title
-          )
-        `)
-        .not('program_id', 'is', null);
-
-      if (prospectsError) {
-        console.error('Error fetching prospects with programs:', prospectsError);
-        throw prospectsError;
-      }
-
-      console.log('Prospects with programs:', prospectsWithPrograms);
-
-      // Get all programs from registration_programs to ensure we show all programs
+      // First, get all registration programs
       const { data: allPrograms, error: programsError } = await supabase
         .from('registration_programs')
         .select('id, title')
@@ -79,12 +60,26 @@ const ProgramSummary = () => {
         throw programsError;
       }
 
+      // Then get all prospects
+      const { data: allProspects, error: prospectsError } = await supabase
+        .from('prospects')
+        .select('program_id, registration_status')
+        .not('program_id', 'is', null);
+
+      if (prospectsError) {
+        console.error('Error fetching prospects:', prospectsError);
+        throw prospectsError;
+      }
+
+      console.log('All programs:', allPrograms);
+      console.log('All prospects:', allProspects);
+
       // Create a map to count statistics for each program
       const programStatsMap = new Map();
 
       // Initialize all programs with zero counts
       allPrograms?.forEach(program => {
-        programStatsMap.set(program.title, {
+        programStatsMap.set(program.id, {
           programName: program.title,
           pending: 0,
           approved: 0,
@@ -96,15 +91,12 @@ const ProgramSummary = () => {
       });
 
       // Count prospects for each program
-      prospectsWithPrograms?.forEach(prospect => {
-        const programTitle = prospect.registration_programs.title;
-        const status = prospect.registration_status;
-
-        if (programStatsMap.has(programTitle)) {
-          const stats = programStatsMap.get(programTitle);
+      allProspects?.forEach(prospect => {
+        if (prospect.program_id && programStatsMap.has(prospect.program_id)) {
+          const stats = programStatsMap.get(prospect.program_id);
           stats.total += 1;
 
-          switch (status) {
+          switch (prospect.registration_status) {
             case 'Pending':
               stats.pending += 1;
               break;

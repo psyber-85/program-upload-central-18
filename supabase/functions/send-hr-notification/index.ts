@@ -235,7 +235,7 @@ const handler = async (req: Request): Promise<Response> => {
           },
         ],
         from: {
-          email: "wani@theaihq.net",
+          email: "pang@theaihq.net",
           name: "AIHQ Training and Consultancy",
         },
         content: [

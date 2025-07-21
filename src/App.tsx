@@ -9,7 +9,6 @@ import Index from "./pages/Index";
 import TrainingOutlineCreator from "./pages/TrainingOutlineCreator";
 import CertificateGenerator from "./pages/CertificateGenerator";
 import RegisterTracker from "./pages/RegisterTracker";
-import CRMTracker from "./pages/CRMTracker";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,7 +25,6 @@ const App = () => (
           <Route path="/training-outline" element={<TrainingOutlineCreator />} />
           <Route path="/certificates" element={<CertificateGenerator />} />
           <Route path="/register-tracker" element={<RegisterTracker />} />
-          <Route path="/crm-tracker" element={<CRMTracker />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

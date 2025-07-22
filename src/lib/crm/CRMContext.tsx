@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { CrmCampaign, CrmLead, CrmLeadActivity } from './types';
 import { fetchCrmCampaigns, fetchCrmLeadsByCampaign, fetchCrmActivitiesByLead } from './placeholderFunctions';
+import { toast } from 'sonner';
 
 interface CrmState {
   campaigns: CrmCampaign[];
@@ -12,10 +13,12 @@ interface CrmState {
   searchTerm: string;
   sortField: keyof CrmLead | null;
   sortDirection: 'asc' | 'desc';
+  error: string | null;
 }
 
 type CrmAction =
   | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_ERROR'; payload: string | null }
   | { type: 'SET_CAMPAIGNS'; payload: CrmCampaign[] }
   | { type: 'SET_ACTIVE_CAMPAIGN'; payload: string }
   | { type: 'SET_LEADS'; payload: CrmLead[] }
@@ -34,18 +37,23 @@ const initialState: CrmState = {
   loading: true,
   searchTerm: '',
   sortField: null,
-  sortDirection: 'asc'
+  sortDirection: 'asc',
+  error: null
 };
 
 const crmReducer = (state: CrmState, action: CrmAction): CrmState => {
   switch (action.type) {
     case 'SET_LOADING':
       return { ...state, loading: action.payload };
+    case 'SET_ERROR':
+      return { ...state, error: action.payload };
     case 'SET_CAMPAIGNS':
       return { 
         ...state, 
         campaigns: action.payload,
-        activeCampaignId: action.payload.length > 0 ? action.payload[0].crm_id : null
+        activeCampaignId: action.payload.length > 0 && !state.activeCampaignId 
+          ? action.payload[0].crm_id 
+          : state.activeCampaignId
       };
     case 'SET_ACTIVE_CAMPAIGN':
       return { ...state, activeCampaignId: action.payload };
@@ -82,18 +90,26 @@ const CrmContext = createContext<{
   dispatch: React.Dispatch<CrmAction>;
   loadLeads: (campaignId: string) => Promise<void>;
   loadActivities: (leadId: string) => Promise<void>;
+  refreshCampaigns: () => Promise<void>;
 } | null>(null);
 
 export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(crmReducer, initialState);
 
   const loadLeads = async (campaignId: string) => {
+    if (!campaignId) return;
+    
     dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_ERROR', payload: null });
+    
     try {
       const leads = await fetchCrmLeadsByCampaign(campaignId);
       dispatch({ type: 'SET_LEADS', payload: leads });
     } catch (error) {
       console.error('Error loading leads:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load leads';
+      dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      toast.error(errorMessage);
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
@@ -105,31 +121,41 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       dispatch({ type: 'SET_ACTIVITIES', payload: activities });
     } catch (error) {
       console.error('Error loading activities:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load activities';
+      toast.error(errorMessage);
+    }
+  };
+
+  const refreshCampaigns = async () => {
+    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_ERROR', payload: null });
+    
+    try {
+      const campaigns = await fetchCrmCampaigns();
+      dispatch({ type: 'SET_CAMPAIGNS', payload: campaigns });
+    } catch (error) {
+      console.error('Error loading campaigns:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load campaigns';
+      dispatch({ type: 'SET_ERROR', payload: errorMessage });
+      toast.error(errorMessage);
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 
   useEffect(() => {
-    const loadCampaigns = async () => {
-      dispatch({ type: 'SET_LOADING', payload: true });
-      try {
-        const campaigns = await fetchCrmCampaigns();
-        dispatch({ type: 'SET_CAMPAIGNS', payload: campaigns });
-        
-        if (campaigns.length > 0) {
-          await loadLeads(campaigns[0].crm_id);
-        }
-      } catch (error) {
-        console.error('Error loading campaigns:', error);
-      } finally {
-        dispatch({ type: 'SET_LOADING', payload: false });
-      }
-    };
-
-    loadCampaigns();
+    refreshCampaigns();
   }, []);
 
+  // Load leads when active campaign changes
+  useEffect(() => {
+    if (state.activeCampaignId) {
+      loadLeads(state.activeCampaignId);
+    }
+  }, [state.activeCampaignId]);
+
   return (
-    <CrmContext.Provider value={{ state, dispatch, loadLeads, loadActivities }}>
+    <CrmContext.Provider value={{ state, dispatch, loadLeads, loadActivities, refreshCampaigns }}>
       {children}
     </CrmContext.Provider>
   );

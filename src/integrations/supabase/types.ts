@@ -14,6 +14,169 @@ export type Database = {
   }
   public: {
     Tables: {
+      crm_campaigns: {
+        Row: {
+          created_at: string
+          end_date: string | null
+          id: string
+          name: string
+          notes: string | null
+          objective: string | null
+          start_date: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          objective?: string | null
+          start_date?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          objective?: string | null
+          start_date?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      crm_lead_activities: {
+        Row: {
+          created_at: string
+          id: string
+          lead_id: string
+          note: string
+          timestamp: string
+          type: Database["public"]["Enums"]["crm_activity_type"]
+          user_id: string
+          user_name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lead_id: string
+          note: string
+          timestamp?: string
+          type: Database["public"]["Enums"]["crm_activity_type"]
+          user_id: string
+          user_name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lead_id?: string
+          note?: string
+          timestamp?: string
+          type?: Database["public"]["Enums"]["crm_activity_type"]
+          user_id?: string
+          user_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_lead_activities_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "crm_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_leads: {
+        Row: {
+          campaign_id: string
+          confirmed_deal_size: number | null
+          converted_at: string | null
+          created_at: string
+          email: string
+          id: string
+          industry: string
+          job_role: string
+          last_contacted: string | null
+          lead_score: Database["public"]["Enums"]["crm_lead_score"]
+          lead_source: string
+          name: string
+          next_follow_up: string | null
+          notes: string | null
+          number: string
+          org: string
+          owner_id: string | null
+          owner_name: string
+          potential_deal_size: number | null
+          state: string
+          status: Database["public"]["Enums"]["crm_lead_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          campaign_id: string
+          confirmed_deal_size?: number | null
+          converted_at?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          industry: string
+          job_role: string
+          last_contacted?: string | null
+          lead_score?: Database["public"]["Enums"]["crm_lead_score"]
+          lead_source: string
+          name: string
+          next_follow_up?: string | null
+          notes?: string | null
+          number: string
+          org: string
+          owner_id?: string | null
+          owner_name: string
+          potential_deal_size?: number | null
+          state: string
+          status?: Database["public"]["Enums"]["crm_lead_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          campaign_id?: string
+          confirmed_deal_size?: number | null
+          converted_at?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          industry?: string
+          job_role?: string
+          last_contacted?: string | null
+          lead_score?: Database["public"]["Enums"]["crm_lead_score"]
+          lead_source?: string
+          name?: string
+          next_follow_up?: string | null
+          notes?: string | null
+          number?: string
+          org?: string
+          owner_id?: string | null
+          owner_name?: string
+          potential_deal_size?: number | null
+          state?: string
+          status?: Database["public"]["Enums"]["crm_lead_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_leads_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "crm_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hr_contacts: {
         Row: {
           created_at: string
@@ -244,7 +407,9 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      crm_activity_type: "Contacted" | "Call" | "Email"
+      crm_lead_score: "A" | "B" | "C" | "D" | "E"
+      crm_lead_status: "Success" | "Lost" | "Future"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -371,6 +536,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      crm_activity_type: ["Contacted", "Call", "Email"],
+      crm_lead_score: ["A", "B", "C", "D", "E"],
+      crm_lead_status: ["Success", "Lost", "Future"],
+    },
   },
 } as const

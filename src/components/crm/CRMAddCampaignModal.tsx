@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useCrm } from '@/lib/crm/CRMContext';
 import { CrmCampaign } from '@/lib/crm/types';
+import { saveCrmCampaign } from '@/lib/crm/placeholderFunctions';
 import { toast } from 'sonner';
 
 interface CRMAddCampaignModalProps {
@@ -25,12 +26,11 @@ interface CampaignFormData {
 
 const CRMAddCampaignModal: React.FC<CRMAddCampaignModalProps> = ({ open, onOpenChange }) => {
   const { state, dispatch } = useCrm();
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<CampaignFormData>();
+  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<CampaignFormData>();
 
   const onSubmit = async (data: CampaignFormData) => {
     try {
-      const newCampaign: CrmCampaign = {
-        crm_id: Date.now().toString(),
+      const newCampaign: Omit<CrmCampaign, 'crm_id'> = {
         crm_name: data.crm_name,
         crm_objective: data.crm_objective || undefined,
         crm_startDate: data.crm_startDate || undefined,
@@ -38,17 +38,17 @@ const CRMAddCampaignModal: React.FC<CRMAddCampaignModalProps> = ({ open, onOpenC
         crm_notes: data.crm_notes || undefined,
       };
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const savedCampaign = await saveCrmCampaign(newCampaign);
 
-      dispatch({ type: 'SET_CAMPAIGNS', payload: [...state.campaigns, newCampaign] });
-      dispatch({ type: 'SET_ACTIVE_CAMPAIGN', payload: newCampaign.crm_id });
+      dispatch({ type: 'SET_CAMPAIGNS', payload: [...state.campaigns, savedCampaign] });
+      dispatch({ type: 'SET_ACTIVE_CAMPAIGN', payload: savedCampaign.crm_id });
       
       toast.success('Campaign created successfully!');
       reset();
       onOpenChange(false);
     } catch (error) {
-      toast.error('Failed to create campaign');
+      console.error('Error creating campaign:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to create campaign');
     }
   };
 
@@ -66,6 +66,7 @@ const CRMAddCampaignModal: React.FC<CRMAddCampaignModalProps> = ({ open, onOpenC
               id="crm_name"
               {...register('crm_name', { required: 'Campaign name is required' })}
               placeholder="Enter campaign name"
+              disabled={isSubmitting}
             />
             {errors.crm_name && (
               <p className="text-sm text-destructive">{errors.crm_name.message}</p>
@@ -78,6 +79,7 @@ const CRMAddCampaignModal: React.FC<CRMAddCampaignModalProps> = ({ open, onOpenC
               id="crm_objective"
               {...register('crm_objective')}
               placeholder="Campaign objective"
+              disabled={isSubmitting}
             />
           </div>
 
@@ -88,6 +90,7 @@ const CRMAddCampaignModal: React.FC<CRMAddCampaignModalProps> = ({ open, onOpenC
                 id="crm_startDate"
                 type="date"
                 {...register('crm_startDate')}
+                disabled={isSubmitting}
               />
             </div>
             <div className="space-y-2">
@@ -96,6 +99,7 @@ const CRMAddCampaignModal: React.FC<CRMAddCampaignModalProps> = ({ open, onOpenC
                 id="crm_endDate"
                 type="date"
                 {...register('crm_endDate')}
+                disabled={isSubmitting}
               />
             </div>
           </div>
@@ -107,14 +111,17 @@ const CRMAddCampaignModal: React.FC<CRMAddCampaignModalProps> = ({ open, onOpenC
               {...register('crm_notes')}
               placeholder="Campaign notes..."
               rows={3}
+              disabled={isSubmitting}
             />
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit">Create Campaign</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Creating...' : 'Create Campaign'}
+            </Button>
           </div>
         </form>
       </DialogContent>

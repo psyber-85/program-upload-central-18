@@ -37,13 +37,14 @@ interface LeadFormData {
 }
 
 const CRMAddLeadModal: React.FC<CRMAddLeadModalProps> = ({ open, onOpenChange, campaignId }) => {
-  const { dispatch } = useCrm();
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<LeadFormData>();
+  const { dispatch, loadLeads } = useCrm();
+  const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<LeadFormData>();
 
   const onSubmit = async (data: LeadFormData) => {
     try {
+      // Create new lead without manual ID - let the database generate it
       const newLead: CrmLead = {
-        crm_id: Date.now().toString(),
+        crm_id: 'new', // This will be replaced by the database-generated ID
         crm_campaignId: campaignId,
         crm_name: data.crm_name,
         crm_email: data.crm_email,
@@ -61,14 +62,18 @@ const CRMAddLeadModal: React.FC<CRMAddLeadModalProps> = ({ open, onOpenChange, c
         crm_notes: data.crm_notes || undefined,
       };
 
-      await saveCrmLead(newLead);
-      dispatch({ type: 'ADD_LEAD', payload: newLead });
+      const savedLead = await saveCrmLead(newLead);
+      dispatch({ type: 'ADD_LEAD', payload: savedLead });
+      
+      // Refresh the leads list to ensure consistency
+      await loadLeads(campaignId);
       
       toast.success('Lead added successfully!');
       reset();
       onOpenChange(false);
     } catch (error) {
-      toast.error('Failed to add lead');
+      console.error('Error adding lead:', error);
+      toast.error('Failed to add lead. Please try again.');
     }
   };
 
@@ -249,7 +254,9 @@ const CRMAddLeadModal: React.FC<CRMAddLeadModalProps> = ({ open, onOpenChange, c
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit">Add Lead</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Adding...' : 'Add Lead'}
+            </Button>
           </div>
         </form>
       </DialogContent>

@@ -10,6 +10,8 @@ import {
   transformLeadForDb,
   transformActivityForDb
 } from './dataTransforms';
+import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 
 // Get current user ID with error handling
 const getCurrentUserId = async (): Promise<string> => {
@@ -97,7 +99,7 @@ export const saveCrmLead = async (lead: CrmLead): Promise<CrmLead> => {
 
     return transformDbLead(data as DbCrmLead);
   } else {
-    // Insert new lead
+    // Insert new lead - don't include the crm_id field
     const { crm_id, ...leadWithoutId } = lead;
     const dbLead = transformLeadForDb(leadWithoutId, userId);
 
@@ -208,23 +210,180 @@ export const importCrmLeadsFromSheet = async (
   console.log(`Importing leads from ${file.name} to campaign ${crm_campaignId}...`);
   
   const userId = await getCurrentUserId();
-  
-  // This is a placeholder implementation - actual CSV/XLSX parsing would be more complex
-  // For now, simulate the import process
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  const mockImportResult = {
-    imported: Math.floor(Math.random() * 20) + 5,
-    duplicates: Math.floor(Math.random() * 3),
-    errors: []
-  };
+  let parsedData: any[] = [];
 
-  // TODO: Implement actual CSV/XLSX parsing and batch insert
-  // 1. Parse the file using papaparse or xlsx
-  // 2. Map columns to lead fields
-  // 3. Validate data
-  // 4. Check for duplicates
-  // 5. Batch insert valid leads
-  
-  return mockImportResult;
+  try {
+    // Parse the file based on its type
+    if (file.name.endsWith('.csv')) {
+      parsedData = await parseCSVFile(file);
+    } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      parsedData = await parseExcelFile(file);
+    } else {
+      throw new Error('Unsupported file type. Please upload CSV or Excel files.');
+    }
+
+    if (parsedData.length === 0) {
+      throw new Error('No data found in the file');
+    }
+
+    // Map CSV columns to lead fields and validate data
+    const mappedLeads = parsedData.map((row, index) => {
+      try {
+        return mapRowToLead(row, crm_campaignId, userId);
+      } catch (error) {
+        throw new Error(`Row ${index + 2}: ${error.message}`);
+      }
+    }).filter(lead => lead !== null);
+
+    if (mappedLeads.length === 0) {
+      throw new Error('No valid leads found in the file');
+    }
+
+    // Check for duplicates in the database
+    const existingLeads = await supabase
+      .from('crm_leads')
+      .select('name, email')
+      .eq('campaign_id', crm_campaignId)
+      .eq('user_id', userId);
+
+    if (existingLeads.error) {
+      throw new Error(`Failed to check for duplicates: ${existingLeads.error.message}`);
+    }
+
+    const existingKeys = new Set(
+      existingLeads.data.map(lead => `${lead.name.toLowerCase()}-${lead.email.toLowerCase()}`)
+    );
+
+    const newLeads: any[] = [];
+    let duplicateCount = 0;
+
+    mappedLeads.forEach(lead => {
+      const key = `${lead.name.toLowerCase()}-${lead.email.toLowerCase()}`;
+      if (existingKeys.has(key)) {
+        duplicateCount++;
+      } else {
+        newLeads.push(lead);
+        existingKeys.add(key);
+      }
+    });
+
+    // Batch insert new leads
+    let importedCount = 0;
+    if (newLeads.length > 0) {
+      const { data, error } = await supabase
+        .from('crm_leads')
+        .insert(newLeads)
+        .select();
+
+      if (error) {
+        throw new Error(`Failed to import leads: ${error.message}`);
+      }
+
+      importedCount = data?.length || 0;
+    }
+
+    return {
+      imported: importedCount,
+      duplicates: duplicateCount,
+      errors: []
+    };
+
+  } catch (error) {
+    console.error('Import error:', error);
+    return {
+      imported: 0,
+      duplicates: 0,
+      errors: [error.message || 'Unknown error occurred']
+    };
+  }
+};
+
+// Helper function to parse CSV files
+const parseCSVFile = (file: File): Promise<any[]> => {
+  return new Promise((resolve, reject) => {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        if (results.errors.length > 0) {
+          reject(new Error(`CSV parsing errors: ${results.errors.map(e => e.message).join(', ')}`));
+        } else {
+          resolve(results.data);
+        }
+      },
+      error: (error) => {
+        reject(new Error(`Failed to parse CSV: ${error.message}`));
+      }
+    });
+  });
+};
+
+// Helper function to parse Excel files
+const parseExcelFile = (file: File): Promise<any[]> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        resolve(jsonData);
+      } catch (error) {
+        reject(new Error(`Failed to parse Excel file: ${error.message}`));
+      }
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsArrayBuffer(file);
+  });
+};
+
+// Helper function to map CSV row to lead object
+const mapRowToLead = (row: any, campaignId: string, userId: string) => {
+  // Column mapping - try different variations
+  const getName = () => row.Name || row.name || row.NAME || '';
+  const getEmail = () => row.Email || row.email || row.EMAIL || '';
+  const getPhone = () => row.Phone || row.phone || row.PHONE || row.Number || row.number || '';
+  const getOrg = () => row.Organization || row.Org || row.org || row.Company || row.company || '';
+  const getJobRole = () => row['Job Role'] || row.Role || row.role || row.Position || row.position || '';
+  const getIndustry = () => row.Industry || row.industry || '';
+  const getLeadSource = () => row['Lead Source'] || row.Source || row.source || '';
+  const getState = () => row.State || row.state || '';
+
+  const name = getName().trim();
+  const email = getEmail().trim();
+
+  if (!name || !email) {
+    throw new Error('Name and Email are required fields');
+  }
+
+  // Basic email validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    throw new Error(`Invalid email format: ${email}`);
+  }
+
+  return {
+    campaign_id: campaignId,
+    user_id: userId,
+    name,
+    email,
+    number: getPhone(),
+    job_role: getJobRole(),
+    org: getOrg(),
+    industry: getIndustry(),
+    lead_source: getLeadSource(),
+    state: getState(),
+    potential_deal_size: 0,
+    confirmed_deal_size: 0,
+    lead_score: 'C',
+    status: 'Future',
+    owner_name: '',
+    notes: null,
+    last_contacted: null,
+    next_follow_up: null,
+    owner_id: null,
+    converted_at: null
+  };
 };

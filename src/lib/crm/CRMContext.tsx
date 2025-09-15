@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { CrmCampaign, CrmLead, CrmLeadActivity } from './types';
-import { mockCrmData } from './mockData';
+import { fetchCrmCampaigns, fetchCrmLeadsByCampaign, fetchCrmActivitiesByLead } from './placeholderFunctions';
 import { toast } from 'sonner';
 
 interface CrmState {
@@ -103,11 +103,7 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     dispatch({ type: 'SET_ERROR', payload: null });
     
     try {
-      // Simulate loading delay
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Filter mock leads by campaign ID
-      const leads = mockCrmData.crm_leads.filter(lead => lead.crm_campaignId === campaignId);
+      const leads = await fetchCrmLeadsByCampaign(campaignId);
       dispatch({ type: 'SET_LEADS', payload: leads });
     } catch (error) {
       console.error('Error loading leads:', error);
@@ -121,11 +117,7 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const loadActivities = async (leadId: string) => {
     try {
-      // Simulate loading delay
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      // Filter mock activities by lead ID
-      const activities = mockCrmData.crm_lead_activities.filter(activity => activity.crm_leadId === leadId);
+      const activities = await fetchCrmActivitiesByLead(leadId);
       dispatch({ type: 'SET_ACTIVITIES', payload: activities });
     } catch (error) {
       console.error('Error loading activities:', error);
@@ -139,11 +131,7 @@ export const CrmProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     dispatch({ type: 'SET_ERROR', payload: null });
     
     try {
-      // Simulate loading delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Use mock campaigns data
-      const campaigns = mockCrmData.crm_campaigns;
+      const campaigns = await fetchCrmCampaigns();
       dispatch({ type: 'SET_CAMPAIGNS', payload: campaigns });
     } catch (error) {
       console.error('Error loading campaigns:', error);

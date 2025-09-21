@@ -6,8 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Navigation from "./components/Navigation";
 import Index from "./pages/Index";
-import TrainingOutlineCreator from "./pages/TrainingOutlineCreator";
-import CertificateGenerator from "./pages/CertificateGenerator";
+import BirthdayDashboard from "./pages/BirthdayDashboard";
 import RegisterTracker from "./pages/RegisterTracker";
 import CRMTracker from "./pages/CRMTracker";
 import NotFound from "./pages/NotFound";
@@ -23,8 +22,7 @@ const App = () => (
         <Navigation />
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/training-outline" element={<TrainingOutlineCreator />} />
-          <Route path="/certificates" element={<CertificateGenerator />} />
+          <Route path="/birthday-dashboard" element={<BirthdayDashboard />} />
           <Route path="/register-tracker" element={<RegisterTracker />} />
           <Route path="/crm-tracker" element={<CRMTracker />} />
           <Route path="*" element={<NotFound />} />

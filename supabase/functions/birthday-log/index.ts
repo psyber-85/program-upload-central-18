@@ -61,32 +61,30 @@ const handler = async (req: Request): Promise<Response> => {
       throw monthError;
     }
 
-    // Get yearly breakdown by month (single grouped query)
-    const { data: yearlyData, error: yearlyError } = await supabase
-      .from('participants_bday_duplicate')
-      .select('birth_date')
-      .not('birth_date', 'is', null);
-
-    if (yearlyError) {
-      console.error('Error getting yearly data:', yearlyError);
-      throw yearlyError;
-    }
-
-    // Process yearly data into monthly counts
+    // Get yearly breakdown by month using efficient count queries
     const yearByMonth = Array.from({ length: 12 }, (_, i) => ({
       month: i + 1,
       total: 0
     }));
 
-    if (yearlyData) {
-      yearlyData.forEach(row => {
-        if (row.birth_date) {
-          const birthMonth = new Date(row.birth_date).getMonth() + 1;
-          if (birthMonth >= 1 && birthMonth <= 12) {
-            yearByMonth[birthMonth - 1].total++;
-          }
-        }
-      });
+    // Query each month's count individually to avoid the 1000-row limit
+    for (let month = 1; month <= 12; month++) {
+      const monthStart = `2000-${month.toString().padStart(2, '0')}-01`;
+      const monthEnd = month === 12 ? `2000-01-01` : `2000-${(month + 1).toString().padStart(2, '0')}-01`;
+      
+      const { count: monthCount, error: monthError } = await supabase
+        .from('participants_bday_duplicate')
+        .select('*', { count: 'exact', head: true })
+        .gte('birth_date', monthStart)
+        .lt('birth_date', monthEnd === `2000-01-01` ? `2001-01-01` : monthEnd)
+        .not('birth_date', 'is', null);
+
+      if (monthError) {
+        console.error(`Error getting count for month ${month}:`, monthError);
+        // Don't throw, just continue with 0 for this month
+      } else {
+        yearByMonth[month - 1].total = monthCount || 0;
+      }
     }
 
     // Get a sample of today's birthdays for quick glance (first 5)

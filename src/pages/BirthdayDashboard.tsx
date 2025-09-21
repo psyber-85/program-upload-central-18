@@ -51,11 +51,8 @@ const BirthdayDashboard = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Load test token from localStorage
-    const savedToken = localStorage.getItem('birthday_test_token');
-    if (savedToken) {
-      setTestToken(savedToken);
-    }
+    // Use the provided TEST_TOKEN automatically
+    setTestToken('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');
     
     fetchStats();
   }, []);
@@ -81,13 +78,6 @@ const BirthdayDashboard = () => {
   };
 
   const handleSendRemaining = async () => {
-    if (!testToken) {
-      const token = prompt('Please enter the TEST_TOKEN:');
-      if (!token) return;
-      setTestToken(token);
-      localStorage.setItem('birthday_test_token', token);
-    }
-
     try {
       setSendingRemaining(true);
       const { data, error } = await supabase.functions.invoke('send-remaining', {
@@ -128,13 +118,6 @@ const BirthdayDashboard = () => {
         variant: "destructive",
       });
       return;
-    }
-
-    if (!testToken) {
-      const token = prompt('Please enter the TEST_TOKEN:');
-      if (!token) return;
-      setTestToken(token);
-      localStorage.setItem('birthday_test_token', token);
     }
 
     try {

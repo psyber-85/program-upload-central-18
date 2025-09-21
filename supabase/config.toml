@@ -1,1 +1,13 @@
 project_id = "nxnpjkthtjaqamrriogp"
+
+[functions.birthday]
+verify_jwt = false
+
+[functions.send-remaining]
+verify_jwt = false
+
+[functions.test-email]
+verify_jwt = false
+
+[functions.birthday-log]
+verify_jwt = false

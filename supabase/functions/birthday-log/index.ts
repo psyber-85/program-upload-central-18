@@ -49,12 +49,11 @@ const handler = async (req: Request): Promise<Response> => {
       throw sentError;
     }
 
-    // Get this month's total birthdays
+    // Get this month's total birthdays using birth_mmdd pattern
     const { count: monthTotal, error: monthError } = await supabase
       .from('participants_bday_duplicate')
       .select('*', { count: 'exact', head: true })
-      .gte('birth_date', `${year}-${thisMonth.toString().padStart(2, '0')}-01`)
-      .lt('birth_date', thisMonth === 12 ? `${parseInt(year) + 1}-01-01` : `${year}-${(thisMonth + 1).toString().padStart(2, '0')}-01`);
+      .like('birth_mmdd', `${thisMonth.toString().padStart(2, '0')}-%`);
 
     if (monthError) {
       console.error('Error getting month total:', monthError);

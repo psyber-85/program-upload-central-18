@@ -26,7 +26,7 @@ async function sendBirthdayEmail(to: string, name: string): Promise<SendGridResp
       to: [{ email: to }],
       dynamic_template_data: { name }
     }],
-    from: { email: FROM_EMAIL },
+    from: { email: FROM_EMAIL, name: "AIHQ - theaihq.net" },
     template_id: SENDGRID_TEMPLATE_ID
   };
 

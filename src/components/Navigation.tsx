@@ -35,26 +35,13 @@ const Navigation = () => {
                 <NavigationMenuItem>
                   <NavigationMenuLink asChild>
                     <Link
-                      to="/training-outline"
+                      to="/birthday-dashboard"
                       className={cn(
                         "group inline-flex h-10 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50",
-                        isActive('/training-outline') && "bg-accent/50"
+                        isActive('/birthday-dashboard') && "bg-accent/50"
                       )}
                     >
-                      Training Outline Creator
-                    </Link>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink asChild>
-                    <Link
-                      to="/certificates"
-                      className={cn(
-                        "group inline-flex h-10 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50",
-                        isActive('/certificates') && "bg-accent/50"
-                      )}
-                    >
-                      Certificate Generator
+                      Birthday Dashboard
                     </Link>
                   </NavigationMenuLink>
                 </NavigationMenuItem>

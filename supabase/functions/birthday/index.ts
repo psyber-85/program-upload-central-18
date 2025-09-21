@@ -22,10 +22,12 @@ async function sendBirthdayEmail(to: string, name: string): Promise<SendGridResp
   }
 
   const emailData = {
-    from: FROM_EMAIL,
-    to: to,
-    template_id: SENDGRID_TEMPLATE_ID,
-    dynamic_template_data: { name }
+    personalizations: [{
+      to: [{ email: to }],
+      dynamic_template_data: { name }
+    }],
+    from: { email: FROM_EMAIL },
+    template_id: SENDGRID_TEMPLATE_ID
   };
 
   const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
@@ -90,7 +92,7 @@ const handler = async (req: Request): Promise<Response> => {
       .eq('birth_mmdd', mmdd);
 
     // If last_birthday_sent_year column exists, filter out already sent
-    query = query.neq('last_birthday_sent_year', parseInt(year));
+    query = query.neq('last_birthday_sent_year', year);
 
     const { data: birthdayPeople, error } = await query;
 
@@ -132,7 +134,7 @@ const handler = async (req: Request): Promise<Response> => {
           // Update last_birthday_sent_year if column exists
           const { error: updateError } = await supabase
             .from('participants_bday_duplicate')
-            .update({ last_birthday_sent_year: parseInt(year) })
+            .update({ last_birthday_sent_year: year })
             .eq('id', person.id);
 
           if (updateError) {

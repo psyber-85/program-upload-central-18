@@ -42,7 +42,7 @@ const handler = async (req: Request): Promise<Response> => {
       .from('participants_bday_duplicate')
       .select('*', { count: 'exact', head: true })
       .eq('birth_mmdd', mmdd)
-      .eq('last_birthday_sent_year', parseInt(year));
+      .eq('last_birthday_sent_year', year);
 
     if (sentError) {
       console.error('Error getting today sent:', sentError);
@@ -67,24 +67,33 @@ const handler = async (req: Request): Promise<Response> => {
       total: 0
     }));
 
-    // Query each month's count individually to avoid the 1000-row limit
+    // Query each month's count using birth_mmdd pattern to avoid 1000-row limit
     for (let month = 1; month <= 12; month++) {
-      const monthStart = `2000-${month.toString().padStart(2, '0')}-01`;
-      const monthEnd = month === 12 ? `2000-01-01` : `2000-${(month + 1).toString().padStart(2, '0')}-01`;
+      // Create patterns for all possible days in this month: 01-01, 01-02, ..., 01-31
+      const monthPadded = month.toString().padStart(2, '0');
+      const daysInMonth = month === 2 ? 29 : [4, 6, 9, 11].includes(month) ? 30 : 31;
       
-      const { count: monthCount, error: monthError } = await supabase
-        .from('participants_bday_duplicate')
-        .select('*', { count: 'exact', head: true })
-        .gte('birth_date', monthStart)
-        .lt('birth_date', monthEnd === `2000-01-01` ? `2001-01-01` : monthEnd)
-        .not('birth_date', 'is', null);
+      let totalForMonth = 0;
+      
+      // Query in batches by day to avoid hitting row limits
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dayPadded = day.toString().padStart(2, '0');
+        const mmddPattern = `${monthPadded}-${dayPadded}`;
+        
+        const { count: dayCount, error: dayError } = await supabase
+          .from('participants_bday_duplicate')
+          .select('*', { count: 'exact', head: true })
+          .eq('birth_mmdd', mmddPattern);
 
-      if (monthError) {
-        console.error(`Error getting count for month ${month}:`, monthError);
-        // Don't throw, just continue with 0 for this month
-      } else {
-        yearByMonth[month - 1].total = monthCount || 0;
+        if (dayError) {
+          console.error(`Error getting count for ${mmddPattern}:`, dayError);
+          // Continue with 0 for this day
+        } else {
+          totalForMonth += dayCount || 0;
+        }
       }
+      
+      yearByMonth[month - 1].total = totalForMonth;
     }
 
     // Get a sample of today's birthdays for quick glance (first 5)

@@ -20,10 +20,12 @@ async function sendTestEmail(to: string, name: string): Promise<boolean> {
   }
 
   const emailData = {
-    from: FROM_EMAIL,
-    to: to,
-    template_id: SENDGRID_TEMPLATE_ID,
-    dynamic_template_data: { name }
+    personalizations: [{
+      to: [{ email: to }],
+      dynamic_template_data: { name }
+    }],
+    from: { email: FROM_EMAIL },
+    template_id: SENDGRID_TEMPLATE_ID
   };
 
   const response = await fetch('https://api.sendgrid.com/v3/mail/send', {

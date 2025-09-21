@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -258,6 +258,112 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "participants_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      participants_bday: {
+        Row: {
+          birth_date: string | null
+          email: string
+          email_sent: boolean
+          id: string
+          key_skills: string | null
+          name: string
+          nric_number: string
+          phone: string | null
+          program_id: string
+          program_name: string
+          registered_at: string
+        }
+        Insert: {
+          birth_date?: string | null
+          email: string
+          email_sent?: boolean
+          id?: string
+          key_skills?: string | null
+          name: string
+          nric_number: string
+          phone?: string | null
+          program_id: string
+          program_name: string
+          registered_at?: string
+        }
+        Update: {
+          birth_date?: string | null
+          email?: string
+          email_sent?: boolean
+          id?: string
+          key_skills?: string | null
+          name?: string
+          nric_number?: string
+          phone?: string | null
+          program_id?: string
+          program_name?: string
+          registered_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "participants_bday_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      participants_bday_duplicate: {
+        Row: {
+          birth_date: string | null
+          birth_mmdd: string | null
+          email: string
+          email_sent: boolean
+          id: string
+          key_skills: string | null
+          last_birthday_sent_year: string | null
+          name: string
+          nric_number: string
+          phone: string | null
+          program_id: string
+          program_name: string
+          registered_at: string
+        }
+        Insert: {
+          birth_date?: string | null
+          birth_mmdd?: string | null
+          email: string
+          email_sent?: boolean
+          id?: string
+          key_skills?: string | null
+          last_birthday_sent_year?: string | null
+          name: string
+          nric_number: string
+          phone?: string | null
+          program_id: string
+          program_name: string
+          registered_at?: string
+        }
+        Update: {
+          birth_date?: string | null
+          birth_mmdd?: string | null
+          email?: string
+          email_sent?: boolean
+          id?: string
+          key_skills?: string | null
+          last_birthday_sent_year?: string | null
+          name?: string
+          nric_number?: string
+          phone?: string | null
+          program_id?: string
+          program_name?: string
+          registered_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "participants_bday_duplicate_program_id_fkey"
             columns: ["program_id"]
             isOneToOne: false
             referencedRelation: "programs"

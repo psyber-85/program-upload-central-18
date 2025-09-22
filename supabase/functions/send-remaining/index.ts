@@ -103,11 +103,13 @@ const handler = async (req: Request): Promise<Response> => {
     );
 
     // Query only today's pending birthdays (NULL or not sent this year)
+    // Use order by email and registered_at to ensure consistent results and avoid duplicates
     const { data: pendingBirthdays, error } = await supabase
       .from('participants_bday_duplicate')
       .select('id, name, email, last_birthday_sent_year')
       .eq('birth_mmdd', mmdd)
-      .or(`last_birthday_sent_year.is.null,last_birthday_sent_year.neq.${year}`);
+      .or(`last_birthday_sent_year.is.null,last_birthday_sent_year.neq.${year}`)
+      .order('email, registered_at', { ascending: false }); // Order by email first, then latest registration
 
     if (error) {
       console.error('Database error:', error);
@@ -125,11 +127,22 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Found ${stats.pendingBefore} pending birthday emails`);
 
+    // Track processed emails to prevent duplicates
+    const processedEmails = new Set<string>();
+
     if (pendingBirthdays && pendingBirthdays.length > 0) {
       for (const person of pendingBirthdays) {
         if (!person.email) {
           continue;
         }
+
+        // Skip if we've already processed this email
+        if (processedEmails.has(person.email.toLowerCase())) {
+          console.log(`Skipping duplicate email: ${person.email}`);
+          continue;
+        }
+        
+        processedEmails.add(person.email.toLowerCase());
 
         try {
           await retryOperation(async () => {

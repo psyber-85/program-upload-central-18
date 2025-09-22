@@ -85,16 +85,15 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Query only today's birthdays
-    let query = supabase
+    // Query only today's birthdays, including those who haven't been sent emails yet (NULL) 
+    // or those whose last sent year is not this year
+    const { data: birthdayPeople, error } = await supabase
       .from('participants_bday_duplicate')
       .select('id, name, email, last_birthday_sent_year')
-      .eq('birth_mmdd', mmdd);
+      .eq('birth_mmdd', mmdd)
+      .or(`last_birthday_sent_year.is.null,last_birthday_sent_year.neq.${year}`);
 
-    // If last_birthday_sent_year column exists, filter out already sent
-    query = query.neq('last_birthday_sent_year', year);
-
-    const { data: birthdayPeople, error } = await query;
+    
 
     if (error) {
       console.error('Database error:', error);

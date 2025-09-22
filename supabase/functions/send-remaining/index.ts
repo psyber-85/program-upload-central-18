@@ -102,12 +102,12 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Query only today's pending birthdays
+    // Query only today's pending birthdays (NULL or not sent this year)
     const { data: pendingBirthdays, error } = await supabase
       .from('participants_bday_duplicate')
       .select('id, name, email, last_birthday_sent_year')
       .eq('birth_mmdd', mmdd)
-      .neq('last_birthday_sent_year', year);
+      .or(`last_birthday_sent_year.is.null,last_birthday_sent_year.neq.${year}`);
 
     if (error) {
       console.error('Database error:', error);

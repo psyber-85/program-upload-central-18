@@ -339,20 +339,17 @@ const parseExcelFile = (file: File): Promise<any[]> => {
   });
 };
 
-// Helper function to map CSV row to lead object
+// Helper function to map CSV row to lead object with exact column names
 const mapRowToLead = (row: any, campaignId: string, userId: string) => {
-  // Column mapping - try different variations
-  const getName = () => row.Name || row.name || row.NAME || '';
-  const getEmail = () => row.Email || row.email || row.EMAIL || '';
-  const getPhone = () => row.Phone || row.phone || row.PHONE || row.Number || row.number || '';
-  const getOrg = () => row.Organization || row.Org || row.org || row.Company || row.company || '';
-  const getJobRole = () => row['Job Role'] || row.Role || row.role || row.Position || row.position || '';
-  const getIndustry = () => row.Industry || row.industry || '';
-  const getLeadSource = () => row['Lead Source'] || row.Source || row.source || '';
-  const getState = () => row.State || row.state || '';
-
-  const name = getName().trim();
-  const email = getEmail().trim();
+  // Exact column mapping - no variations allowed
+  const name = (row.Name || '').toString().trim();
+  const email = (row.Email || '').toString().trim();
+  const phone = (row.Phone || '').toString().trim();
+  const org = (row.Org || '').toString().trim();
+  const role = (row.Role || '').toString().trim();
+  const industry = (row.Industry || '').toString().trim();
+  const leadSource = (row['Lead Source'] || '').toString().trim();
+  const state = (row.State || '').toString().trim();
 
   if (!name || !email) {
     throw new Error('Name and Email are required fields');
@@ -369,12 +366,12 @@ const mapRowToLead = (row: any, campaignId: string, userId: string) => {
     user_id: userId,
     name,
     email,
-    number: getPhone(),
-    job_role: getJobRole(),
-    org: getOrg(),
-    industry: getIndustry(),
-    lead_source: getLeadSource(),
-    state: getState(),
+    number: phone,
+    job_role: role,
+    org: org,
+    industry: industry,
+    lead_source: leadSource,
+    state: state,
     potential_deal_size: 0,
     confirmed_deal_size: 0,
     lead_score: 'C',

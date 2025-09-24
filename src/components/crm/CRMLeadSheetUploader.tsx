@@ -17,6 +17,7 @@ const CRMLeadSheetUploader = () => {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<any[]>([]);
   const [showPreview, setShowPreview] = useState(false);
+  const [columnValidation, setColumnValidation] = useState<{valid: boolean, missing: string[], invalid: string[]} | null>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -26,6 +27,48 @@ const CRMLeadSheetUploader = () => {
     }
   };
 
+  const validateColumns = (data: any[]) => {
+    const requiredColumns = ['Name', 'Email'];
+    const optionalColumns = ['Phone', 'Org', 'Role', 'Industry', 'Lead Source', 'State'];
+    const allValidColumns = [...requiredColumns, ...optionalColumns];
+    
+    if (!data || data.length === 0) {
+      return { valid: false, missing: requiredColumns, invalid: [] };
+    }
+    
+    const fileColumns = Object.keys(data[0] || {});
+    const missing = requiredColumns.filter(col => !fileColumns.includes(col));
+    const invalid = fileColumns.filter(col => !allValidColumns.includes(col));
+    
+    return {
+      valid: missing.length === 0,
+      missing,
+      invalid
+    };
+  };
+
+  const downloadTemplate = () => {
+    const headers = ['Name', 'Email', 'Phone', 'Org', 'Role', 'Industry', 'Lead Source', 'State'];
+    const sampleData = [
+      ['John Doe', 'john@example.com', '+60123456789', 'ABC Corp', 'Manager', 'Technology', 'Website', 'Kuala Lumpur'],
+      ['Jane Smith', 'jane@company.com', '+60987654321', 'XYZ Ltd', 'Director', 'Finance', 'Referral', 'Selangor']
+    ];
+    
+    const csvContent = [headers, ...sampleData]
+      .map(row => row.map(cell => `"${cell}"`).join(','))
+      .join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'crm_leads_template.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const previewFile = (file: File) => {
     if (file.name.endsWith('.csv')) {
       Papa.parse(file, {
@@ -33,8 +76,17 @@ const CRMLeadSheetUploader = () => {
         preview: 5,
         complete: (results) => {
           console.log('CSV Preview:', results.data);
+          const validation = validateColumns(results.data);
+          setColumnValidation(validation);
           setPreview(results.data);
           setShowPreview(true);
+          
+          if (!validation.valid) {
+            toast.error(`Missing required columns: ${validation.missing.join(', ')}`);
+          }
+          if (validation.invalid.length > 0) {
+            toast.warning(`Unrecognized columns will be ignored: ${validation.invalid.join(', ')}`);
+          }
         },
         error: (error) => {
           console.error('CSV Parse Error:', error);
@@ -43,12 +95,15 @@ const CRMLeadSheetUploader = () => {
       });
     } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
       // For XLSX files, show a placeholder preview since full parsing happens during import
-      setPreview([
+      const sampleData = [
         { Name: 'Sample Lead 1', Email: 'lead1@example.com', Phone: '+60123456789' },
         { Name: 'Sample Lead 2', Email: 'lead2@example.com', Phone: '+60987654321' }
-      ]);
+      ];
+      const validation = validateColumns(sampleData);
+      setColumnValidation(validation);
+      setPreview(sampleData);
       setShowPreview(true);
-      toast.info('Excel file selected - preview will show sample data');
+      toast.info('Excel file selected - upload to validate columns');
     }
   };
 
@@ -79,6 +134,7 @@ const CRMLeadSheetUploader = () => {
         setFile(null);
         setPreview([]);
         setShowPreview(false);
+        setColumnValidation(null);
         
         // Clear file input
         const fileInput = document.getElementById('lead-file') as HTMLInputElement;
@@ -116,18 +172,47 @@ const CRMLeadSheetUploader = () => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="lead-file">Upload CSV or XLSX file</Label>
-          <Input
-            id="lead-file"
-            type="file"
-            accept=".csv,.xlsx,.xls"
-            onChange={handleFileChange}
-            className="cursor-pointer"
-          />
-          <p className="text-xs text-muted-foreground">
-            Supports CSV and Excel files
-          </p>
+        <div className="space-y-4">
+          <div className="p-4 border rounded-lg bg-amber-50 dark:bg-amber-950/20">
+            <h4 className="font-medium text-amber-800 dark:text-amber-200 mb-3">Required Column Names (Case Sensitive)</h4>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="space-y-1">
+                <div className="font-medium text-red-600 dark:text-red-400">Required:</div>
+                <div className="font-mono text-xs bg-white dark:bg-gray-900 p-2 rounded">Name</div>
+                <div className="font-mono text-xs bg-white dark:bg-gray-900 p-2 rounded">Email</div>
+              </div>
+              <div className="space-y-1">
+                <div className="font-medium text-gray-600 dark:text-gray-400">Optional:</div>
+                <div className="font-mono text-xs bg-white dark:bg-gray-900 p-2 rounded">Phone</div>
+                <div className="font-mono text-xs bg-white dark:bg-gray-900 p-2 rounded">Org</div>
+                <div className="font-mono text-xs bg-white dark:bg-gray-900 p-2 rounded">Role</div>
+                <div className="font-mono text-xs bg-white dark:bg-gray-900 p-2 rounded">Industry</div>
+                <div className="font-mono text-xs bg-white dark:bg-gray-900 p-2 rounded">Lead Source</div>
+                <div className="font-mono text-xs bg-white dark:bg-gray-900 p-2 rounded">State</div>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={downloadTemplate}
+                className="text-xs"
+              >
+                Download Template CSV
+              </Button>
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="lead-file">Upload CSV or XLSX file with exact column names above</Label>
+            <Input
+              id="lead-file"
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              onChange={handleFileChange}
+              className="cursor-pointer"
+            />
+          </div>
         </div>
 
         {file && (
@@ -142,7 +227,7 @@ const CRMLeadSheetUploader = () => {
 
             {showPreview && preview.length > 0 && (
               <div className="space-y-2">
-                <Label>Data Preview (first 5 rows)</Label>
+                <Label>Data Preview (first 3 rows)</Label>
                 <div className="border rounded p-3 bg-muted/50 max-h-40 overflow-auto">
                   <div className="text-xs font-mono space-y-1">
                     {preview.slice(0, 3).map((row, index) => (
@@ -157,21 +242,38 @@ const CRMLeadSheetUploader = () => {
                   </div>
                 </div>
                 
-                <div className="flex items-start space-x-2 text-sm text-amber-600">
-                  <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium">Required columns:</p>
-                    <p className="text-xs">
-                      Name, Email (required) • Phone, Org, Role, Industry, State (optional)
-                    </p>
+                {columnValidation && (
+                  <div className="space-y-2">
+                    {columnValidation.valid ? (
+                      <div className="flex items-start space-x-2 text-sm text-green-600 dark:text-green-400">
+                        <CheckCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-medium">Column validation passed!</p>
+                          <p className="text-xs">File contains all required columns with correct names.</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-start space-x-2 text-sm text-red-600 dark:text-red-400">
+                        <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-medium">Column validation failed!</p>
+                          {columnValidation.missing.length > 0 && (
+                            <p className="text-xs">Missing required columns: {columnValidation.missing.join(', ')}</p>
+                          )}
+                          {columnValidation.invalid.length > 0 && (
+                            <p className="text-xs">Unrecognized columns: {columnValidation.invalid.join(', ')}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
               </div>
             )}
 
             <Button 
               onClick={handleUpload} 
-              disabled={loading}
+              disabled={loading || (columnValidation && !columnValidation.valid)}
               className="w-full"
             >
               {loading ? (
@@ -188,12 +290,12 @@ const CRMLeadSheetUploader = () => {
 
         <div className="text-xs text-muted-foreground space-y-1">
           <div className="flex items-start space-x-2">
-            <CheckCircle className="h-3 w-3 mt-0.5 text-green-500" />
+            <AlertTriangle className="h-3 w-3 mt-0.5 text-orange-500" />
             <div>
-              <p className="font-medium">Tips for best results:</p>
+              <p className="font-medium">Important Notes:</p>
               <ul className="list-disc list-inside space-y-1 mt-1">
-                <li>Include headers: Name, Email, Phone, Organization, Role, etc.</li>
-                <li>Name and Email are required fields</li>
+                <li>Column names must match EXACTLY as shown above (case-sensitive)</li>
+                <li>Use the template to avoid column name issues</li>
                 <li>Duplicates are detected using Name + Email combination</li>
                 <li>Invalid email formats will be rejected</li>
               </ul>

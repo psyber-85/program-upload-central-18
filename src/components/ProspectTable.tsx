@@ -763,6 +763,7 @@ const ProspectTable: React.FC<ProspectTableProps> = ({ programId }) => {
         isOpen={addProspectModalOpen}
         onClose={() => setAddProspectModalOpen(false)}
         onComplete={refreshProspects}
+        programId={programId}
       />
     </div>
   );

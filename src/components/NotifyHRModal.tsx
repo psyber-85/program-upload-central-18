@@ -105,12 +105,12 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
     // Program-specific links mapping using exact program titles
     const programLinks: Record<string, { signupForm: string; courseBrochure: string }> = {
       "Business Writing with AI: 2-Day Masterclass": {
-        signupForm: "https://drive.google.com/file/d/1i8os64_0YWr0nlJns88-i3IT1hNaepaN/view?usp=drive_link",
-        courseBrochure: "https://drive.google.com/file/d/1f0-Nyg0zXxJ2-4c4OBzAduQr7Lk9QWmU/view?usp=drive_link"
+        signupForm: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/Sign%20Up%20Form%20-%20Business%20Writing%20with%20AI_Q4_compressed.pdf",
+        courseBrochure: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/Business%20Writing%20with%20AI-Course_Brochure.pdf"
       },
       "ChatGPT Skill Boost (Intermediate)": {
-        signupForm: "https://drive.google.com/file/d/14xHGHHjbpXKo37D0Rp12mPKxJGxfJWP3/view?usp=drive_link",
-        courseBrochure: "https://drive.google.com/file/d/16L7LfiuwFIIlJoY8HsMYql9pMSn372LX/view?usp=drive_link"
+        signupForm: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/Sign%20Up%20Form%20-%20ChatGPT%20Skill%20Boost%20Intermediate_Q4_compressed.pdf",
+        courseBrochure: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/ChatGPT%20Skill%20Boost%20(GPT-5)-Course_Brochure.pdf"
       },
       "AI and ChatGPT for HR Professionals - 2 Day Masterclass": {
         signupForm: "https://drive.google.com/file/d/1IG9gOVe65C__6KTjJCd_RZqj_nAFlob_/view?usp=drive_link",
@@ -166,18 +166,19 @@ The fee for this 2-day program is RM${programPricing}, as stated in the sign-up 
 
 For more information on AIHQ's expertise and track record, feel free to explore:
 
-AIHQ's Profile & Portfolio: https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms//AIHQ_Profile.pdf
-
-Our Website: http://theaihq.net
-
-Our 4.8-Star Google Reviews: https://www.google.com/search?sca_esv=0e58669465c64ea2&sxsrf=AE3TifO01M1ZnuMUGy1ZOYy7cKB3BSmg_Q:1750924007883&si=AMgyJEtREmoPL4P1I5IDCfuA8gybfVI2d5Uj7QMwYCZHKDZ-E8ss9ZAsrmkP2SnQ13k5Q1slVi9Okp1e3MtSGzQ-A-qiOCtAkpQyLE2q_z62UrP3t8xZxayiwjuBCszv6GjHWAAj1U9IqF7fgfSx9Q-7DIJQXGoJXg%3D%3D&q=AIHQ+Training+and+Consultancy+Reviews&sa=X&ved=2ahUKEwiLtZKczI6OAxWIS2wGHYSsHcMQ0bkNegQINRAE&biw=1536&bih=730&dpr=1.25
+    📌 AIHQ's Profile & Portfolio (http://storage.theaihq.net/AIHQ_Profile.pdf)
+    🌍 Our Website - http://theaihq.net
+    ⭐ Our 4.9-Star Google Reviews - https://www.google.com/maps?q=AIHQ+Training+and+Consultancy
 
 Should you have any questions or need further assistance, please feel free to contact me directly.
 
 Thank you for your attention and support. We look forward to welcoming ${staffName} to the program.
 
-Best regards,
-AIHQ Training and Consultancy
+Warm regards,
+Vino
+Training Support Specialist
+AIHQ Training & Consultancy
+Phone: 016-4609464
 
 _______`;
 
@@ -334,7 +335,7 @@ _______`;
                     <div><strong>To:</strong> {hrContact.name} ({hrContact.email})</div>
                     <div><strong>To:</strong> {prospectData?.name} ({prospectData?.email})</div>
                     <div><strong>CC:</strong> AIHQ Training and Consultancy (wani@theaihq.net)</div>
-                    <div><strong>From:</strong> AIHQ Training and Consultancy (wani@theaihq.net)</div>
+                    <div><strong>From:</strong> Vino - AIHQ Training and Consultancy (vino@theaihq.net)</div>
                     <div><strong>Program:</strong> {prospectData?.programTitle}</div>
                     <div><strong>Pricing:</strong> RM{pricing}</div>
                     <div><strong>Participant:</strong> {prospectData?.name}</div>

@@ -45,9 +45,9 @@ export const RegistrationProvider: React.FC<RegistrationProviderProps> = ({ chil
   useEffect(() => {
     loadRounds();
 
-    // Set up real-time subscription for rounds
+    // Set up real-time subscription for rounds with unique channel name
     const roundsChannel = supabase
-      .channel('rounds-changes')
+      .channel(`rounds-changes-${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'registration_rounds' }, () => {
         console.log('Rounds changed, refreshing...');
         loadRounds();
@@ -64,9 +64,9 @@ export const RegistrationProvider: React.FC<RegistrationProviderProps> = ({ chil
     if (activeRoundId) {
       loadPrograms(activeRoundId);
 
-      // Set up real-time subscription for programs
+      // Set up real-time subscription for programs with unique channel name
       const programsChannel = supabase
-        .channel('programs-changes')
+        .channel(`programs-changes-${activeRoundId}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'registration_programs' }, () => {
           console.log('Programs changed, refreshing...');
           loadPrograms(activeRoundId);
@@ -84,9 +84,9 @@ export const RegistrationProvider: React.FC<RegistrationProviderProps> = ({ chil
     if (activeProgramId) {
       loadProspects(activeProgramId);
 
-      // Set up real-time subscription for prospects
+      // Set up real-time subscription for prospects with unique channel name
       const prospectsChannel = supabase
-        .channel('prospects-changes')
+        .channel(`prospects-changes-${activeProgramId}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'prospects' }, () => {
           console.log('Prospects changed, refreshing...');
           loadProspects(activeProgramId);

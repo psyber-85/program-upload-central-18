@@ -27,9 +27,9 @@ const ProgramSummary: React.FC<ProgramSummaryProps> = ({ programId }) => {
   useEffect(() => {
     fetchProgramStats();
     
-    // Set up real-time subscription for prospects table changes
+    // Set up real-time subscription for prospects table changes with unique channel name
     const prospectsChannel = supabase
-      .channel('program-stats-changes')
+      .channel(`program-stats-changes-${programId || 'all'}-${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -47,7 +47,7 @@ const ProgramSummary: React.FC<ProgramSummaryProps> = ({ programId }) => {
     return () => {
       supabase.removeChannel(prospectsChannel);
     };
-  }, []);
+  }, [programId]);
 
   const fetchProgramStats = async () => {
     try {

@@ -56,6 +56,10 @@ const generateEmailTemplate = async (hrName: string, staffName: string, courseNa
       signupForm: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/Sign%20Up%20Form%20-%20ChatGPT%20Skill%20Boost%20Intermediate_Q4_compressed.pdf",
       courseBrochure: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/ChatGPT%20Skill%20Boost%20(GPT-5)-Course_Brochure.pdf"
     },
+    "ChatGPT Skill Boost (GPT-5 Edition)": {
+      signupForm: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/Sign%20Up%20Form%20-%20ChatGPT%20Skill%20Boost%20Intermediate_Q4_compressed.pdf",
+      courseBrochure: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/ChatGPT%20Skill%20Boost%20(GPT-5)-Course_Brochure.pdf"
+    },
     "AI and ChatGPT for HR Professionals - 2 Day Masterclass": {
       signupForm: "https://drive.google.com/file/d/1IG9gOVe65C__6KTjJCd_RZqj_nAFlob_/view?usp=drive_link",
       courseBrochure: "https://drive.google.com/file/d/1GWc2tUZfsUR8FSZxuGuBR8T34iVv9fFy/view"
@@ -207,7 +211,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('Sending email via SendGrid...');
     console.log('Email subject:', emailSubject);
     console.log('Program title:', program_title);
-    console.log('Recipients - HR:', to_email, 'Participant:', participant_email, 'CC: wani@theaihq.net');
+    console.log('Recipients - HR:', to_email, 'Participant:', participant_email, 'CC: vino@theaihq.net');
     
     // SendGrid API request with multiple recipients
     const sendgridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
@@ -231,7 +235,7 @@ const handler = async (req: Request): Promise<Response> => {
             ],
             cc: [
               {
-                email: "wani@theaihq.net",
+                email: "vino@theaihq.net",
                 name: "AIHQ Training and Consultancy",
               },
             ],
@@ -273,7 +277,7 @@ const handler = async (req: Request): Promise<Response> => {
         recipients: {
           hr: to_email,
           participant: participant_email,
-          cc: "wani@theaihq.net"
+          cc: "vino@theaihq.net"
         },
         subject: emailSubject
       }),

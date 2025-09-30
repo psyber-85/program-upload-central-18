@@ -112,6 +112,10 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
         signupForm: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/Sign%20Up%20Form%20-%20ChatGPT%20Skill%20Boost%20Intermediate_Q4_compressed.pdf",
         courseBrochure: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/ChatGPT%20Skill%20Boost%20(GPT-5)-Course_Brochure.pdf"
       },
+      "ChatGPT Skill Boost (GPT-5 Edition)": {
+        signupForm: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/Sign%20Up%20Form%20-%20ChatGPT%20Skill%20Boost%20Intermediate_Q4_compressed.pdf",
+        courseBrochure: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/ChatGPT%20Skill%20Boost%20(GPT-5)-Course_Brochure.pdf"
+      },
       "AI and ChatGPT for HR Professionals - 2 Day Masterclass": {
         signupForm: "https://drive.google.com/file/d/1IG9gOVe65C__6KTjJCd_RZqj_nAFlob_/view?usp=drive_link",
         courseBrochure: "https://drive.google.com/file/d/1GWc2tUZfsUR8FSZxuGuBR8T34iVv9fFy/view"
@@ -334,7 +338,7 @@ _______`;
                   <div className="text-sm text-blue-700 mt-1">
                     <div><strong>To:</strong> {hrContact.name} ({hrContact.email})</div>
                     <div><strong>To:</strong> {prospectData?.name} ({prospectData?.email})</div>
-                    <div><strong>CC:</strong> AIHQ Training and Consultancy (wani@theaihq.net)</div>
+                    <div><strong>CC:</strong> AIHQ Training and Consultancy (vino@theaihq.net)</div>
                     <div><strong>From:</strong> Vino - AIHQ Training and Consultancy (vino@theaihq.net)</div>
                     <div><strong>Program:</strong> {prospectData?.programTitle}</div>
                     <div><strong>Pricing:</strong> RM{pricing}</div>

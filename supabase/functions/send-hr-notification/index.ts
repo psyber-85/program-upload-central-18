@@ -213,6 +213,24 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('Program title:', program_title);
     console.log('Recipients - HR:', to_email, 'Participant:', participant_email, 'CC: vino@theaihq.net');
     
+    // Deduplicate email addresses (case-insensitive)
+    const toRecipients = [];
+    const normalizedToEmail = to_email.toLowerCase();
+    const normalizedParticipantEmail = participant_email.toLowerCase();
+    
+    toRecipients.push({
+      email: to_email,
+      name: to_name || to_email,
+    });
+    
+    // Only add participant email if it's different from HR email
+    if (normalizedParticipantEmail !== normalizedToEmail) {
+      toRecipients.push({
+        email: participant_email,
+        name: prospect_name,
+      });
+    }
+    
     // SendGrid API request with multiple recipients
     const sendgridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
@@ -223,16 +241,7 @@ const handler = async (req: Request): Promise<Response> => {
       body: JSON.stringify({
         personalizations: [
           {
-            to: [
-              {
-                email: to_email,
-                name: to_name || to_email,
-              },
-              {
-                email: participant_email,
-                name: prospect_name,
-              },
-            ],
+            to: toRecipients,
             cc: [
               {
                 email: "vino@theaihq.net",

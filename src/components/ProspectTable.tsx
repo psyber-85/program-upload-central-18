@@ -33,13 +33,16 @@ interface Prospect {
   product_type: string | null;
   registration_status: 'Pending' | 'Approved' | 'Rejected' | 'Postponed' | 'On Hold';
   status_reason?: string | null;
+  prospect_score?: 'A' | 'B' | 'C' | 'D' | 'E';
   lastCall?: string;
   hrContact?: HRContact;
   hasCallNotes?: boolean;
 }
 
-type SortField = 'name' | 'email' | 'org' | 'role' | 'program' | 'registration_status' | 'payment' | 'lastCall';
+type SortField = 'name' | 'email' | 'org' | 'role' | 'program' | 'registration_status' | 'prospect_score' | 'payment' | 'lastCall';
 type SortDirection = 'asc' | 'desc';
+
+const PROSPECT_SCORES = ['A', 'B', 'C', 'D', 'E'] as const;
 
 interface ProspectTableProps {
   programId?: string;
@@ -228,6 +231,7 @@ const ProspectTable: React.FC<ProspectTableProps> = ({ programId }) => {
           product_type: prospect.product_type,
           registration_status: prospect.registration_status as Prospect['registration_status'],
           status_reason: prospect.status_reason,
+          prospect_score: prospect.prospect_score as Prospect['prospect_score'],
           lastCall: lastCall ? new Date(lastCall).toLocaleDateString() : undefined,
           hrContact: hrContact ? {
             name: hrContact.name,
@@ -294,6 +298,45 @@ const ProspectTable: React.FC<ProspectTableProps> = ({ programId }) => {
     
     // Capitalize first letter for display
     return payment.charAt(0).toUpperCase() + payment.slice(1).toLowerCase();
+  };
+
+  const getScoreBadgeVariant = (score: string | undefined) => {
+    switch (score) {
+      case 'A': return 'default';      
+      case 'B': return 'secondary';    
+      case 'C': return 'outline';      
+      case 'D': return 'secondary';    
+      case 'E': return 'destructive';  
+      default: return 'outline';
+    }
+  };
+
+  const handleScoreUpdate = async (prospectId: string, newScore: string) => {
+    try {
+      const { error } = await supabase
+        .from('prospects')
+        .update({ prospect_score: newScore })
+        .eq('id', prospectId);
+
+      if (error) throw error;
+
+      // Update local state
+      setProspects(prospects.map(p => 
+        p.id === prospectId ? { ...p, prospect_score: newScore as Prospect['prospect_score'] } : p
+      ));
+
+      toast({
+        title: "Success",
+        description: "Prospect score updated successfully",
+      });
+    } catch (error) {
+      console.error('Error updating prospect score:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update prospect score",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleModalOpen = (modalType: string, prospectId: string) => {
@@ -454,6 +497,11 @@ const ProspectTable: React.FC<ProspectTableProps> = ({ programId }) => {
                   Status {getSortIcon('registration_status')}
                 </div>
               </TableHead>
+              <TableHead className="cursor-pointer" onClick={() => handleSort('prospect_score')}>
+                <div className="flex items-center gap-1">
+                  Score {getSortIcon('prospect_score')}
+                </div>
+              </TableHead>
               <TableHead className="cursor-pointer" onClick={() => handleSort('payment')}>
                 <div className="flex items-center gap-1">
                   Payment {getSortIcon('payment')}
@@ -493,7 +541,7 @@ const ProspectTable: React.FC<ProspectTableProps> = ({ programId }) => {
           <TableBody>
             {currentProspects.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={showSecondaryColumns ? 13 : 5} className="text-center py-6">
+                <TableCell colSpan={showSecondaryColumns ? 14 : 6} className="text-center py-6">
                   {searchTerm || statusFilter !== 'all' 
                     ? 'No prospects found matching your filters.' 
                     : 'No prospects found. Add some prospects to get started.'}
@@ -524,6 +572,17 @@ const ProspectTable: React.FC<ProspectTableProps> = ({ programId }) => {
                         </div>
                       )}
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <select
+                      value={prospect.prospect_score || 'C'}
+                      onChange={(e) => handleScoreUpdate(prospect.id, e.target.value)}
+                      className="w-16 px-2 py-1 border border-input bg-background rounded-md text-sm hover:bg-accent cursor-pointer"
+                    >
+                      {PROSPECT_SCORES.map(score => (
+                        <option key={score} value={score}>{score}</option>
+                      ))}
+                    </select>
                   </TableCell>
                   <TableCell>
                     <Badge variant={getPaymentBadgeVariant(prospect.payment)}>

@@ -35,7 +35,8 @@ const AddProspectModal = ({ isOpen, onClose, onComplete }: AddProspectModalProps
     phone: '',
     org: '',
     role: '',
-    payment: ''
+    payment: '',
+    prospect_score: 'C'
   });
   const { toast } = useToast();
 
@@ -93,6 +94,7 @@ const AddProspectModal = ({ isOpen, onClose, onComplete }: AddProspectModalProps
           org: formData.org || null,
           role: formData.role || null,
           payment: formData.payment || null,
+          prospect_score: formData.prospect_score,
           registration_status: 'Pending'
         }]);
 
@@ -111,7 +113,8 @@ const AddProspectModal = ({ isOpen, onClose, onComplete }: AddProspectModalProps
         phone: '',
         org: '',
         role: '',
-        payment: ''
+        payment: '',
+        prospect_score: 'C'
       });
       onComplete();
       onClose();
@@ -135,7 +138,8 @@ const AddProspectModal = ({ isOpen, onClose, onComplete }: AddProspectModalProps
       phone: '',
       org: '',
       role: '',
-      payment: ''
+      payment: '',
+      prospect_score: 'C'
     });
     onClose();
   };
@@ -238,6 +242,23 @@ const AddProspectModal = ({ isOpen, onClose, onComplete }: AddProspectModalProps
               <option value="">Select payment type...</option>
               <option value="hrdc">HRDC</option>
               <option value="individual">Individual</option>
+            </select>
+          </div>
+
+          <div>
+            <Label htmlFor="prospect_score">Prospect Score</Label>
+            <select
+              id="prospect_score"
+              name="prospect_score"
+              value={formData.prospect_score}
+              onChange={handleInputChange}
+              className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md"
+            >
+              <option value="A">A - Highest Priority</option>
+              <option value="B">B - High Priority</option>
+              <option value="C">C - Medium Priority</option>
+              <option value="D">D - Low Priority</option>
+              <option value="E">E - Lowest Priority</option>
             </select>
           </div>
 

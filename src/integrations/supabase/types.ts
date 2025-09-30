@@ -439,6 +439,7 @@ export type Database = {
           product_id: string | null
           product_type: string | null
           program_id: string | null
+          prospect_score: string | null
           registration_status: string | null
           role: string | null
           status_reason: string | null
@@ -455,6 +456,7 @@ export type Database = {
           product_id?: string | null
           product_type?: string | null
           program_id?: string | null
+          prospect_score?: string | null
           registration_status?: string | null
           role?: string | null
           status_reason?: string | null
@@ -471,6 +473,7 @@ export type Database = {
           product_id?: string | null
           product_type?: string | null
           program_id?: string | null
+          prospect_score?: string | null
           registration_status?: string | null
           role?: string | null
           status_reason?: string | null

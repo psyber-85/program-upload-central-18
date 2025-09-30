@@ -173,6 +173,7 @@ const BulkUploadForm: React.FC<BulkUploadFormProps> = ({ programId }) => {
           org: row.org || null,
           role: row.role || null,
           payment: normalizePayment(row.payment),
+          prospect_score: row.prospect_score || 'C',
           registration_status: 'Pending',
           program_id: programId
         }));
@@ -214,6 +215,7 @@ const BulkUploadForm: React.FC<BulkUploadFormProps> = ({ programId }) => {
             org: row.org || null,
             role: row.role || null,
             payment: normalizePayment(row.payment),
+            prospect_score: row.prospect_score || 'C',
             registration_status: 'Pending'
           });
         });
@@ -303,6 +305,7 @@ const BulkUploadForm: React.FC<BulkUploadFormProps> = ({ programId }) => {
               <li>org</li>
               <li>role</li>
               <li>payment (accepts: hrdc/individual for payment types, or paid/pending/failed for status)</li>
+              <li>prospect_score (optional: A, B, C, D, or E - defaults to C if not provided)</li>
               {!programId && (
                 <>
                   <li>product_type (program name - required if not uploading to a specific program)</li>

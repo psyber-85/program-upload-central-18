@@ -15,7 +15,11 @@ interface ProgramStats {
   total: number;
 }
 
-const ProgramSummary = () => {
+interface ProgramSummaryProps {
+  programId?: string;
+}
+
+const ProgramSummary: React.FC<ProgramSummaryProps> = ({ programId }) => {
   const [programStats, setProgramStats] = useState<ProgramStats[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -49,22 +53,34 @@ const ProgramSummary = () => {
     try {
       setLoading(true);
       
-      // First, get all registration programs
-      const { data: allPrograms, error: programsError } = await supabase
+      // If programId is provided, only fetch that program
+      let programsQuery = supabase
         .from('registration_programs')
         .select('id, title')
         .order('title');
+
+      if (programId) {
+        programsQuery = programsQuery.eq('id', programId);
+      }
+
+      const { data: allPrograms, error: programsError } = await programsQuery;
 
       if (programsError) {
         console.error('Error fetching programs:', programsError);
         throw programsError;
       }
 
-      // Then get all prospects
-      const { data: allProspects, error: prospectsError } = await supabase
+      // Then get prospects - filter by programId if provided
+      let prospectsQuery = supabase
         .from('prospects')
         .select('program_id, registration_status')
         .not('program_id', 'is', null);
+
+      if (programId) {
+        prospectsQuery = prospectsQuery.eq('program_id', programId);
+      }
+
+      const { data: allProspects, error: prospectsError } = await prospectsQuery;
 
       if (prospectsError) {
         console.error('Error fetching prospects:', prospectsError);

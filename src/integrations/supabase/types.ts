@@ -484,6 +484,7 @@ export type Database = {
           id: string
           pricing: number | null
           product_id: string | null
+          round_id: string
           title: string
           updated_at: string
         }
@@ -492,6 +493,7 @@ export type Database = {
           id?: string
           pricing?: number | null
           product_id?: string | null
+          round_id: string
           title: string
           updated_at?: string
         }
@@ -500,7 +502,49 @@ export type Database = {
           id?: string
           pricing?: number | null
           product_id?: string | null
+          round_id?: string
           title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registration_programs_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "registration_rounds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      registration_rounds: {
+        Row: {
+          created_at: string
+          description: string | null
+          end_date: string | null
+          id: string
+          name: string
+          start_date: string | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          name: string
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          name?: string
+          start_date?: string | null
+          status?: string | null
           updated_at?: string
         }
         Relationships: []

@@ -17,7 +17,11 @@ const PRODUCT_ID_TRANSLATIONS: Record<string, string> = {
   'ai-chatgpt-hr': 'AI and ChatGPT for HR Professionals - 2 Day Masterclass'
 };
 
-const BulkUploadForm = () => {
+interface BulkUploadFormProps {
+  programId?: string;
+}
+
+const BulkUploadForm: React.FC<BulkUploadFormProps> = ({ programId }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
@@ -160,75 +164,96 @@ const BulkUploadForm = () => {
         throw new Error(`Missing required columns: ${missingColumns.join(', ')}`);
       }
 
-      // Group data by program and process each group
-      const programGroups: Record<string, any[]> = {};
-      
-      fileData.forEach((row: any) => {
-        let programTitle = row.product_type;
-        
-        // Translate product_id if present
-        if (row.product_id) {
-          programTitle = translateProductId(row.product_id);
-        }
-        
-        if (!programTitle) {
-          throw new Error('Program information missing in data');
-        }
-        
-        if (!programGroups[programTitle]) {
-          programGroups[programTitle] = [];
-        }
-        
-        programGroups[programTitle].push({
+      // If programId is provided, auto-assign all prospects to that program
+      if (programId) {
+        const prospectsWithProgramId = fileData.map((row: any) => ({
           name: row.name,
           email: row.email,
           phone: row.phone || null,
           org: row.org || null,
           role: row.role || null,
           payment: normalizePayment(row.payment),
-          registration_status: 'Pending'
-        });
-      });
-
-      let totalInserted = 0;
-      
-      // Process each program group
-      for (const [programTitle, prospects] of Object.entries(programGroups)) {
-        // Get program_id from registration_programs
-        const { data: existingProgram, error: fetchError } = await supabase
-          .from('registration_programs')
-          .select('id')
-          .eq('title', programTitle)
-          .single();
-
-        if (fetchError && fetchError.code !== 'PGRST116') {
-          throw fetchError;
-        }
-
-        if (!existingProgram) {
-          throw new Error(`Program "${programTitle}" not found in registration_programs. Please add it first.`);
-        }
-
-        // Add program_id to prospects (remove product_type)
-        const prospectsWithProgramId = prospects.map(prospect => ({
-          ...prospect,
-          program_id: existingProgram.id
+          registration_status: 'Pending',
+          program_id: programId
         }));
 
-        // Insert prospects
+        // Insert all prospects
         const { error: insertError } = await supabase
           .from('prospects')
           .insert(prospectsWithProgramId);
 
         if (insertError) throw insertError;
+
+        toast({
+          title: "Success",
+          description: `Successfully uploaded ${prospectsWithProgramId.length} prospects to this program.`,
+        });
+      } else {
+        // Original behavior: group by program and match by title
+        const programGroups: Record<string, any[]> = {};
         
-        totalInserted += prospects.length;
+        fileData.forEach((row: any) => {
+          let programTitle = row.product_type;
+          
+          if (row.product_id) {
+            programTitle = translateProductId(row.product_id);
+          }
+          
+          if (!programTitle) {
+            throw new Error('Program information missing in data');
+          }
+          
+          if (!programGroups[programTitle]) {
+            programGroups[programTitle] = [];
+          }
+          
+          programGroups[programTitle].push({
+            name: row.name,
+            email: row.email,
+            phone: row.phone || null,
+            org: row.org || null,
+            role: row.role || null,
+            payment: normalizePayment(row.payment),
+            registration_status: 'Pending'
+          });
+        });
+
+        let totalInserted = 0;
+        
+        for (const [programTitle, prospects] of Object.entries(programGroups)) {
+          const { data: existingProgram, error: fetchError } = await supabase
+            .from('registration_programs')
+            .select('id')
+            .eq('title', programTitle)
+            .single();
+
+          if (fetchError && fetchError.code !== 'PGRST116') {
+            throw fetchError;
+          }
+
+          if (!existingProgram) {
+            throw new Error(`Program "${programTitle}" not found. Please add it first.`);
+          }
+
+          const prospectsWithProgramId = prospects.map(prospect => ({
+            ...prospect,
+            program_id: existingProgram.id
+          }));
+
+          const { error: insertError } = await supabase
+            .from('prospects')
+            .insert(prospectsWithProgramId);
+
+          if (insertError) throw insertError;
+          
+          totalInserted += prospects.length;
+        }
+        
+        toast({
+          title: "Success",
+          description: `Successfully uploaded ${totalInserted} prospects across ${Object.keys(programGroups).length} program(s).`,
+        });
       }
-      
-      toast({
-        title: "Success",
-        description: `Successfully uploaded ${totalInserted} prospects across ${Object.keys(programGroups).length} program(s). All prospects are now linked to programs via program_id.`,
-      });
 
       // Reset form
       setSelectedFile(null);
@@ -278,16 +303,23 @@ const BulkUploadForm = () => {
               <li>org</li>
               <li>role</li>
               <li>payment (accepts: hrdc/individual for payment types, or paid/pending/failed for status)</li>
-              <li>product_type (program name - must match exactly with programs in registration_programs table)</li>
-              <li>product_id (optional - will be automatically translated to program titles)</li>
+              {!programId && (
+                <>
+                  <li>product_type (program name - required if not uploading to a specific program)</li>
+                  <li>product_id (optional - will be automatically translated to program titles)</li>
+                </>
+              )}
             </ul>
             <div className="mt-3 p-3 bg-blue-100 rounded">
-              <p className="text-xs text-blue-800 font-medium">Program Matching & Payment Handling:</p>
+              <p className="text-xs text-blue-800 font-medium">
+                {programId ? 'Auto-Assignment:' : 'Program Matching & Payment Handling:'}
+              </p>
               <p className="text-xs text-blue-700">
-                Program names must match exactly with those in the registration_programs table. 
-                Each prospect will be assigned a program_id based on the program name match.
-                Payment values will be automatically normalized - "HRDC"/"HRDF" → "hrdc", "Individual"/"Self-funded" → "individual".
-                Common payment status variations are also supported (e.g., "Paid" → "paid", "Processing" → "pending").
+                {programId 
+                  ? 'All prospects will be automatically assigned to this program. No product_type column needed.'
+                  : 'Program names must match exactly with those in the registration_programs table. Each prospect will be assigned based on the program name match.'
+                }
+                {' '}Payment values will be automatically normalized.
               </p>
             </div>
           </div>

@@ -41,7 +41,11 @@ interface Prospect {
 type SortField = 'name' | 'email' | 'org' | 'role' | 'program' | 'registration_status' | 'payment' | 'lastCall';
 type SortDirection = 'asc' | 'desc';
 
-const ProspectTable = () => {
+interface ProspectTableProps {
+  programId?: string;
+}
+
+const ProspectTable: React.FC<ProspectTableProps> = ({ programId }) => {
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [filteredProspects, setFilteredProspects] = useState<Prospect[]>([]);
   const [programs, setPrograms] = useState<{[key: string]: string}>({});
@@ -50,7 +54,6 @@ const ProspectTable = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [programFilter, setProgramFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -130,9 +133,8 @@ const ProspectTable = () => {
         (prospect.role && prospect.role.toLowerCase().includes(searchTerm.toLowerCase()));
       
       const matchesStatus = statusFilter === 'all' || prospect.registration_status === statusFilter;
-      const matchesProgram = programFilter === 'all' || prospect.program === programFilter;
       
-      return matchesSearch && matchesStatus && matchesProgram;
+      return matchesSearch && matchesStatus;
     });
 
     // Sort prospects
@@ -159,12 +161,12 @@ const ProspectTable = () => {
     if (currentPage > newTotalPages && newTotalPages > 0) {
       setCurrentPage(newTotalPages);
     }
-  }, [searchTerm, statusFilter, programFilter, prospects, sortField, sortDirection, prospectsPerPage]);
+  }, [searchTerm, statusFilter, prospects, sortField, sortDirection, prospectsPerPage]);
 
   // Separate useEffect to handle filter changes that should reset page
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter, programFilter]);
+  }, [searchTerm, statusFilter]);
 
   const fetchProspects = async () => {
     try {
@@ -185,15 +187,20 @@ const ProspectTable = () => {
       
       setPrograms(programsMap);
 
-      // Fetch prospects with related data
-      const { data: prospectsData, error: prospectsError } = await supabase
+      // Fetch prospects with related data - filter by programId if provided
+      let query = supabase
         .from('prospects')
         .select(`
           *,
           prospect_calls(call_date, notes),
           hr_contacts(name, email, email_sent_at)
-        `)
-        .order('created_at', { ascending: false });
+        `);
+
+      if (programId) {
+        query = query.eq('program_id', programId);
+      }
+
+      const { data: prospectsData, error: prospectsError } = await query.order('created_at', { ascending: false });
 
       if (prospectsError) throw prospectsError;
 
@@ -402,28 +409,11 @@ const ProspectTable = () => {
                 </SelectContent>
               </Select>
               
-              <Select value={programFilter} onValueChange={setProgramFilter}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Filter by Programme" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Programmes</SelectItem>
-                  {uniquePrograms.map((program) => (
-                    <SelectItem key={program} value={program}>
-                      {program}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              {(statusFilter !== 'all' || programFilter !== 'all') && (
+              {statusFilter !== 'all' && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    setStatusFilter('all');
-                    setProgramFilter('all');
-                  }}
+                  onClick={() => setStatusFilter('all')}
                   className="text-xs"
                 >
                   Clear Filters
@@ -435,9 +425,9 @@ const ProspectTable = () => {
         
         <div className="mt-2 text-sm text-gray-600">
           Showing {filteredProspects.length} of {prospects.length} prospects
-          {(statusFilter !== 'all' || programFilter !== 'all') && (
+          {statusFilter !== 'all' && (
             <span className="ml-2 text-blue-600">
-              (filtered by {statusFilter !== 'all' ? `status: ${statusFilter}` : ''}{statusFilter !== 'all' && programFilter !== 'all' ? ', ' : ''}{programFilter !== 'all' ? `programme: ${programFilter}` : ''})
+              (filtered by status: {statusFilter})
             </span>
           )}
         </div>
@@ -447,11 +437,13 @@ const ProspectTable = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="cursor-pointer" onClick={() => handleSort('program')}>
-                <div className="flex items-center gap-1">
-                  Programme {getSortIcon('program')}
-                </div>
-              </TableHead>
+              {!programId && (
+                <TableHead className="cursor-pointer" onClick={() => handleSort('program')}>
+                  <div className="flex items-center gap-1">
+                    Programme {getSortIcon('program')}
+                  </div>
+                </TableHead>
+              )}
               <TableHead className="cursor-pointer" onClick={() => handleSort('name')}>
                 <div className="flex items-center gap-1">
                   Name {getSortIcon('name')}
@@ -502,7 +494,7 @@ const ProspectTable = () => {
             {currentProspects.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={showSecondaryColumns ? 13 : 5} className="text-center py-6">
-                  {searchTerm || statusFilter !== 'all' || programFilter !== 'all' 
+                  {searchTerm || statusFilter !== 'all' 
                     ? 'No prospects found matching your filters.' 
                     : 'No prospects found. Add some prospects to get started.'}
                 </TableCell>
@@ -510,11 +502,13 @@ const ProspectTable = () => {
             ) : (
               currentProspects.map((prospect) => (
                 <TableRow key={prospect.id}>
-                  <TableCell className="font-medium max-w-xs">
-                    <div className="truncate" title={prospect.program}>
-                      {prospect.program}
-                    </div>
-                  </TableCell>
+                  {!programId && (
+                    <TableCell className="font-medium max-w-xs">
+                      <div className="truncate" title={prospect.program}>
+                        {prospect.program}
+                      </div>
+                    </TableCell>
+                  )}
                   <TableCell className="font-medium">{prospect.name}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">

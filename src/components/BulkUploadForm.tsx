@@ -155,8 +155,10 @@ const BulkUploadForm: React.FC<BulkUploadFormProps> = ({ programId }) => {
         throw new Error('No data found in file');
       }
 
-      // Validate required columns
-      const requiredColumns = ['name', 'email', 'phone', 'org', 'role', 'payment', 'product_type'];
+      // Validate required columns - product_type only required when not uploading to a specific program
+      const requiredColumns = programId
+        ? ['name', 'email', 'phone', 'org', 'role', 'payment']
+        : ['name', 'email', 'phone', 'org', 'role', 'payment', 'product_type'];
       const firstRow = fileData[0] as any;
       const missingColumns = requiredColumns.filter(col => !(col in firstRow));
       

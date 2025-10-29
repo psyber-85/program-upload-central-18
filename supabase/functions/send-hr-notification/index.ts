@@ -21,7 +21,7 @@ interface EmailRequest {
 const generateEmailTemplate = async (hrName: string, staffName: string, courseName: string, productType: string) => {
   console.log('Generating email template for program:', productType);
   
-  // Initialize Supabase client to fetch pricing
+  // Initialize Supabase client to fetch pricing and links
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseKey);
@@ -46,43 +46,39 @@ const generateEmailTemplate = async (hrName: string, staffName: string, courseNa
     console.log('Using default pricing:', pricing);
   }
   
-  // Program-specific links mapping using exact program titles
-  const programLinks = {
-    "Business Writing with AI: 2-Day Masterclass": {
-      signupForm: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/Sign%20Up%20Form%20-%20Business%20Writing%20with%20AI_Q4_compressed.pdf",
-      courseBrochure: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/Business%20Writing%20with%20AI-Course_Brochure.pdf"
-    },
-    "ChatGPT Skill Boost (Intermediate)": {
-      signupForm: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/Sign%20Up%20Form%20-%20ChatGPT%20Skill%20Boost%20Intermediate_Q4_compressed.pdf",
-      courseBrochure: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/ChatGPT%20Skill%20Boost%20(GPT-5)-Course_Brochure.pdf"
-    },
-    "ChatGPT Skill Boost (GPT-5 Edition)": {
-      signupForm: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/Sign%20Up%20Form%20-%20ChatGPT%20Skill%20Boost%20Intermediate_Q4_compressed.pdf",
-      courseBrochure: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/ChatGPT%20Skill%20Boost%20(GPT-5)-Course_Brochure.pdf"
-    },
-    "AI and ChatGPT for HR Professionals - 2 Day Masterclass": {
-      signupForm: "https://drive.google.com/file/d/1IG9gOVe65C__6KTjJCd_RZqj_nAFlob_/view?usp=drive_link",
-      courseBrochure: "https://drive.google.com/file/d/1GWc2tUZfsUR8FSZxuGuBR8T34iVv9fFy/view"
-    },
-    "The AI-Ready Leader: Win the Future with Strategic Action": {
-      signupForm: "https://drive.google.com/file/d/1KEE95XsMiSMgV8YseUX2db7eV0qtI5AY/view?usp=drive_link",
-      courseBrochure: "https://drive.google.com/file/d/1silb4DtDCHv04r_eriODS6nn-QWZmkrs/view"
+  // Fetch program links from database
+  const programLinksMap: Record<string, { signupForm: string; courseBrochure: string }> = {};
+  try {
+    const { data: linksData, error: linksError } = await supabase
+      .from('program_links')
+      .select('program_title, signup_form_url, brochure_url');
+    
+    if (!linksError && linksData) {
+      linksData.forEach(item => {
+        programLinksMap[item.program_title] = {
+          signupForm: item.signup_form_url,
+          courseBrochure: item.brochure_url
+        };
+      });
+      console.log('Loaded program links from database:', Object.keys(programLinksMap));
     }
-  };
+  } catch (error) {
+    console.error('Error fetching program links:', error);
+  }
 
   // Try exact match first
-  let links = programLinks[productType as keyof typeof programLinks];
+  let links = programLinksMap[productType];
   
   if (!links) {
     // Try to find partial matches for flexibility
-    const programKeys = Object.keys(programLinks);
+    const programKeys = Object.keys(programLinksMap);
     const matchedKey = programKeys.find(key => 
       key.toLowerCase().includes(productType.toLowerCase()) || 
       productType.toLowerCase().includes(key.toLowerCase().replace(/[^\w\s]/g, '').trim())
     );
     
     if (matchedKey) {
-      links = programLinks[matchedKey as keyof typeof programLinks];
+      links = programLinksMap[matchedKey];
       console.log(`Found partial match: ${matchedKey} for ${productType}`);
     }
   }

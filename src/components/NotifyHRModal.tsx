@@ -27,13 +27,41 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
   const [emailPreview, setEmailPreview] = useState('');
   const [pricing, setPricing] = useState<number>(2850);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [programLinks, setProgramLinks] = useState<Record<string, { signupForm: string; courseBrochure: string }>>({});
   const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen && prospectId) {
+      loadProgramLinks();
       loadProspectData();
     }
   }, [isOpen, prospectId]);
+
+  const loadProgramLinks = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('program_links')
+        .select('program_title, signup_form_url, brochure_url');
+
+      if (error) throw error;
+
+      if (data) {
+        const linksMap = data.reduce((acc, item) => {
+          acc[item.program_title] = {
+            signupForm: item.signup_form_url,
+            courseBrochure: item.brochure_url
+          };
+          return acc;
+        }, {} as Record<string, { signupForm: string; courseBrochure: string }>);
+        
+        setProgramLinks(linksMap);
+        console.log('Loaded program links from database:', Object.keys(linksMap));
+      }
+    } catch (error) {
+      console.error('Failed to load program links:', error);
+      // Graceful fallback - will use placeholder links
+    }
+  };
 
   const loadProspectData = async () => {
     try {
@@ -102,30 +130,6 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
   const generateEmailPreview = (hrName: string, staffName: string, courseName: string, programKey: string, programPricing: number) => {
     console.log('Generating email preview for program:', programKey);
     
-    // Program-specific links mapping using exact program titles
-    const programLinks: Record<string, { signupForm: string; courseBrochure: string }> = {
-      "Business Writing with AI: 2-Day Masterclass": {
-        signupForm: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/Sign%20Up%20Form%20-%20Business%20Writing%20with%20AI_Q4_compressed.pdf",
-        courseBrochure: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/Business%20Writing%20with%20AI-Course_Brochure.pdf"
-      },
-      "ChatGPT Skill Boost (Intermediate)": {
-        signupForm: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/Sign%20Up%20Form%20-%20ChatGPT%20Skill%20Boost%20Intermediate_Q4_compressed.pdf",
-        courseBrochure: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/ChatGPT%20Skill%20Boost%20(GPT-5)-Course_Brochure.pdf"
-      },
-      "ChatGPT Skill Boost (GPT-5 Edition)": {
-        signupForm: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/Sign%20Up%20Form%20-%20ChatGPT%20Skill%20Boost%20Intermediate_Q4_compressed.pdf",
-        courseBrochure: "https://nxnpjkthtjaqamrriogp.supabase.co/storage/v1/object/public/signup-forms/ChatGPT%20Skill%20Boost%20(GPT-5)-Course_Brochure.pdf"
-      },
-      "AI and ChatGPT for HR Professionals - 2 Day Masterclass": {
-        signupForm: "https://drive.google.com/file/d/1IG9gOVe65C__6KTjJCd_RZqj_nAFlob_/view?usp=drive_link",
-        courseBrochure: "https://drive.google.com/file/d/1GWc2tUZfsUR8FSZxuGuBR8T34iVv9fFy/view"
-      },
-      "The AI-Ready Leader: Win the Future with Strategic Action": {
-        signupForm: "https://drive.google.com/file/d/1KEE95XsMiSMgV8YseUX2db7eV0qtI5AY/view?usp=drive_link",
-        courseBrochure: "https://drive.google.com/file/d/1silb4DtDCHv04r_eriODS6nn-QWZmkrs/view"
-      }
-    };
-
     // Try exact match first
     let links = programLinks[programKey];
     

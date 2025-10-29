@@ -371,6 +371,33 @@ export type Database = {
           },
         ]
       }
+      program_links: {
+        Row: {
+          brochure_url: string
+          created_at: string
+          id: string
+          program_title: string
+          signup_form_url: string
+          updated_at: string
+        }
+        Insert: {
+          brochure_url: string
+          created_at?: string
+          id?: string
+          program_title: string
+          signup_form_url: string
+          updated_at?: string
+        }
+        Update: {
+          brochure_url?: string
+          created_at?: string
+          id?: string
+          program_title?: string
+          signup_form_url?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       programs: {
         Row: {
           created_at: string

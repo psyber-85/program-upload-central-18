@@ -37,6 +37,19 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
     }
   }, [isOpen, prospectId]);
 
+  // Regenerate email preview when program links are loaded
+  useEffect(() => {
+    if (Object.keys(programLinks).length > 0 && prospectData && hrContact) {
+      generateEmailPreview(
+        hrContact.name, 
+        prospectData.name, 
+        prospectData.programTitle, 
+        prospectData.programTitle, 
+        prospectData.pricing
+      );
+    }
+  }, [programLinks, prospectData, hrContact]);
+
   const loadProgramLinks = async () => {
     try {
       const { data, error } = await supabase

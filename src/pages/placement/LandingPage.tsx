@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { StepTimeline, AISkillBadge, Callout } from '@/components/placement/ui';
-import { Users, Shield, TrendingUp, ArrowRight, CheckCircle } from 'lucide-react';
+import { Users, Shield, TrendingUp, ArrowRight, CheckCircle, Info } from 'lucide-react';
 
 const placementSteps = [
   { label: 'Submit Role Request' },
@@ -21,7 +21,7 @@ const valueProps = [
   {
     icon: Shield,
     title: 'Grant-Backed Training',
-    description: 'Access government-supported training schemes to upskill your new hires.',
+    description: 'Access government-supported training schemes to upskill candidates before placement.',
   },
   {
     icon: TrendingUp,
@@ -115,24 +115,24 @@ export function LandingPage() {
               The AI Skill Framework
             </h2>
             <p className="text-center text-muted-foreground mb-10 max-w-2xl mx-auto">
-              Our structured framework ensures candidates have the right AI capabilities for your needs.
+              Our structured framework ensures candidates have the right workplace AI capabilities for your needs.
             </p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               <Card className="text-center p-4 border-border/50">
                 <AISkillBadge level="L1" size="lg" />
-                <p className="mt-2 text-sm font-medium text-foreground">AI Aware</p>
+                <p className="mt-2 text-sm font-medium text-foreground">AI Awareness</p>
               </Card>
               <Card className="text-center p-4 border-border/50">
                 <AISkillBadge level="L2" size="lg" />
-                <p className="mt-2 text-sm font-medium text-foreground">AI User</p>
+                <p className="mt-2 text-sm font-medium text-foreground">AI Workplace User</p>
               </Card>
               <Card className="text-center p-4 border-border/50">
                 <AISkillBadge level="L3" size="lg" />
-                <p className="mt-2 text-sm font-medium text-foreground">AI Builder</p>
+                <p className="mt-2 text-sm font-medium text-foreground">Workflow Automation</p>
               </Card>
               <Card className="text-center p-4 border-border/50">
                 <AISkillBadge level="L4" size="lg" />
-                <p className="mt-2 text-sm font-medium text-foreground">AI Architect</p>
+                <p className="mt-2 text-sm font-medium text-foreground">AI Adoption Lead</p>
               </Card>
             </div>
             <div className="text-center">
@@ -147,8 +147,37 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* Trust Callout */}
+      {/* Commitment & Risk Doctrine */}
       <section className="py-16 lg:py-24 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="max-w-3xl mx-auto">
+            <Card className="border-border/50 bg-background">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-4">
+                  <Info className="h-6 w-6 text-primary flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-foreground mb-2">
+                      Employer Flexibility
+                    </h3>
+                    <p className="text-muted-foreground text-sm mb-4">
+                      Hiring decisions remain with the employer. The Letter of Intent (LOI) enables AIHQ to 
+                      proceed with training coordination and grant workflow — it is not an employment contract. 
+                      Final hiring decisions are made after training completion.
+                    </p>
+                    <p className="text-muted-foreground text-sm">
+                      At each stage, employers can choose to proceed, hold, or not proceed. 
+                      AIHQ will coordinate alternatives if needed.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* Trust Callout */}
+      <section className="py-16 lg:py-24 bg-background">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto">
             <Callout variant="trust" title="AIHQ Manages the Entire Process">
@@ -162,7 +191,7 @@ export function LandingPage() {
       </section>
 
       {/* Grant Eligibility Note */}
-      <section className="py-16 lg:py-24 bg-background">
+      <section className="py-16 lg:py-24 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto">
             <Card className="bg-primary/5 border-primary/20">

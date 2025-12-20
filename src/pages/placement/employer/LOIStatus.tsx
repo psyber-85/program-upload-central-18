@@ -1,11 +1,22 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Download, Upload, FileText, User, Building2 } from 'lucide-react';
+import { ArrowLeft, Download, FileText, User, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { StatusBadge, StepTimeline, Callout, FileUploadStub } from '@/components/placement/ui';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { 
+  StatusBadge, 
+  StepTimeline, 
+  Callout, 
+  FileUploadStub,
+  LOICallout,
+  SafeExitDialog
+} from '@/components/placement/ui';
 import { useToast } from '@/hooks/use-toast';
 import { mockLOIRecords, mockCandidates, mockRoleRequests, mockCompanies } from '@/lib/placement/mockData';
+import { CloseReasonType } from '@/lib/placement/types';
 
 const loiSteps = [
   { label: 'Draft Generated', description: 'AIHQ prepares LOI' },
@@ -34,6 +45,8 @@ export function LOIStatus() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [safeExitOpen, setSafeExitOpen] = useState(false);
 
   // Find the LOI
   const loi = mockLOIRecords.find((l) => l.id === id);
@@ -63,10 +76,37 @@ export function LOIStatus() {
   };
 
   const handleUploadSigned = () => {
+    if (!acknowledged) {
+      toast({
+        title: 'Acknowledgement required',
+        description: 'Please acknowledge that you understand the LOI is not an employment contract.',
+        variant: 'destructive',
+      });
+      return;
+    }
     toast({
       title: 'Upload feature',
       description: 'In the full version, you would upload the signed LOI here.',
     });
+  };
+
+  const handleHold = () => {
+    toast({
+      title: 'LOI on hold',
+      description: 'Take your time. AIHQ will follow up when you\'re ready.',
+    });
+  };
+
+  const handleNotProceeding = () => {
+    setSafeExitOpen(true);
+  };
+
+  const handleSafeExitConfirm = (reason: CloseReasonType, notes?: string) => {
+    toast({
+      title: 'Not proceeding',
+      description: 'AIHQ will close this LOI and coordinate alternatives if appropriate.',
+    });
+    console.log('Safe exit:', { reason, notes });
   };
 
   return (
@@ -86,6 +126,9 @@ export function LOIStatus() {
           Review and manage the LOI for this placement
         </p>
       </div>
+
+      {/* IMPORTANT: LOI ≠ Employment Callout */}
+      <LOICallout variant="prominent" />
 
       {/* Timeline */}
       <Card>
@@ -135,6 +178,29 @@ export function LOIStatus() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Acknowledgement */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex items-start space-x-3">
+            <Checkbox
+              id="acknowledge"
+              checked={acknowledged}
+              onCheckedChange={(checked) => setAcknowledged(checked === true)}
+            />
+            <div className="space-y-1">
+              <Label htmlFor="acknowledge" className="text-sm font-medium cursor-pointer">
+                I understand that this LOI is not an employment contract
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                By checking this box, I acknowledge that signing this LOI enables AIHQ to proceed with 
+                training coordination and grant workflow, but does not obligate me to hire the candidate. 
+                The final hiring decision will be made after training completion.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* LOI Document Section */}
       <Card>
@@ -187,6 +253,30 @@ export function LOIStatus() {
         </CardContent>
       </Card>
 
+      {/* Action Buttons */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={handleUploadSigned} disabled={!acknowledged}>
+              Proceed with LOI
+            </Button>
+            <Button variant="outline" onClick={handleHold}>
+              Hold for Now
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="text-muted-foreground"
+              onClick={handleNotProceeding}
+            >
+              Not Proceeding
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-3">
+            Not proceeding is a supported option. AIHQ will coordinate alternatives if appropriate.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Grant Info Callout */}
       <Callout variant="info" title="Grant Eligibility">
         This placement may be eligible for grant-backed training schemes. AIHQ will advise on available options and coordinate the application process if applicable.
@@ -196,6 +286,14 @@ export function LOIStatus() {
       <Callout variant="trust">
         AIHQ coordinates all LOI processing and will guide you through each step. Contact us if you have any questions.
       </Callout>
+
+      {/* Safe Exit Dialog */}
+      <SafeExitDialog
+        open={safeExitOpen}
+        onOpenChange={setSafeExitOpen}
+        onConfirm={handleSafeExitConfirm}
+        context="loi"
+      />
     </div>
   );
 }

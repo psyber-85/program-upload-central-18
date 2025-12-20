@@ -1,13 +1,22 @@
+import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, AlertCircle, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { StatusBadge, AISkillBadge, CandidateCard, Callout, EmptyState } from '@/components/placement/ui';
+import { 
+  StatusBadge, 
+  AISkillBadge, 
+  CandidateCardEmployer, 
+  Callout, 
+  EmptyState,
+  DecisionCheckpointPanel,
+  SafeExitDialog
+} from '@/components/placement/ui';
 import { useToast } from '@/hooks/use-toast';
 import { mockRoleRequests, mockMatches, mockCandidates } from '@/lib/placement/mockData';
-import { AI_SKILL_LEVELS } from '@/lib/placement/types';
+import { AI_SKILL_LEVELS, CheckpointStatus, CloseReasonType } from '@/lib/placement/types';
 
 const timelineLabels = {
   urgent: { label: 'Urgent', description: 'Need to fill within 2 weeks' },
@@ -19,6 +28,12 @@ export function RoleDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [safeExitOpen, setSafeExitOpen] = useState(false);
+  const [checkpointStatuses, setCheckpointStatuses] = useState<Record<string, CheckpointStatus>>({
+    interview: 'pending',
+    loi: 'pending',
+    training_completion: 'pending',
+  });
 
   // Find the role
   const role = mockRoleRequests.find((r) => r.id === id);
@@ -52,9 +67,9 @@ export function RoleDetail() {
       case 'MATCHING':
         return 'Review the curated candidates below';
       case 'INTERVIEWING':
-        return 'Complete interviews and provide feedback';
+        return 'Complete interviews and decide whether to proceed';
       case 'LOI_PENDING':
-        return 'Review and sign the Letter of Intent';
+        return 'Review and sign the Letter of Intent (hiring remains optional)';
       case 'PLACED':
         return 'Placement completed successfully';
       default:
@@ -68,6 +83,56 @@ export function RoleDetail() {
       description: `AIHQ will coordinate an interview with ${candidateName}.`,
     });
   };
+
+  const handleCheckpointProceed = (checkpointId: string) => {
+    setCheckpointStatuses(prev => ({ ...prev, [checkpointId]: 'proceed' }));
+    toast({
+      title: 'Proceeding',
+      description: 'AIHQ will coordinate the next steps.',
+    });
+  };
+
+  const handleCheckpointHold = (checkpointId: string) => {
+    setCheckpointStatuses(prev => ({ ...prev, [checkpointId]: 'hold' }));
+    toast({
+      title: 'On hold',
+      description: 'Take your time. AIHQ will follow up when you\'re ready.',
+    });
+  };
+
+  const handleNotProceeding = () => {
+    setSafeExitOpen(true);
+  };
+
+  const handleSafeExitConfirm = (reason: CloseReasonType, notes?: string) => {
+    toast({
+      title: 'Not proceeding',
+      description: 'AIHQ will coordinate alternatives if appropriate.',
+    });
+    console.log('Safe exit:', { reason, notes });
+  };
+
+  // Build checkpoints for the panel
+  const checkpoints = [
+    {
+      id: 'interview' as const,
+      label: 'After Interview',
+      description: 'Decide whether to proceed with candidates',
+      status: checkpointStatuses.interview,
+    },
+    {
+      id: 'loi' as const,
+      label: 'Before LOI Signing',
+      description: 'LOI enables training coordination (hiring remains optional)',
+      status: checkpointStatuses.loi,
+    },
+    {
+      id: 'training_completion' as const,
+      label: 'After Training Completion',
+      description: 'Final hiring decision',
+      status: checkpointStatuses.training_completion,
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -161,6 +226,17 @@ export function RoleDetail() {
         </CardContent>
       </Card>
 
+      {/* Decision Checkpoints */}
+      {['INTERVIEWING', 'LOI_PENDING'].includes(role.status) && (
+        <DecisionCheckpointPanel
+          checkpoints={checkpoints}
+          onProceed={handleCheckpointProceed}
+          onHold={handleCheckpointHold}
+          onNotProceeding={handleNotProceeding}
+          variant="employer"
+        />
+      )}
+
       {/* Curated Candidates Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -178,33 +254,17 @@ export function RoleDetail() {
         {matchedCandidates.length > 0 ? (
           <>
             <Callout variant="trust">
-              These candidates have been carefully screened by AIHQ. Click on a candidate to view their full profile.
+              These candidates have been carefully screened by AIHQ. All interviews are coordinated through AIHQ.
             </Callout>
             
             <div className="space-y-4">
               {matchedCandidates.map(({ match, candidate }) => (
-                <div key={match.id} className="space-y-2">
-                  <CandidateCard
-                    candidate={candidate!}
-                    variant="employer"
-                    linkTo={`/employer/candidates/${candidate!.id}`}
-                    showStatus={false}
-                  />
-                  <div className="flex gap-2 pl-4">
-                    <Button
-                      size="sm"
-                      onClick={() => handleRequestInterview(candidate!.display_name)}
-                      disabled={['INTERVIEW_SCHEDULED', 'PROCEEDING_TO_LOI'].includes(match.match_status)}
-                    >
-                      Request Interview
-                    </Button>
-                    {match.interview_status && (
-                      <span className="text-sm text-muted-foreground flex items-center">
-                        {match.interview_status}
-                      </span>
-                    )}
-                  </div>
-                </div>
+                <CandidateCardEmployer
+                  key={match.id}
+                  candidate={candidate!}
+                  linkTo={`/employer/candidates/${candidate!.id}`}
+                  onRequestInterview={() => handleRequestInterview(candidate!.display_name)}
+                />
               ))}
             </div>
           </>
@@ -219,6 +279,14 @@ export function RoleDetail() {
           </Card>
         )}
       </div>
+
+      {/* Safe Exit Dialog */}
+      <SafeExitDialog
+        open={safeExitOpen}
+        onOpenChange={setSafeExitOpen}
+        onConfirm={handleSafeExitConfirm}
+        context="interview"
+      />
     </div>
   );
 }

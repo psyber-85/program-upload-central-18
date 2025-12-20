@@ -19,12 +19,19 @@ import { PublicLayout, EmployerLayout, OpsLayout } from "./components/placement/
 import { ProtectedRoute, RoleGuard } from "./components/placement/guards";
 import DemoLogin from "./pages/placement/DemoLogin";
 
-// Placeholder pages (to be built in Phase 2)
+// Phase 2: Public Pages
+import { LandingPage } from "./pages/placement/LandingPage";
+import { HowItWorks } from "./pages/placement/HowItWorks";
+import { AISkillFramework } from "./pages/placement/AISkillFramework";
+import { RequestTalent } from "./pages/placement/RequestTalent";
+import { Contact } from "./pages/placement/Contact";
+
+// Placeholder pages (for remaining phases)
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center min-h-[60vh]">
     <div className="text-center">
       <h1 className="text-2xl font-bold mb-2">{title}</h1>
-      <p className="text-muted-foreground">Coming in Phase 2</p>
+      <p className="text-muted-foreground">Coming soon</p>
     </div>
   </div>
 );
@@ -43,11 +50,11 @@ const App = () => (
             {/* PUBLIC ROUTES (Placement Portal) */}
             {/* ============================================ */}
             <Route element={<PublicLayout />}>
-              <Route path="/" element={<PlaceholderPage title="AIHQ Talent Placement" />} />
-              <Route path="/how-it-works" element={<PlaceholderPage title="How It Works" />} />
-              <Route path="/ai-skill-framework" element={<PlaceholderPage title="AI Skill Framework" />} />
-              <Route path="/request-talent" element={<PlaceholderPage title="Request Talent" />} />
-              <Route path="/contact" element={<PlaceholderPage title="Contact" />} />
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/how-it-works" element={<HowItWorks />} />
+              <Route path="/ai-skill-framework" element={<AISkillFramework />} />
+              <Route path="/request-talent" element={<RequestTalent />} />
+              <Route path="/contact" element={<Contact />} />
               <Route path="/login" element={<DemoLogin />} />
             </Route>
 

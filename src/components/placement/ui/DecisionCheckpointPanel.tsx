@@ -11,21 +11,57 @@ interface Checkpoint {
   status: CheckpointStatus;
 }
 
+type CheckpointStatusMap = {
+  interview: CheckpointStatus;
+  loi: CheckpointStatus;
+  training: CheckpointStatus;
+};
+
 interface DecisionCheckpointPanelProps {
-  checkpoints: Checkpoint[];
+  checkpoints: Checkpoint[] | CheckpointStatusMap;
   onProceed?: (checkpointId: string) => void;
   onHold?: (checkpointId: string) => void;
   onNotProceeding?: (checkpointId: string) => void;
   variant?: 'employer' | 'ops';
+  compact?: boolean;
   className?: string;
 }
 
 const statusConfig: Record<CheckpointStatus, { icon: typeof CheckCircle; color: string; label: string }> = {
   pending: { icon: Circle, color: 'text-muted-foreground', label: 'Pending' },
   proceed: { icon: CheckCircle, color: 'text-green-600', label: 'Proceeding' },
+  completed: { icon: CheckCircle, color: 'text-green-600', label: 'Completed' },
   hold: { icon: PauseCircle, color: 'text-amber-600', label: 'On Hold' },
   not_proceeding: { icon: XCircle, color: 'text-slate-500', label: 'Not Proceeding' },
 };
+
+function normalizeCheckpoints(input: Checkpoint[] | CheckpointStatusMap): Checkpoint[] {
+  if (Array.isArray(input)) {
+    return input;
+  }
+  
+  // Convert object format to array format
+  return [
+    {
+      id: 'interview',
+      label: 'After Interview',
+      description: 'Decide whether to proceed with this candidate',
+      status: input.interview || 'pending',
+    },
+    {
+      id: 'loi',
+      label: 'Before LOI Signing',
+      description: 'LOI enables training coordination (hiring remains optional)',
+      status: input.loi || 'pending',
+    },
+    {
+      id: 'training_completion',
+      label: 'After Training Completion',
+      description: 'Final decision on hiring',
+      status: input.training || 'pending',
+    },
+  ];
+}
 
 export function DecisionCheckpointPanel({
   checkpoints,
@@ -33,6 +69,7 @@ export function DecisionCheckpointPanel({
   onHold,
   onNotProceeding,
   variant = 'employer',
+  compact = false,
   className,
 }: DecisionCheckpointPanelProps) {
   const defaultCheckpoints: Checkpoint[] = [
@@ -56,7 +93,28 @@ export function DecisionCheckpointPanel({
     },
   ];
 
-  const displayCheckpoints = checkpoints.length > 0 ? checkpoints : defaultCheckpoints;
+  const normalizedCheckpoints = normalizeCheckpoints(checkpoints);
+  const displayCheckpoints = normalizedCheckpoints.length > 0 ? normalizedCheckpoints : defaultCheckpoints;
+
+  if (compact) {
+    return (
+      <div className={cn('space-y-2', className)}>
+        {displayCheckpoints.map((checkpoint) => {
+          const config = statusConfig[checkpoint.status] || statusConfig.pending;
+          const Icon = config.icon;
+          return (
+            <div key={checkpoint.id} className="flex items-center gap-2">
+              <Icon className={cn('h-4 w-4', config.color)} />
+              <span className="text-sm">{checkpoint.label}</span>
+              <span className={cn('text-xs ml-auto', config.color)}>
+                {config.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <Card className={className}>
@@ -71,10 +129,10 @@ export function DecisionCheckpointPanel({
       </CardHeader>
       <CardContent className="space-y-4">
         {displayCheckpoints.map((checkpoint, index) => {
-          const config = statusConfig[checkpoint.status];
+          const config = statusConfig[checkpoint.status] || statusConfig.pending;
           const Icon = config.icon;
           const isActive = checkpoint.status === 'pending' && 
-            (index === 0 || displayCheckpoints[index - 1].status === 'proceed');
+            (index === 0 || displayCheckpoints[index - 1].status === 'proceed' || displayCheckpoints[index - 1].status === 'completed');
 
           return (
             <div

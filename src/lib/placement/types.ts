@@ -182,7 +182,7 @@ export interface MatchRecord {
 // Decision Checkpoints
 // ============================================
 
-export type CheckpointStatus = 'pending' | 'proceed' | 'hold' | 'not_proceeding';
+export type CheckpointStatus = 'pending' | 'proceed' | 'hold' | 'not_proceeding' | 'completed';
 
 export interface DecisionCheckpoint {
   checkpoint: 'interview' | 'loi' | 'training_completion';

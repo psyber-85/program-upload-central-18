@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { StatusBadge, AISkillBadge, CandidateCard } from '@/components/placement/ui';
+import { StatusBadge, AISkillBadge, CandidateCardInternal, DecisionCheckpointPanel } from '@/components/placement/ui';
 import { roleRequestRepo } from '@/lib/placement/repositories/roleRequestRepo';
 import { employerRepo } from '@/lib/placement/repositories/employerRepo';
 import { matchRepo } from '@/lib/placement/repositories/matchRepo';
@@ -319,16 +319,26 @@ export function OpsRoleDetail() {
             </Card>
           )}
 
-          {/* Next Action */}
+          {/* Decision Checkpoints */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
                 <Target className="h-4 w-4" />
-                Next Action
+                Decision Checkpoints
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+              <DecisionCheckpointPanel
+                checkpoints={{
+                  interview: role.status === 'INTERVIEWING' ? 'pending' : 
+                             ['LOI_PENDING', 'PLACED'].includes(role.status) ? 'completed' : 'pending',
+                  loi: role.status === 'LOI_PENDING' ? 'pending' : 
+                       role.status === 'PLACED' ? 'completed' : 'pending',
+                  training: role.status === 'PLACED' ? 'completed' : 'pending',
+                }}
+                compact
+              />
+              <div className="mt-4 p-3 rounded-lg bg-primary/5 border border-primary/20">
                 <p className="text-sm font-medium">
                   {role.status === 'SCOPING' && 'Complete scoping call with employer'}
                   {role.status === 'REVIEWING' && 'Review requirements and finalize spec'}

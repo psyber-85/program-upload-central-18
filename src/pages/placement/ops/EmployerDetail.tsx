@@ -16,7 +16,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
-import { StatusBadge, RoleCard } from '@/components/placement/ui';
+import { StatusBadge, RoleCard, RiskFlagBadge, LOICallout } from '@/components/placement/ui';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { BypassRiskLevel } from '@/lib/placement/types';
 import { employerRepo } from '@/lib/placement/repositories/employerRepo';
 import { roleRequestRepo } from '@/lib/placement/repositories/roleRequestRepo';
 import { noteRepo } from '@/lib/placement/repositories/noteRepo';
@@ -33,6 +41,13 @@ export function EmployerDetail() {
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [newNote, setNewNote] = useState('');
   const [loading, setLoading] = useState(true);
+  const [riskFlag, setRiskFlag] = useState<BypassRiskLevel>('low');
+
+  useEffect(() => {
+    if (company?.risk_flag) {
+      setRiskFlag(company.risk_flag);
+    }
+  }, [company]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -122,6 +137,44 @@ export function EmployerDetail() {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Program Value Lock Messaging */}
+          <LOICallout variant="info" className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20">
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              AIHQ coordinates interviews and training workflow. Training and grant coordination are provided through the AIHQ programme flow.
+            </p>
+          </LOICallout>
+
+          {/* Internal Bypass Risk Flag */}
+          <Card className="border-amber-500/30 bg-amber-500/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                Bypass Risk Assessment (Internal)
+              </CardTitle>
+              <CardDescription>Track potential programme bypass indicators</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <p className="text-sm font-medium mb-2">Current Risk Level</p>
+                  <Select value={riskFlag} onValueChange={(v) => setRiskFlag(v as BypassRiskLevel)}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low Risk</SelectItem>
+                      <SelectItem value="medium">Medium Risk</SelectItem>
+                      <SelectItem value="high">High Risk</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <RiskFlagBadge level={riskFlag} showLabel />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Flag if employer repeatedly requests contact details or tries to skip programme steps.
+              </p>
+            </CardContent>
+          </Card>
+
           {/* Company Info */}
           <Card>
             <CardHeader>

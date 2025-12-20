@@ -2,11 +2,12 @@ import { AlertTriangle, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface LOICalloutProps {
-  variant?: 'prominent' | 'subtle';
+  variant?: 'prominent' | 'subtle' | 'info';
   className?: string;
+  children?: React.ReactNode;
 }
 
-export function LOICallout({ variant = 'prominent', className }: LOICalloutProps) {
+export function LOICallout({ variant = 'prominent', className, children }: LOICalloutProps) {
   if (variant === 'prominent') {
     return (
       <div
@@ -26,6 +27,24 @@ export function LOICallout({ variant = 'prominent', className }: LOICalloutProps
               <li>• The LOI enables AIHQ to proceed with training coordination and grant workflow.</li>
               <li>• Final hiring decision is made after training completion.</li>
             </ul>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (variant === 'info') {
+    return (
+      <div
+        className={cn(
+          'rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 p-4',
+          className
+        )}
+      >
+        <div className="flex items-start gap-3">
+          <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            {children}
           </div>
         </div>
       </div>

@@ -49,6 +49,8 @@ const statusConfigs: Record<string, StatusConfig> = {
   PENDING_SIGNATURE: { label: 'Pending Signature', variant: 'outline', className: 'border-orange-500 text-orange-600' },
   SIGNED: { label: 'Signed', variant: 'default', className: 'bg-green-600' },
   UPLOADED: { label: 'Uploaded', variant: 'default', className: 'bg-green-600' },
+  HOLD: { label: 'On Hold', variant: 'outline', className: 'border-slate-500 text-slate-600' },
+  NOT_PROCEEDING: { label: 'Not Proceeding', variant: 'secondary' },
 
   // Match statuses
   PROPOSED: { label: 'Proposed', variant: 'secondary' },
@@ -60,6 +62,13 @@ const statusConfigs: Record<string, StatusConfig> = {
   PROCEEDING_TO_LOI: { label: 'Proceeding to LOI', variant: 'default', className: 'bg-green-600' },
   REJECTED: { label: 'Rejected', variant: 'destructive' },
   WITHDRAWN: { label: 'Withdrawn', variant: 'secondary' },
+  
+  // Safe exit statuses - calm, non-punitive styling
+  NOT_PROCEEDING_FIT: { label: 'Not Proceeding', variant: 'secondary', className: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' },
+  WITHDRAWN_BY_EMPLOYER: { label: 'Closed', variant: 'secondary', className: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' },
+  TRAINING_COMPLETED_NOT_HIRED: { label: 'Training Complete', variant: 'secondary', className: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' },
+  CLOSED_NO_HIRE: { label: 'Closed', variant: 'secondary', className: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' },
+  CLOSED_REPLACED_BY_ALTERNATIVE: { label: 'Replaced', variant: 'secondary', className: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' },
 
   // Grant statuses
   PENDING: { label: 'Pending', variant: 'secondary' },

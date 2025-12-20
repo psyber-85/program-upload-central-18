@@ -1,14 +1,21 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, Calendar, Briefcase, CheckCircle } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { AISkillBadge, StepTimeline, Callout } from '@/components/placement/ui';
+import { 
+  AISkillBadge, 
+  StepTimeline, 
+  Callout,
+  DecisionCheckpointPanel,
+  SafeExitDialog
+} from '@/components/placement/ui';
 import { useToast } from '@/hooks/use-toast';
 import { mockCandidates, mockMatches, mockRoleRequests } from '@/lib/placement/mockData';
 import { useAuth } from '@/lib/placement/AuthContext';
-import { AI_SKILL_LEVELS } from '@/lib/placement/types';
+import { AI_SKILL_LEVELS, CheckpointStatus, CloseReasonType } from '@/lib/placement/types';
 
 const availabilityLabels = {
   immediate: 'Available immediately',
@@ -23,6 +30,12 @@ export function CandidateProfile() {
   const { toast } = useToast();
   const { user } = useAuth();
   const companyId = user?.company_id;
+  const [safeExitOpen, setSafeExitOpen] = useState(false);
+  const [checkpointStatuses, setCheckpointStatuses] = useState<Record<string, CheckpointStatus>>({
+    interview: 'pending',
+    loi: 'pending',
+    training_completion: 'pending',
+  });
 
   // Find the candidate
   const candidate = mockCandidates.find((c) => c.id === id);
@@ -57,8 +70,40 @@ export function CandidateProfile() {
   const handleProceedToLOI = () => {
     toast({
       title: 'Proceeding to LOI',
-      description: 'AIHQ will prepare the Letter of Intent for your review.',
+      description: 'AIHQ will prepare the Letter of Intent for your review. Remember: LOI enables training coordination, hiring remains optional.',
     });
+  };
+
+  const handleCheckpointProceed = (checkpointId: string) => {
+    setCheckpointStatuses(prev => ({ ...prev, [checkpointId]: 'proceed' }));
+    if (checkpointId === 'loi') {
+      handleProceedToLOI();
+    } else {
+      toast({
+        title: 'Proceeding',
+        description: 'AIHQ will coordinate the next steps.',
+      });
+    }
+  };
+
+  const handleCheckpointHold = (checkpointId: string) => {
+    setCheckpointStatuses(prev => ({ ...prev, [checkpointId]: 'hold' }));
+    toast({
+      title: 'On hold',
+      description: 'Take your time. AIHQ will follow up when you\'re ready.',
+    });
+  };
+
+  const handleNotProceeding = () => {
+    setSafeExitOpen(true);
+  };
+
+  const handleSafeExitConfirm = (reason: CloseReasonType, notes?: string) => {
+    toast({
+      title: 'Not proceeding',
+      description: 'AIHQ will coordinate alternatives if appropriate.',
+    });
+    console.log('Safe exit:', { reason, notes });
   };
 
   // Training timeline steps (mock)
@@ -69,6 +114,28 @@ export function CandidateProfile() {
     { label: 'Placement Ready', description: candidate.placement_readiness ? 'Yes' : 'Pending' },
   ];
   const currentTrainingStep = candidate.placement_readiness ? 3 : 1;
+
+  // Build checkpoints for the panel
+  const checkpoints = [
+    {
+      id: 'interview' as const,
+      label: 'After Interview',
+      description: 'Decide whether to proceed with this candidate',
+      status: checkpointStatuses.interview,
+    },
+    {
+      id: 'loi' as const,
+      label: 'Before LOI Signing',
+      description: 'LOI enables training coordination (hiring remains optional)',
+      status: checkpointStatuses.loi,
+    },
+    {
+      id: 'training_completion' as const,
+      label: 'After Training Completion',
+      description: 'Final hiring decision',
+      status: checkpointStatuses.training_completion,
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -90,10 +157,7 @@ export function CandidateProfile() {
 
           <div className="flex gap-2">
             <Button onClick={handleRequestInterview}>
-              Request Interview
-            </Button>
-            <Button variant="outline" onClick={handleProceedToLOI}>
-              Proceed to LOI
+              Request Interview via AIHQ
             </Button>
           </div>
         </div>
@@ -105,6 +169,15 @@ export function CandidateProfile() {
           This candidate has been curated for: <strong>{matchedRole.title}</strong>
         </Callout>
       )}
+
+      {/* AIHQ Coordination Notice */}
+      <Callout variant="trust">
+        <p className="font-medium mb-1">AIHQ Coordinates All Communication</p>
+        <p className="text-sm">
+          All interviews and candidate interactions are coordinated through AIHQ. 
+          This ensures a smooth process and access to training and grant coordination.
+        </p>
+      </Callout>
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -177,11 +250,20 @@ export function CandidateProfile() {
               </CardContent>
             </Card>
           )}
+
+          {/* Decision Checkpoint Panel */}
+          <DecisionCheckpointPanel
+            checkpoints={checkpoints}
+            onProceed={handleCheckpointProceed}
+            onHold={handleCheckpointHold}
+            onNotProceeding={handleNotProceeding}
+            variant="employer"
+          />
         </div>
 
         {/* Right Column - Quick Info */}
         <div className="space-y-6">
-          {/* Quick Info Card */}
+          {/* Quick Info Card - NO CONTACT DETAILS */}
           <Card>
             <CardHeader>
               <CardTitle>Quick Info</CardTitle>
@@ -210,24 +292,16 @@ export function CandidateProfile() {
               {candidate.salary_range_display && (
                 <>
                   <Separator />
-                  <div className="flex items-start gap-3">
-                    <Briefcase className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="font-medium">Expected Salary</p>
-                      <p className="text-sm text-muted-foreground">
-                        {candidate.salary_range_display}
-                      </p>
-                    </div>
+                  <div>
+                    <p className="font-medium">Expected Salary</p>
+                    <p className="text-sm text-muted-foreground">
+                      {candidate.salary_range_display}
+                    </p>
                   </div>
                 </>
               )}
             </CardContent>
           </Card>
-
-          {/* Trust Callout */}
-          <Callout variant="trust">
-            This candidate has been screened and verified by AIHQ. We coordinate all communication and interviews.
-          </Callout>
 
           {/* Actions Card */}
           <Card>
@@ -236,18 +310,30 @@ export function CandidateProfile() {
             </CardHeader>
             <CardContent className="space-y-3">
               <Button className="w-full" onClick={handleRequestInterview}>
-                Request Interview
+                Request Interview via AIHQ
               </Button>
-              <Button variant="outline" className="w-full" onClick={handleProceedToLOI}>
-                Proceed to LOI
+              <Button 
+                variant="ghost" 
+                className="w-full text-muted-foreground"
+                onClick={handleNotProceeding}
+              >
+                Not Proceeding
               </Button>
               <p className="text-xs text-muted-foreground text-center">
-                AIHQ will coordinate all next steps
+                AIHQ coordinates all interviews and training workflow
               </p>
             </CardContent>
           </Card>
         </div>
       </div>
+
+      {/* Safe Exit Dialog */}
+      <SafeExitDialog
+        open={safeExitOpen}
+        onOpenChange={setSafeExitOpen}
+        onConfirm={handleSafeExitConfirm}
+        context="interview"
+      />
     </div>
   );
 }

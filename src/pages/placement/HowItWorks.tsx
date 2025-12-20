@@ -13,7 +13,10 @@ import {
   ArrowRight,
   Clock,
   Shield,
-  Sparkles
+  Sparkles,
+  CircleCheck,
+  PauseCircle,
+  XCircle
 } from 'lucide-react';
 
 const processSteps = [
@@ -21,7 +24,7 @@ const processSteps = [
     number: 1,
     icon: FileText,
     title: 'Submit Role Request',
-    description: 'Tell us about your hiring needs, the role requirements, and the AI skills you\'re looking for. Our team reviews every request personally.',
+    description: 'Tell us about your hiring needs, the workflow problems you want to solve, and the AI skills you\'re looking for. Our team reviews every request personally.',
     duration: 'Day 1',
   },
   {
@@ -42,15 +45,17 @@ const processSteps = [
     number: 4,
     icon: MessageSquare,
     title: 'Interview & Select',
-    description: 'Conduct interviews with your preferred candidates. AIHQ can assist with scheduling and provide interview guidance if needed.',
+    description: 'Conduct interviews with your preferred candidates. AIHQ coordinates all interviews and provides guidance if needed.',
     duration: 'Week 2-3',
+    checkpoint: 'After Interview: Choose to proceed, hold, or not proceed. AIHQ will coordinate alternatives if needed.',
   },
   {
     number: 5,
     icon: FileSignature,
     title: 'LOI & Grant Processing',
-    description: 'Once you\'ve selected a candidate, we help prepare the Letter of Intent and process any applicable grant applications.',
+    description: 'If proceeding, we help prepare the Letter of Intent (LOI) and process any applicable grant applications. LOI enables training coordination — hiring remains optional.',
     duration: 'Week 3-4',
+    checkpoint: 'Before LOI: LOI is not an employment contract. You can still decide not to proceed at any point.',
   },
   {
     number: 6,
@@ -62,9 +67,10 @@ const processSteps = [
   {
     number: 7,
     icon: CheckCircle,
-    title: 'Placement & Ongoing Support',
-    description: 'The candidate joins your organization. AIHQ remains available for any follow-up support during the initial months.',
+    title: 'Final Decision & Placement',
+    description: 'After training completion, make your final hiring decision. AIHQ remains available for any follow-up support during the initial months.',
     duration: 'Ongoing',
+    checkpoint: 'After Training: Final hiring decision is made. Not hiring is a supported option — AIHQ coordinates next steps.',
   },
 ];
 
@@ -77,12 +83,32 @@ const benefits = [
   {
     icon: Shield,
     title: 'Low Risk',
-    description: 'Candidates are pre-vetted for AI skills and work readiness before you meet them.',
+    description: 'Candidates are pre-vetted for AI skills and work readiness. Hiring decisions remain with you.',
   },
   {
     icon: Sparkles,
     title: 'Clear Next Steps',
     description: 'At every stage, you know exactly what happens next. No guesswork.',
+  },
+];
+
+const decisionCheckpoints = [
+  {
+    stage: 'After Interview',
+    icon: CircleCheck,
+    options: ['Proceed to LOI', 'Hold for now', 'Not proceeding (AIHQ will propose alternatives)'],
+  },
+  {
+    stage: 'Before LOI Signing',
+    icon: PauseCircle,
+    options: ['Request LOI', 'Hold', 'Not proceeding'],
+    note: 'LOI enables training coordination — it is not an employment contract.',
+  },
+  {
+    stage: 'After Training Completion',
+    icon: XCircle,
+    options: ['Confirm hire', 'Do not hire (fit)'],
+    note: 'Final hiring decision. AIHQ moves case to a respectful close if not hiring.',
   },
 ];
 
@@ -104,10 +130,57 @@ export function HowItWorks() {
         </div>
       </section>
 
+      {/* Decision Checkpoints Section */}
+      <section className="py-16 lg:py-24 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-2xl lg:text-3xl font-semibold text-center text-foreground mb-4">
+              Decision Checkpoints
+            </h2>
+            <p className="text-center text-muted-foreground mb-8 max-w-2xl mx-auto">
+              At key stages, you decide whether to proceed. Not proceeding is always a supported option.
+            </p>
+
+            <div className="grid md:grid-cols-3 gap-6">
+              {decisionCheckpoints.map((checkpoint, index) => (
+                <Card key={checkpoint.stage} className="border-border/50">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="text-sm font-bold text-primary">{index + 1}</span>
+                      </div>
+                      <CardTitle className="text-base">{checkpoint.stage}</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <ul className="space-y-2">
+                      {checkpoint.options.map((option, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                          <span className="text-primary mt-1">•</span>
+                          {option}
+                        </li>
+                      ))}
+                    </ul>
+                    {checkpoint.note && (
+                      <p className="text-xs text-muted-foreground bg-muted/50 rounded p-2">
+                        {checkpoint.note}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Process Steps */}
       <section className="py-16 lg:py-24 bg-background">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
+            <h2 className="text-2xl lg:text-3xl font-semibold text-center text-foreground mb-12">
+              The Full Process
+            </h2>
             <div className="space-y-8">
               {processSteps.map((step, index) => (
                 <div key={step.number} className="relative">
@@ -140,6 +213,13 @@ export function HowItWorks() {
                           <p className="text-muted-foreground">
                             {step.description}
                           </p>
+                          {step.checkpoint && (
+                            <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+                              <p className="text-sm text-amber-800 dark:text-amber-200">
+                                <strong>Checkpoint:</strong> {step.checkpoint}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </CardContent>
@@ -202,7 +282,7 @@ export function HowItWorks() {
               Ready to Get Started?
             </h2>
             <p className="text-primary-foreground/80 mb-8">
-              Submit a role request and we'll begin the process of finding the right AI talent for your team.
+              Submit a role request and we'll begin the process of finding the right AI-skilled talent for your team.
             </p>
             <Button asChild size="lg" variant="secondary" className="text-base">
               <Link to="/request-talent">

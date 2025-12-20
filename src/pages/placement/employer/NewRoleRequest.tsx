@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -47,6 +46,16 @@ const timelineOptions: { value: RoleRequestTimeline; label: string; description:
   { value: 'urgent', label: 'Urgent', description: 'Need to fill within 2 weeks' },
   { value: 'normal', label: 'Normal', description: 'Standard 4-6 week timeline' },
   { value: 'flexible', label: 'Flexible', description: 'No specific deadline' },
+];
+
+// Workplace-focused role examples
+const roleTitleExamples = [
+  'Operations Executive (AI-enabled)',
+  'Admin / PMO Coordinator (AI-enabled)',
+  'Business Analyst (AI-enabled)',
+  'Customer Support Ops (AI-enabled)',
+  'Process Automation Specialist',
+  'Marketing Ops (AI-enabled)',
 ];
 
 export function NewRoleRequest() {
@@ -122,7 +131,7 @@ export function NewRoleRequest() {
         </Button>
         <h1 className="text-2xl font-bold text-foreground">New Role Request</h1>
         <p className="text-muted-foreground">
-          Tell us about the AI talent you need
+          Tell us about the workflow problems you want to solve with AI-skilled talent
         </p>
       </div>
 
@@ -142,8 +151,11 @@ export function NewRoleRequest() {
                   <FormItem>
                     <FormLabel>Role Title</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. AI Operations Specialist" {...field} />
+                      <Input placeholder="e.g. Operations Executive (AI-enabled)" {...field} />
                     </FormControl>
+                    <FormDescription>
+                      Examples: {roleTitleExamples.slice(0, 3).join(', ')}
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -157,29 +169,29 @@ export function NewRoleRequest() {
                   <FormItem>
                     <FormLabel>Department</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. Operations, Marketing, IT" {...field} />
+                      <Input placeholder="e.g. Operations, Marketing, HR, Customer Service" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {/* Problem Statement */}
+              {/* Problem Statement - Business-focused */}
               <FormField
                 control={form.control}
                 name="problem_statement"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>What problem are you hiring to solve?</FormLabel>
+                    <FormLabel>What workflow problem are you solving?</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Describe the business challenge or opportunity this role will address..."
+                        placeholder="Describe the business challenge or workflow improvement you need. For example: 'We need to reduce time spent on manual reporting and automate customer query responses.'"
                         className="min-h-[120px]"
                         {...field}
                       />
                     </FormControl>
                     <FormDescription>
-                      Help us understand your needs so we can find the best-fit candidates
+                      Help us understand the productivity gains you're looking for so we can find the best-fit candidates
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -256,7 +268,7 @@ export function NewRoleRequest() {
                     <FormLabel>Additional Notes (Optional)</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Any other requirements or preferences..."
+                        placeholder="Any other requirements, team context, or preferences..."
                         className="min-h-[80px]"
                         {...field}
                       />

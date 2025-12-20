@@ -4,62 +4,63 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AISkillBadge, Callout } from '@/components/placement/ui';
 import { ArrowRight, CheckCircle, Lightbulb, Target } from 'lucide-react';
 
+// WORKPLACE AI SKILL LEVELS - NOT engineering
 const skillLevels = [
   {
     level: 'L1' as const,
-    name: 'AI Aware',
-    tagline: 'Understanding AI Fundamentals',
-    description: 'Professionals at this level have a foundational understanding of AI concepts and can use simple AI-powered tools effectively.',
+    name: 'AI Awareness (Workplace)',
+    tagline: 'Understanding AI Basics for Work',
+    description: 'Professionals at this level understand AI basics, use ChatGPT safely for drafting and summarising, and can follow company AI policies and best practices.',
     capabilities: [
-      'Understands basic AI terminology and concepts',
-      'Can use AI-powered productivity tools (e.g., Grammarly, smart assistants)',
-      'Recognizes opportunities where AI could add value',
-      'Aware of AI ethics and responsible use principles',
+      'Understands basic AI concepts and safe usage principles',
+      'Uses AI tools like ChatGPT for drafting emails, meeting notes, and summaries',
+      'Follows company policies on data sensitivity and AI usage',
+      'Recognizes opportunities where AI could improve daily tasks',
     ],
-    suitableFor: 'Roles requiring general AI literacy and tool adoption across departments.',
+    suitableFor: 'Roles requiring general AI literacy and basic tool adoption across any department.',
   },
   {
     level: 'L2' as const,
-    name: 'AI User',
+    name: 'AI Workplace User',
     tagline: 'Proficient Daily AI Usage',
-    description: 'These professionals actively use AI tools as part of their daily workflow and understand prompt engineering basics.',
+    description: 'These professionals use AI daily to improve output quality and speed, create repeatable prompting workflows, and understand data sensitivity in AI interactions.',
     capabilities: [
-      'Proficient with ChatGPT, Copilot, and similar tools',
-      'Understands prompt engineering fundamentals',
-      'Can evaluate AI outputs for accuracy and relevance',
-      'Integrates AI tools into existing workflows effectively',
+      'Uses AI tools daily to improve work quality and speed',
+      'Creates and documents repeatable prompting workflows',
+      'Understands data sensitivity and appropriate AI usage',
+      'Applies AI to routine tasks like reporting, documentation, and communication',
       'Trains colleagues on basic AI tool usage',
     ],
-    suitableFor: 'Knowledge workers, analysts, content creators, and customer-facing roles.',
+    suitableFor: 'Admin, operations, customer service, and knowledge worker roles seeking productivity gains.',
   },
   {
     level: 'L3' as const,
-    name: 'AI Builder',
-    tagline: 'Building & Customizing AI Solutions',
-    description: 'Technical professionals who can build, customize, and deploy AI-powered solutions for business problems.',
+    name: 'AI Workflow Automation Specialist',
+    tagline: 'Building AI-Powered Workflows (Non-Engineering)',
+    description: 'Specialists who build AI-supported workflows using no-code/low-code tools, integrate with common apps like CRM, docs, and sheets, and create SOPs for measurable productivity gains.',
     capabilities: [
-      'Builds custom AI workflows and automations',
-      'Integrates AI APIs into applications',
-      'Fine-tunes and customizes AI models for specific use cases',
-      'Develops internal AI tools and prototypes',
-      'Manages AI project implementation end-to-end',
+      'Builds AI-supported workflows using no-code/low-code platforms',
+      'Integrates AI tools with common business apps (CRM, docs, sheets)',
+      'Creates SOPs and documentation for AI-powered processes',
+      'Measures and reports productivity improvements',
+      'Designs automation solutions for recurring business challenges',
     ],
-    suitableFor: 'Technical roles, product teams, operations, and innovation-focused positions.',
+    suitableFor: 'Process improvement, operations optimization, and business systems roles.',
   },
   {
     level: 'L4' as const,
-    name: 'AI Architect',
-    tagline: 'Strategic AI Leadership',
-    description: 'Expert-level professionals who design AI systems, set organizational AI strategy, and lead AI transformation initiatives.',
+    name: 'AI Adoption Lead (Business)',
+    tagline: 'Leading AI Adoption in Teams',
+    description: 'Leaders who drive AI adoption across teams, define use cases, train others, set governance policies, and coordinate AI solution needs with vendors and consultants. They do not build models but enable others to leverage AI effectively.',
     capabilities: [
-      'Designs scalable AI system architectures',
-      'Develops organizational AI strategy and roadmaps',
-      'Leads and mentors AI teams',
-      'Evaluates and selects AI technologies and vendors',
-      'Ensures AI governance, compliance, and ethics',
-      'Drives AI adoption across the organization',
+      'Leads AI adoption initiatives within teams and departments',
+      'Defines and prioritizes AI use cases for business impact',
+      'Trains and mentors team members on AI tools and workflows',
+      'Sets governance policies for responsible AI usage',
+      'Coordinates with vendors and consultants on AI solutions',
+      'Measures and communicates business value from AI adoption',
     ],
-    suitableFor: 'Leadership roles, CTO/CDO offices, and strategic transformation initiatives.',
+    suitableFor: 'Team leads, department heads, and transformation roles driving workplace AI adoption.',
   },
 ];
 
@@ -74,8 +75,12 @@ export function AISkillFramework() {
               The AI Skill Framework
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              A structured approach to understanding and specifying AI capabilities. 
-              From awareness to architecture, find the right skill level for your needs.
+              A structured approach to workplace AI capabilities. 
+              From awareness to adoption leadership — find the right skill level for your business needs.
+            </p>
+            <p className="text-sm text-muted-foreground mt-4 max-w-xl mx-auto">
+              This framework focuses on <strong>AI-augmented business roles</strong> — professionals who use AI tools 
+              to improve productivity, not engineers who build AI systems.
             </p>
           </div>
         </div>
@@ -85,7 +90,7 @@ export function AISkillFramework() {
       <section className="py-8 bg-background">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto">
-            <div className="grid grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               {skillLevels.map((skill) => (
                 <Card key={skill.level} className="text-center p-4 border-border/50">
                   <AISkillBadge level={skill.level} size="lg" />
@@ -209,7 +214,7 @@ export function AISkillFramework() {
                   <div>
                     <p className="font-medium mb-1">Not Sure Which Level?</p>
                     <p className="text-sm">
-                      Describe the role and what you want the person to accomplish with AI. 
+                      Describe the workflow problems you want to solve and what you want the person to accomplish. 
                       AIHQ will recommend the appropriate skill level based on your requirements.
                     </p>
                   </div>
@@ -228,7 +233,7 @@ export function AISkillFramework() {
               Request Talent with Specific AI Skills
             </h2>
             <p className="text-primary-foreground/80 mb-8">
-              Tell us what AI capabilities you need, and we'll find candidates who match your requirements.
+              Tell us what workflow challenges you need to solve, and we'll find candidates who match your requirements.
             </p>
             <Button asChild size="lg" variant="secondary" className="text-base">
               <Link to="/request-talent">

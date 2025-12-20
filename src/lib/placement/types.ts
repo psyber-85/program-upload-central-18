@@ -14,19 +14,33 @@ export type UserRole =
 export const EMPLOYER_ROLES: UserRole[] = ['employer_owner', 'employer_hr'];
 export const AIHQ_ROLES: UserRole[] = ['aihq_admin', 'aihq_placement_ops', 'aihq_training_ops'];
 
-// AI Skill Levels
+// AI Skill Levels - WORKPLACE AI FOCUSED (NOT engineering)
 export type AISkillLevel = 'L1' | 'L2' | 'L3' | 'L4';
 
 export const AI_SKILL_LEVELS: Record<AISkillLevel, { label: string; description: string }> = {
-  L1: { label: 'AI Aware', description: 'Basic understanding of AI concepts and tools' },
-  L2: { label: 'AI User', description: 'Proficient in using AI tools for daily tasks' },
-  L3: { label: 'AI Builder', description: 'Can build and customize AI solutions' },
-  L4: { label: 'AI Architect', description: 'Expert in designing AI systems and strategy' },
+  L1: { 
+    label: 'AI Awareness (Workplace)', 
+    description: 'Understands AI basics, uses ChatGPT safely for drafting/summarising, follows company policies' 
+  },
+  L2: { 
+    label: 'AI Workplace User', 
+    description: 'Uses AI daily to improve output quality/speed, creates repeatable prompting workflows, understands data sensitivity' 
+  },
+  L3: { 
+    label: 'AI Workflow Automation Specialist', 
+    description: 'Builds AI-supported workflows using no-code/low-code tools, integrates with common apps via automation platforms' 
+  },
+  L4: { 
+    label: 'AI Adoption Lead (Business)', 
+    description: 'Leads AI adoption in teams, defines use cases, trains others, sets governance, coordinates with vendors' 
+  },
 };
 
 // ============================================
 // Employer Entities
 // ============================================
+
+export type BypassRiskLevel = 'low' | 'medium' | 'high';
 
 export interface EmployerCompany {
   id: string;
@@ -36,6 +50,7 @@ export interface EmployerCompany {
   location: string;
   primary_contact_id: string;
   notes?: string;
+  risk_flag?: BypassRiskLevel; // Internal only - bypass risk assessment
   created_at: string;
   updated_at: string;
 }
@@ -111,6 +126,7 @@ export interface CandidateProfile {
   public_summary: string;
   internal_summary?: string;
   tags: string[];
+  is_briefed_on_program?: boolean; // Internal only - candidate briefed on AIHQ programme coordination
   created_at: string;
   updated_at: string;
 }
@@ -118,6 +134,18 @@ export interface CandidateProfile {
 // ============================================
 // Match & Pipeline
 // ============================================
+
+export type CloseReasonType = 
+  | 'not_proceeding_fit' 
+  | 'withdrawn' 
+  | 'replaced' 
+  | 'training_completed_no_hire'
+  | 'other';
+
+export interface CloseReason {
+  type: CloseReasonType;
+  notes?: string;
+}
 
 export type MatchStatus =
   | 'PROPOSED'
@@ -128,7 +156,13 @@ export type MatchStatus =
   | 'EMPLOYER_INTERESTED'
   | 'PROCEEDING_TO_LOI'
   | 'REJECTED'
-  | 'WITHDRAWN';
+  | 'WITHDRAWN'
+  // Safe exit statuses - non-punitive closes
+  | 'NOT_PROCEEDING_FIT'
+  | 'WITHDRAWN_BY_EMPLOYER'
+  | 'TRAINING_COMPLETED_NOT_HIRED'
+  | 'CLOSED_NO_HIRE'
+  | 'CLOSED_REPLACED_BY_ALTERNATIVE';
 
 export interface MatchRecord {
   id: string;
@@ -139,8 +173,22 @@ export interface MatchRecord {
   interview_status?: string;
   next_action?: string;
   owner_id?: string;
+  close_reason?: CloseReason; // For safe exit tracking
   created_at: string;
   updated_at: string;
+}
+
+// ============================================
+// Decision Checkpoints
+// ============================================
+
+export type CheckpointStatus = 'pending' | 'proceed' | 'hold' | 'not_proceeding';
+
+export interface DecisionCheckpoint {
+  checkpoint: 'interview' | 'loi' | 'training_completion';
+  status: CheckpointStatus;
+  decided_at?: string;
+  notes?: string;
 }
 
 // ============================================
@@ -152,7 +200,9 @@ export type LOIStatus =
   | 'PENDING_REVIEW'
   | 'PENDING_SIGNATURE'
   | 'SIGNED'
-  | 'UPLOADED';
+  | 'UPLOADED'
+  | 'HOLD'
+  | 'NOT_PROCEEDING';
 
 export interface LOIRecord {
   id: string;
@@ -163,6 +213,7 @@ export interface LOIRecord {
   generated_at?: string;
   signed_at?: string;
   file_url_placeholder?: string;
+  employer_acknowledged?: boolean; // Employer acknowledged LOI ≠ employment
   created_at: string;
   updated_at: string;
 }

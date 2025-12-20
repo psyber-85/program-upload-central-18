@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FileSignature, Search, Upload, FileText, Check, Clock, Send } from 'lucide-react';
+import { FileSignature, Search, Upload, FileText, Check, Clock, Send, Bell } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,7 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { StatusBadge, GenerateDraftButton, FileUploadStub } from '@/components/placement/ui';
+import { StatusBadge, GenerateDraftButton, FileUploadStub, LOICallout } from '@/components/placement/ui';
+import { toast } from 'sonner';
 import { loiRepo } from '@/lib/placement/repositories/loiRepo';
 import { candidateRepo } from '@/lib/placement/repositories/candidateRepo';
 import { roleRequestRepo } from '@/lib/placement/repositories/roleRequestRepo';
@@ -102,6 +103,14 @@ export function LOIQueue() {
         <h1 className="text-2xl font-bold">LOI Queue</h1>
         <p className="text-muted-foreground">Manage Letters of Intent</p>
       </div>
+
+      {/* Internal Doctrine Reminder */}
+      <LOICallout variant="info" className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20">
+        <p className="text-sm text-blue-800 dark:text-blue-200">
+          <strong>Internal Reminder:</strong> LOI ≠ employment contract. The LOI enables AIHQ to proceed with training coordination 
+          and grant workflow (subject to approval). Final hiring decision remains with employer.
+        </p>
+      </LOICallout>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -272,10 +281,19 @@ export function LOIQueue() {
                             />
                           )}
                           {loi.status === 'PENDING_SIGNATURE' && (
-                            <FileUploadStub
-                              label="Upload Signed"
-                              onUpload={() => handleStatusChange(loi.id, 'SIGNED')}
-                            />
+                            <>
+                              <FileUploadStub
+                                label="Upload Signed"
+                                onUpload={() => handleStatusChange(loi.id, 'SIGNED')}
+                              />
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => toast.success('LOI reminder sent to employer')}
+                              >
+                                <Bell className="h-4 w-4" />
+                              </Button>
+                            </>
                           )}
                           <Button variant="ghost" size="sm">
                             View

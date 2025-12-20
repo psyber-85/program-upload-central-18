@@ -24,7 +24,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { StatusBadge, AISkillBadge, StepTimeline } from '@/components/placement/ui';
+import { StatusBadge, AISkillBadge, StepTimeline, RiskFlagBadge } from '@/components/placement/ui';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { candidateRepo } from '@/lib/placement/repositories/candidateRepo';
 import { matchRepo } from '@/lib/placement/repositories/matchRepo';
 import { roleRequestRepo } from '@/lib/placement/repositories/roleRequestRepo';
@@ -55,6 +57,13 @@ export function OpsCandidateProfile() {
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [newNote, setNewNote] = useState('');
   const [loading, setLoading] = useState(true);
+  const [isBriefed, setIsBriefed] = useState(false);
+
+  useEffect(() => {
+    if (candidate) {
+      setIsBriefed(candidate.is_briefed_on_program ?? false);
+    }
+  }, [candidate]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -208,11 +217,28 @@ export function OpsCandidateProfile() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
                 <MessageSquare className="h-5 w-5" />
-                Internal Notes
+                Internal Notes & Controls
               </CardTitle>
               <CardDescription>Visible only to ops team</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Program Briefing Checkbox */}
+              <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                <div className="flex items-center space-x-3">
+                  <Checkbox
+                    id="briefed"
+                    checked={isBriefed}
+                    onCheckedChange={(checked) => setIsBriefed(checked as boolean)}
+                  />
+                  <Label htmlFor="briefed" className="text-sm font-medium cursor-pointer">
+                    Candidate briefed: placement is coordinated via AIHQ programme
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2 ml-6">
+                  Mark when candidate understands the programme coordination process
+                </p>
+              </div>
+
               {candidate.internal_summary && (
                 <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
                   <p className="text-sm font-medium mb-1">Internal Summary</p>

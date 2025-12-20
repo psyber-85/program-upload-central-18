@@ -8,12 +8,14 @@ import {
   AlertTriangle,
   ArrowRight,
   Building2,
-  Clock
+  Clock,
+  CalendarCheck,
+  XCircle
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { KPIStatCard, StatusBadge } from '@/components/placement/ui';
+import { KPIStatCard, StatusBadge, LOICallout } from '@/components/placement/ui';
 import { roleRequestRepo } from '@/lib/placement/repositories/roleRequestRepo';
 import { candidateRepo } from '@/lib/placement/repositories/candidateRepo';
 import { matchRepo } from '@/lib/placement/repositories/matchRepo';
@@ -62,6 +64,8 @@ export function OpsDashboard() {
   const pendingMatches = matches.filter(m => ['PROPOSED', 'EMPLOYER_REVIEWING', 'INTERVIEW_REQUESTED'].includes(m.match_status));
   const loisInProgress = lois.filter(l => l.status !== 'SIGNED');
   const activeEnrollments = enrollments.filter(e => e.status === 'IN_PROGRESS');
+  const interviewsPending = matches.filter(m => ['INTERVIEW_REQUESTED', 'INTERVIEW_SCHEDULED'].includes(m.match_status));
+  const closedNotProceeding = matches.filter(m => ['NOT_PROCEEDING_FIT', 'WITHDRAWN_BY_EMPLOYER', 'CLOSED_NO_HIRE', 'TRAINING_COMPLETED_NOT_HIRED', 'CLOSED_REPLACED_BY_ALTERNATIVE'].includes(m.match_status));
 
   if (loading) {
     return (
@@ -95,15 +99,22 @@ export function OpsDashboard() {
         </div>
       </div>
 
+      {/* Internal Reminder */}
+      <LOICallout variant="info" className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20">
+        <p className="text-sm text-blue-800 dark:text-blue-200">
+          <strong>Reminder:</strong> LOI ≠ employment. Hiring decisions remain with employers. Safe exits are normal and supported.
+        </p>
+      </LOICallout>
+
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
         <KPIStatCard
-          label="Active Role Requests"
+          label="Active Roles"
           value={activeRoles.length}
           icon={FileText}
         />
         <KPIStatCard
-          label="Candidates in Pipeline"
+          label="Pipeline Ready"
           value={candidates.filter(c => c.placement_readiness).length}
           icon={Users}
         />
@@ -113,14 +124,26 @@ export function OpsDashboard() {
           icon={GitMerge}
         />
         <KPIStatCard
-          label="LOIs in Progress"
+          label="Interviews Pending"
+          value={interviewsPending.length}
+          icon={CalendarCheck}
+          variant={interviewsPending.length > 5 ? 'warning' : 'default'}
+        />
+        <KPIStatCard
+          label="LOI Pending"
           value={loisInProgress.length}
           icon={FileSignature}
+          variant={loisInProgress.length > 3 ? 'warning' : 'default'}
         />
         <KPIStatCard
           label="Active Training"
           value={activeEnrollments.length}
           icon={GraduationCap}
+        />
+        <KPIStatCard
+          label="Closed (Not Proceeding)"
+          value={closedNotProceeding.length}
+          icon={XCircle}
         />
         <KPIStatCard
           label="Overdue Tasks"

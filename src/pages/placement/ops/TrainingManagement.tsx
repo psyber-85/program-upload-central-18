@@ -39,8 +39,8 @@ export function TrainingManagement() {
   useEffect(() => {
     const loadData = async () => {
       const [programsData, enrollmentsData, candidatesData] = await Promise.all([
-        trainingRepo.getAllPrograms(),
-        trainingRepo.getAllEnrollments(),
+        trainingRepo.getPrograms(),
+        trainingRepo.getEnrollments(),
         candidateRepo.getAll(),
       ]);
       setPrograms(programsData);

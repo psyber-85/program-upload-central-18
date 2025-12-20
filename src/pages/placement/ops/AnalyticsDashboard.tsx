@@ -69,7 +69,6 @@ export function AnalyticsDashboard() {
     L2: candidates.filter((c) => c.ai_skill_level === 'L2').length,
     L3: candidates.filter((c) => c.ai_skill_level === 'L3').length,
     L4: candidates.filter((c) => c.ai_skill_level === 'L4').length,
-    L5: candidates.filter((c) => c.ai_skill_level === 'L5').length,
   };
 
   // Candidate pool by status

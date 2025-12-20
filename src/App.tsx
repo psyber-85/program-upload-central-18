@@ -38,15 +38,22 @@ import {
   Settings as EmployerSettings,
 } from './pages/placement/employer';
 
-// Placeholder pages (for remaining phases - Ops Cockpit)
-const PlaceholderPage = ({ title }: { title: string }) => (
-  <div className="flex items-center justify-center min-h-[60vh]">
-    <div className="text-center">
-      <h1 className="text-2xl font-bold mb-2">{title}</h1>
-      <p className="text-muted-foreground">Coming soon</p>
-    </div>
-  </div>
-);
+// Phase 4: Ops Cockpit
+import {
+  OpsDashboard,
+  EmployersList,
+  EmployerDetail,
+  RoleRequestsList,
+  OpsRoleDetail,
+  CandidatesList,
+  OpsCandidateProfile,
+  MatchesOverview,
+  LOIQueue,
+  TrainingManagement,
+  GrantsManagement,
+  TemplatesPage,
+  AnalyticsDashboard,
+} from './pages/placement/ops';
 
 const queryClient = new QueryClient();
 
@@ -106,19 +113,19 @@ const App = () => (
                 </ProtectedRoute>
               }
             >
-              <Route index element={<PlaceholderPage title="Ops Dashboard" />} />
-              <Route path="employers" element={<PlaceholderPage title="All Employers" />} />
-              <Route path="employers/:id" element={<PlaceholderPage title="Employer Details" />} />
-              <Route path="roles" element={<PlaceholderPage title="All Role Requests" />} />
-              <Route path="roles/:id" element={<PlaceholderPage title="Role Details" />} />
-              <Route path="candidates" element={<PlaceholderPage title="All Candidates" />} />
-              <Route path="candidates/:id" element={<PlaceholderPage title="Candidate Profile" />} />
-              <Route path="matches" element={<PlaceholderPage title="Matches" />} />
-              <Route path="loi" element={<PlaceholderPage title="LOI Queue" />} />
-              <Route path="training" element={<PlaceholderPage title="Training" />} />
-              <Route path="grants" element={<PlaceholderPage title="Grants" />} />
-              <Route path="templates" element={<PlaceholderPage title="Templates" />} />
-              <Route path="analytics" element={<PlaceholderPage title="Analytics" />} />
+              <Route index element={<OpsDashboard />} />
+              <Route path="employers" element={<EmployersList />} />
+              <Route path="employers/:id" element={<EmployerDetail />} />
+              <Route path="roles" element={<RoleRequestsList />} />
+              <Route path="roles/:id" element={<OpsRoleDetail />} />
+              <Route path="candidates" element={<CandidatesList />} />
+              <Route path="candidates/:id" element={<OpsCandidateProfile />} />
+              <Route path="matches" element={<MatchesOverview />} />
+              <Route path="loi" element={<LOIQueue />} />
+              <Route path="training" element={<TrainingManagement />} />
+              <Route path="grants" element={<GrantsManagement />} />
+              <Route path="templates" element={<TemplatesPage />} />
+              <Route path="analytics" element={<AnalyticsDashboard />} />
             </Route>
 
             {/* ============================================ */}

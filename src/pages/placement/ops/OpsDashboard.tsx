@@ -42,7 +42,7 @@ export function OpsDashboard() {
         candidateRepo.getAll(),
         matchRepo.getAll(),
         loiRepo.getAll(),
-        trainingRepo.getAllEnrollments(),
+        trainingRepo.getEnrollments(),
         taskRepo.getOverdue(),
         activityRepo.getRecent(10),
       ]);
@@ -98,41 +98,35 @@ export function OpsDashboard() {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <KPIStatCard
-          title="Active Role Requests"
+          label="Active Role Requests"
           value={activeRoles.length}
-          subtitle={`${roleRequests.filter(r => r.status === 'SCOPING').length} in scoping`}
           icon={FileText}
         />
         <KPIStatCard
-          title="Candidates in Pipeline"
+          label="Candidates in Pipeline"
           value={candidates.filter(c => c.placement_readiness).length}
-          subtitle={`${candidates.length} total`}
           icon={Users}
         />
         <KPIStatCard
-          title="Pending Matches"
+          label="Pending Matches"
           value={pendingMatches.length}
-          subtitle="Awaiting action"
           icon={GitMerge}
         />
         <KPIStatCard
-          title="LOIs in Progress"
+          label="LOIs in Progress"
           value={loisInProgress.length}
-          subtitle={`${lois.filter(l => l.status === 'SIGNED').length} signed`}
           icon={FileSignature}
         />
         <KPIStatCard
-          title="Active Training"
+          label="Active Training"
           value={activeEnrollments.length}
-          subtitle="Enrollments"
           icon={GraduationCap}
         />
         <KPIStatCard
-          title="Overdue Tasks"
+          label="Overdue Tasks"
           value={overdueTasks.length}
-          subtitle="Need attention"
           icon={AlertTriangle}
-          className={overdueTasks.length > 0 ? 'border-destructive/50' : ''}
+          variant={overdueTasks.length > 0 ? 'danger' : 'default'}
         />
       </div>
 
@@ -195,9 +189,9 @@ export function OpsDashboard() {
                   >
                     <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm">{activity.description}</p>
+                      <p className="text-sm">{activity.action}</p>
                       <p className="text-xs text-muted-foreground">
-                        {format(new Date(activity.created_at), 'MMM d, h:mm a')} · {activity.actor_name}
+                        {format(new Date(activity.timestamp), 'MMM d, h:mm a')} · {activity.actor}
                       </p>
                     </div>
                   </div>

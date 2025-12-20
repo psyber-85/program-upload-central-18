@@ -44,7 +44,7 @@ const mockGrants: GrantCase[] = [
     status: 'SUBMITTED',
     notes: 'All documents submitted, awaiting WSG review',
     created_at: '2024-03-01T08:00:00Z',
-    updated_at: '2024-03-20T10:00:00Z',
+    last_updated: '2024-03-20T10:00:00Z',
   },
   {
     id: 'grant-002',
@@ -53,7 +53,7 @@ const mockGrants: GrantCase[] = [
     status: 'APPROVED',
     notes: 'Approved for RM 15,000 training subsidy',
     created_at: '2024-02-15T09:00:00Z',
-    updated_at: '2024-03-15T11:00:00Z',
+    last_updated: '2024-03-15T11:00:00Z',
   },
   {
     id: 'grant-003',
@@ -62,7 +62,7 @@ const mockGrants: GrantCase[] = [
     status: 'COMPLETED',
     notes: 'Grant disbursed successfully',
     created_at: '2024-01-20T10:00:00Z',
-    updated_at: '2024-03-10T12:00:00Z',
+    last_updated: '2024-03-10T12:00:00Z',
   },
 ];
 
@@ -117,7 +117,7 @@ export function GrantsManagement() {
   const handleStatusChange = (grantId: string, newStatus: GrantCase['status']) => {
     setGrants((prev) =>
       prev.map((g) =>
-        g.id === grantId ? { ...g, status: newStatus, updated_at: new Date().toISOString() } : g
+        g.id === grantId ? { ...g, status: newStatus, last_updated: new Date().toISOString() } : g
       )
     );
   };
@@ -125,7 +125,7 @@ export function GrantsManagement() {
   const handleSaveNote = (grantId: string) => {
     setGrants((prev) =>
       prev.map((g) =>
-        g.id === grantId ? { ...g, notes: noteValue, updated_at: new Date().toISOString() } : g
+        g.id === grantId ? { ...g, notes: noteValue, last_updated: new Date().toISOString() } : g
       )
     );
     setEditingNote(null);
@@ -291,7 +291,7 @@ export function GrantsManagement() {
                         </p>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {format(new Date(grant.updated_at), 'MMM d, yyyy')}
+                        {format(new Date(grant.last_updated), 'MMM d, yyyy')}
                       </TableCell>
                       <TableCell>
                         <Dialog>

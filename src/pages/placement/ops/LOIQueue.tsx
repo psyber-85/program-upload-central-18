@@ -268,7 +268,7 @@ export function LOIQueue() {
                         <div className="flex items-center gap-2">
                           {loi.status === 'DRAFT' && (
                             <GenerateDraftButton
-                              onClick={() => handleStatusChange(loi.id, 'PENDING_REVIEW')}
+                              onGenerate={() => handleStatusChange(loi.id, 'PENDING_REVIEW')}
                             />
                           )}
                           {loi.status === 'PENDING_SIGNATURE' && (

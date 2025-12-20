@@ -70,7 +70,7 @@ export function OpsCandidateProfile() {
         matchRepo.getByCandidate(id),
         roleRequestRepo.getAll(),
         trainingRepo.getEnrollmentsByCandidate(id),
-        trainingRepo.getAllPrograms(),
+        trainingRepo.getPrograms(),
         noteRepo.getByEntity('candidate', id),
         activityRepo.getByEntity('candidate', id),
       ]);
@@ -98,8 +98,8 @@ export function OpsCandidateProfile() {
       entity_type: 'candidate',
       entity_id: id,
       content: newNote,
-      author_id: 'ops-user',
-      author_name: 'Ops User',
+      author: 'Ops User',
+      internal_only: true,
     });
     const updatedNotes = await noteRepo.getByEntity('candidate', id);
     setNotes(updatedNotes);
@@ -238,7 +238,7 @@ export function OpsCandidateProfile() {
                       <div key={note.id} className="p-3 rounded-lg bg-muted/50">
                         <p className="text-sm">{note.content}</p>
                         <p className="text-xs text-muted-foreground mt-2">
-                          {note.author_name} · {format(new Date(note.created_at), 'MMM d, h:mm a')}
+                          {note.author} · {format(new Date(note.created_at), 'MMM d, h:mm a')}
                         </p>
                       </div>
                     ))}
@@ -417,9 +417,9 @@ export function OpsCandidateProfile() {
                     <div key={activity.id} className="flex gap-3">
                       <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />
                       <div>
-                        <p className="text-sm">{activity.description}</p>
+                        <p className="text-sm">{activity.action}</p>
                         <p className="text-xs text-muted-foreground">
-                          {format(new Date(activity.created_at), 'MMM d, h:mm a')}
+                          {format(new Date(activity.timestamp), 'MMM d, h:mm a')}
                         </p>
                       </div>
                     </div>

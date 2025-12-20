@@ -26,7 +26,19 @@ import { AISkillFramework } from "./pages/placement/AISkillFramework";
 import { RequestTalent } from "./pages/placement/RequestTalent";
 import { Contact } from "./pages/placement/Contact";
 
-// Placeholder pages (for remaining phases)
+// Phase 3: Employer Portal
+import {
+  EmployerDashboard,
+  RolesList,
+  NewRoleRequest,
+  RoleDetail,
+  CandidateProfile,
+  LOIStatus,
+  TrainingOverview,
+  Settings as EmployerSettings,
+} from './pages/placement/employer';
+
+// Placeholder pages (for remaining phases - Ops Cockpit)
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="flex items-center justify-center min-h-[60vh]">
     <div className="text-center">
@@ -71,14 +83,14 @@ const App = () => (
                 </ProtectedRoute>
               }
             >
-              <Route index element={<PlaceholderPage title="Placement Overview" />} />
-              <Route path="roles" element={<PlaceholderPage title="Role Requests" />} />
-              <Route path="roles/new" element={<PlaceholderPage title="New Role Request" />} />
-              <Route path="roles/:id" element={<PlaceholderPage title="Role Details" />} />
-              <Route path="candidates/:id" element={<PlaceholderPage title="Candidate Profile" />} />
-              <Route path="loi/:id" element={<PlaceholderPage title="LOI Status" />} />
-              <Route path="training" element={<PlaceholderPage title="Training Overview" />} />
-              <Route path="settings" element={<PlaceholderPage title="Settings" />} />
+              <Route index element={<EmployerDashboard />} />
+              <Route path="roles" element={<RolesList />} />
+              <Route path="roles/new" element={<NewRoleRequest />} />
+              <Route path="roles/:id" element={<RoleDetail />} />
+              <Route path="candidates/:id" element={<CandidateProfile />} />
+              <Route path="loi/:id" element={<LOIStatus />} />
+              <Route path="training" element={<TrainingOverview />} />
+              <Route path="settings" element={<EmployerSettings />} />
             </Route>
 
             {/* ============================================ */}

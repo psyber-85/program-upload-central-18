@@ -1,17 +1,20 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 // Public pages
 import PublicHome from "./pages/PublicHome";
 import NotFound from "./pages/NotFound";
 
-// Staff pages
-import StaffLayout from "./components/staff/StaffLayout";
-import StaffDashboard from "./pages/staff/StaffDashboard";
+// Staff Portal
+import PortalLayout from "./components/staff/PortalLayout";
+import StaffHome from "./pages/staff/StaffHome";
+
+// Marketing Portal
+import MarketingLayout from "./components/marketing/MarketingLayout";
+import MarketingDashboard from "./pages/staff/marketing/MarketingDashboard";
 import Index from "./pages/Index";
 import BirthdayDashboard from "./pages/BirthdayDashboard";
 import RegisterTracker from "./pages/RegisterTracker";
@@ -29,9 +32,14 @@ const App = () => (
           {/* Public routes */}
           <Route path="/" element={<PublicHome />} />
           
-          {/* Staff portal routes */}
-          <Route path="/staff" element={<StaffLayout />}>
-            <Route index element={<StaffDashboard />} />
+          {/* Staff Portal routes */}
+          <Route path="/staff" element={<PortalLayout />}>
+            <Route index element={<StaffHome />} />
+          </Route>
+          
+          {/* Marketing Portal routes (nested under /staff/marketing) */}
+          <Route path="/staff/marketing" element={<MarketingLayout />}>
+            <Route index element={<MarketingDashboard />} />
             <Route path="participant-manager" element={<Index />} />
             <Route path="birthday-dashboard" element={<BirthdayDashboard />} />
             <Route path="register-tracker" element={<RegisterTracker />} />

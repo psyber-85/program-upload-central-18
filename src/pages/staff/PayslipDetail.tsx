@@ -24,9 +24,8 @@ const PayslipDetail = () => {
     if (!id) return;
     setIsLoading(true);
     try {
-      const allPayslips = await payrollLocalRepo.getPayslips();
-      const found = allPayslips.find(p => p.id === id);
-      setPayslip(found || null);
+      const found = await payrollLocalRepo.getPayslipById(id);
+      setPayslip(found);
     } catch (error) {
       console.error('Failed to load payslip:', error);
     } finally {

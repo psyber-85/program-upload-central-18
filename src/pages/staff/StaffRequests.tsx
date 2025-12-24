@@ -26,7 +26,11 @@ const StaffRequests = () => {
     if (!user) return;
     setIsLoading(true);
     try {
-      const allRequests = await requestsLocalRepo.getAllRequests();
+      const [leaveRequests, claimRequests] = await Promise.all([
+        requestsLocalRepo.getAllLeaveRequests(),
+        requestsLocalRepo.getAllClaimRequests(),
+      ]);
+      const allRequests: AnyRequest[] = [...leaveRequests, ...claimRequests];
       const filtered = isAdmin && filter === 'all' 
         ? allRequests 
         : allRequests.filter(r => r.userId === user.id);

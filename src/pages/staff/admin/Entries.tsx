@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { entriesLocalRepo } from '@/lib/dal/localStorage/EntriesLocalRepo';
 import { useAuth } from '@/contexts/AuthContext';
-import { Invoice, Bill } from '@/lib/dal/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Invoice, Bill, Quotation } from '@/lib/dal/types';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,15 +13,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Plus, FileText, Receipt, CheckCircle, Clock, Send, Loader2 } from 'lucide-react';
+import { Plus, FileText, Receipt, CheckCircle, Clock, Send, Loader2, FileCheck, XCircle, User } from 'lucide-react';
 import { format } from 'date-fns';
 
 const Entries = () => {
   const { user } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
+  const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('invoices');
+  const [creatorFilter, setCreatorFilter] = useState<string>('all');
   
   // Invoice dialog state
   const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
@@ -45,18 +47,48 @@ const Entries = () => {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [allInvoices, allBills] = await Promise.all([
+      const [allInvoices, allBills, allQuotations] = await Promise.all([
         entriesLocalRepo.getAllInvoices(),
         entriesLocalRepo.getAllBills(),
+        entriesLocalRepo.getAllQuotations(),
       ]);
       setInvoices(allInvoices);
       setBills(allBills);
+      setQuotations(allQuotations);
     } catch (error) {
       console.error('Failed to load entries:', error);
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Get unique creators for filter
+  const uniqueCreators = React.useMemo(() => {
+    const creators = new Map<string, string>();
+    invoices.forEach(inv => {
+      if (inv.creatorName) {
+        creators.set(inv.createdBy, inv.creatorName);
+      }
+    });
+    quotations.forEach(q => {
+      if (q.creatorName) {
+        creators.set(q.createdBy, q.creatorName);
+      }
+    });
+    return Array.from(creators.entries()).map(([id, name]) => ({ id, name }));
+  }, [invoices, quotations]);
+
+  // Filter invoices by creator
+  const filteredInvoices = React.useMemo(() => {
+    if (creatorFilter === 'all') return invoices;
+    return invoices.filter(inv => inv.createdBy === creatorFilter);
+  }, [invoices, creatorFilter]);
+
+  // Filter quotations by creator
+  const filteredQuotations = React.useMemo(() => {
+    if (creatorFilter === 'all') return quotations;
+    return quotations.filter(q => q.createdBy === creatorFilter);
+  }, [quotations, creatorFilter]);
 
   const handleCreateInvoice = async () => {
     if (!user || !invoiceClient || !invoiceAmount || !invoiceDescription) {
@@ -74,6 +106,7 @@ const Entries = () => {
     try {
       await entriesLocalRepo.createInvoice({
         createdBy: user.id,
+        creatorName: user.name,
         businessArm: invoiceBusinessArm,
         clientName: invoiceClient,
         issueDate: format(new Date(), 'yyyy-MM-dd'),
@@ -167,6 +200,21 @@ const Entries = () => {
     setBillAmount('');
   };
 
+  const getQuotationStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Accepted':
+        return <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50"><CheckCircle className="h-3 w-3 mr-1" />Accepted</Badge>;
+      case 'Converted':
+        return <Badge variant="outline" className="text-purple-600 border-purple-300 bg-purple-50"><FileCheck className="h-3 w-3 mr-1" />Converted</Badge>;
+      case 'Sent':
+        return <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-50"><Send className="h-3 w-3 mr-1" />Sent</Badge>;
+      case 'Rejected':
+        return <Badge variant="outline" className="text-red-600 border-red-300 bg-red-50"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>;
+      default:
+        return <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50"><Clock className="h-3 w-3 mr-1" />Draft</Badge>;
+    }
+  };
+
   const getInvoiceStatusBadge = (status: string) => {
     switch (status) {
       case 'Paid':
@@ -183,101 +231,122 @@ const Entries = () => {
       <div className="max-w-6xl mx-auto">
         <header className="mb-6">
           <h1 className="text-2xl font-bold text-foreground">Entries</h1>
-          <p className="text-muted-foreground">Manage invoices and bills</p>
+          <p className="text-muted-foreground">Manage invoices, quotations, and bills</p>
         </header>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <TabsList>
               <TabsTrigger value="invoices">Invoices</TabsTrigger>
+              <TabsTrigger value="quotations">Quotations</TabsTrigger>
               <TabsTrigger value="bills">Bills</TabsTrigger>
             </TabsList>
-            {activeTab === 'invoices' ? (
-              <Dialog open={showInvoiceDialog} onOpenChange={setShowInvoiceDialog}>
-                <DialogTrigger asChild>
-                  <Button><Plus className="h-4 w-4 mr-2" />New Invoice</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Create Invoice</DialogTitle>
-                    <DialogDescription>Add a new invoice entry</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    <div className="space-y-2">
-                      <Label>Client Name</Label>
-                      <Input value={invoiceClient} onChange={(e) => setInvoiceClient(e.target.value)} placeholder="ABC Corp" />
+            
+            <div className="flex items-center gap-2 flex-wrap">
+              {(activeTab === 'invoices' || activeTab === 'quotations') && uniqueCreators.length > 0 && (
+                <Select value={creatorFilter} onValueChange={setCreatorFilter}>
+                  <SelectTrigger className="w-[180px]">
+                    <User className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Filter by creator" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Creators</SelectItem>
+                    {uniqueCreators.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              
+              {activeTab === 'invoices' && (
+                <Dialog open={showInvoiceDialog} onOpenChange={setShowInvoiceDialog}>
+                  <DialogTrigger asChild>
+                    <Button><Plus className="h-4 w-4 mr-2" />New Invoice</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create Invoice</DialogTitle>
+                      <DialogDescription>Add a new invoice entry</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 mt-4">
+                      <div className="space-y-2">
+                        <Label>Client Name</Label>
+                        <Input value={invoiceClient} onChange={(e) => setInvoiceClient(e.target.value)} placeholder="ABC Corp" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Business Arm</Label>
+                        <Select value={invoiceBusinessArm} onValueChange={(v) => setInvoiceBusinessArm(v as any)}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Training">Training</SelectItem>
+                            <SelectItem value="Solutions">Solutions</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Amount (RM)</Label>
+                        <Input type="number" value={invoiceAmount} onChange={(e) => setInvoiceAmount(e.target.value)} placeholder="0.00" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Description</Label>
+                        <Input value={invoiceDescription} onChange={(e) => setInvoiceDescription(e.target.value)} placeholder="Service description" />
+                      </div>
+                      <Button onClick={handleCreateInvoice} className="w-full" disabled={isCreatingInvoice}>
+                        {isCreatingInvoice && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        Create Invoice
+                      </Button>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Business Arm</Label>
-                      <Select value={invoiceBusinessArm} onValueChange={(v) => setInvoiceBusinessArm(v as any)}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Training">Training</SelectItem>
-                          <SelectItem value="Solutions">Solutions</SelectItem>
-                        </SelectContent>
-                      </Select>
+                  </DialogContent>
+                </Dialog>
+              )}
+              
+              {activeTab === 'bills' && (
+                <Dialog open={showBillDialog} onOpenChange={setShowBillDialog}>
+                  <DialogTrigger asChild>
+                    <Button><Plus className="h-4 w-4 mr-2" />New Bill</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create Bill</DialogTitle>
+                      <DialogDescription>Add a new bill entry</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 mt-4">
+                      <div className="space-y-2">
+                        <Label>Vendor Name</Label>
+                        <Input value={billVendor} onChange={(e) => setBillVendor(e.target.value)} placeholder="AWS" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Category</Label>
+                        <Select value={billCategory} onValueChange={setBillCategory}>
+                          <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Utilities">Utilities</SelectItem>
+                            <SelectItem value="Cloud Services">Cloud Services</SelectItem>
+                            <SelectItem value="Office Rent">Office Rent</SelectItem>
+                            <SelectItem value="Software">Software</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Amount (RM)</Label>
+                        <Input type="number" value={billAmount} onChange={(e) => setBillAmount(e.target.value)} placeholder="0.00" />
+                      </div>
+                      <Button onClick={handleCreateBill} className="w-full" disabled={isCreatingBill}>
+                        {isCreatingBill && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        Create Bill
+                      </Button>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Amount (RM)</Label>
-                      <Input type="number" value={invoiceAmount} onChange={(e) => setInvoiceAmount(e.target.value)} placeholder="0.00" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Description</Label>
-                      <Input value={invoiceDescription} onChange={(e) => setInvoiceDescription(e.target.value)} placeholder="Service description" />
-                    </div>
-                    <Button onClick={handleCreateInvoice} className="w-full" disabled={isCreatingInvoice}>
-                      {isCreatingInvoice && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      Create Invoice
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            ) : (
-              <Dialog open={showBillDialog} onOpenChange={setShowBillDialog}>
-                <DialogTrigger asChild>
-                  <Button><Plus className="h-4 w-4 mr-2" />New Bill</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Create Bill</DialogTitle>
-                    <DialogDescription>Add a new bill entry</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 mt-4">
-                    <div className="space-y-2">
-                      <Label>Vendor Name</Label>
-                      <Input value={billVendor} onChange={(e) => setBillVendor(e.target.value)} placeholder="AWS" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Category</Label>
-                      <Select value={billCategory} onValueChange={setBillCategory}>
-                        <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Utilities">Utilities</SelectItem>
-                          <SelectItem value="Cloud Services">Cloud Services</SelectItem>
-                          <SelectItem value="Office Rent">Office Rent</SelectItem>
-                          <SelectItem value="Software">Software</SelectItem>
-                          <SelectItem value="Other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Amount (RM)</Label>
-                      <Input type="number" value={billAmount} onChange={(e) => setBillAmount(e.target.value)} placeholder="0.00" />
-                    </div>
-                    <Button onClick={handleCreateBill} className="w-full" disabled={isCreatingBill}>
-                      {isCreatingBill && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      Create Bill
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            )}
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
           </div>
 
           <TabsContent value="invoices">
             {isLoading ? (
               <Card><CardContent className="p-6"><Skeleton className="h-64 w-full" /></CardContent></Card>
-            ) : invoices.length === 0 ? (
+            ) : filteredInvoices.length === 0 ? (
               <Card className="text-center py-12">
                 <CardContent>
                   <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -292,6 +361,7 @@ const Entries = () => {
                       <TableRow>
                         <TableHead>Invoice #</TableHead>
                         <TableHead>Client</TableHead>
+                        <TableHead>Created By</TableHead>
                         <TableHead>Business Arm</TableHead>
                         <TableHead className="text-right">Total</TableHead>
                         <TableHead>Status</TableHead>
@@ -299,10 +369,16 @@ const Entries = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {invoices.map((invoice) => (
+                      {filteredInvoices.map((invoice) => (
                         <TableRow key={invoice.id}>
                           <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                           <TableCell>{invoice.clientName || '-'}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <User className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-sm">{invoice.creatorName || 'Unknown'}</span>
+                            </div>
+                          </TableCell>
                           <TableCell><Badge variant="secondary">{invoice.businessArm}</Badge></TableCell>
                           <TableCell className="text-right">RM {invoice.total.toLocaleString()}</TableCell>
                           <TableCell>{getInvoiceStatusBadge(invoice.status)}</TableCell>
@@ -321,6 +397,53 @@ const Entries = () => {
                               )}
                             </div>
                           </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="quotations">
+            {isLoading ? (
+              <Card><CardContent className="p-6"><Skeleton className="h-64 w-full" /></CardContent></Card>
+            ) : filteredQuotations.length === 0 ? (
+              <Card className="text-center py-12">
+                <CardContent>
+                  <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">No quotations yet</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Quotation #</TableHead>
+                        <TableHead>Client</TableHead>
+                        <TableHead>Created By</TableHead>
+                        <TableHead>Business Arm</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredQuotations.map((quotation) => (
+                        <TableRow key={quotation.id}>
+                          <TableCell className="font-medium">{quotation.quotationNumber}</TableCell>
+                          <TableCell>{quotation.clientName || '-'}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <User className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-sm">{quotation.creatorName || 'Unknown'}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell><Badge variant="secondary">{quotation.businessArm}</Badge></TableCell>
+                          <TableCell className="text-right">RM {quotation.total.toLocaleString()}</TableCell>
+                          <TableCell>{getQuotationStatusBadge(quotation.status)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

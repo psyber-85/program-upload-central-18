@@ -7,6 +7,7 @@ import {
   LeaveBalance,
   Invoice,
   Bill,
+  Quotation,
   PayrollRun,
   PayrollItem,
   Payslip,
@@ -234,6 +235,7 @@ export const seedInvoices: Invoice[] = [
   {
     id: 'inv-001',
     createdBy: 'user-admin-001',
+    creatorName: 'Ahmad Rizal',
     invoiceNumber: 'INV00001',
     businessArm: 'Training',
     clientName: 'ABC Corp',
@@ -252,6 +254,7 @@ export const seedInvoices: Invoice[] = [
   {
     id: 'inv-002',
     createdBy: 'user-admin-001',
+    creatorName: 'Ahmad Rizal',
     invoiceNumber: 'INV00002',
     businessArm: 'Solutions',
     clientName: 'XYZ Sdn Bhd',
@@ -268,7 +271,8 @@ export const seedInvoices: Invoice[] = [
   },
   {
     id: 'inv-003',
-    createdBy: 'user-admin-001',
+    createdBy: 'user-staff-001',
+    creatorName: 'Siti Nurhaliza',
     invoiceNumber: 'INV00003',
     businessArm: 'Training',
     clientName: 'DEF Industries',
@@ -284,7 +288,8 @@ export const seedInvoices: Invoice[] = [
   },
   {
     id: 'inv-004',
-    createdBy: 'user-admin-001',
+    createdBy: 'user-staff-002',
+    creatorName: 'Wani Ibrahim',
     invoiceNumber: 'INV00004',
     businessArm: 'Solutions',
     issueDate: '2024-12-20',
@@ -295,6 +300,48 @@ export const seedInvoices: Invoice[] = [
     total: 20000,
     createdAt: '2024-12-20T15:00:00Z',
     updatedAt: '2024-12-20T15:00:00Z',
+  },
+];
+
+// ============================================
+// QUOTATIONS
+// ============================================
+
+export const seedQuotations: Quotation[] = [
+  {
+    id: 'quo-001',
+    createdBy: 'user-staff-001',
+    creatorName: 'Siti Nurhaliza',
+    quotationNumber: 'QUO00001',
+    businessArm: 'Training',
+    clientName: 'MegaCorp Sdn Bhd',
+    issueDate: '2024-12-15',
+    validUntil: '2025-01-15',
+    status: 'Sent',
+    items: [
+      { description: 'Leadership Workshop (3 days)', quantity: 1, unitPrice: 15000, total: 15000 },
+    ],
+    total: 15000,
+    createdAt: '2024-12-15T10:00:00Z',
+    updatedAt: '2024-12-15T10:00:00Z',
+  },
+  {
+    id: 'quo-002',
+    createdBy: 'user-staff-002',
+    creatorName: 'Wani Ibrahim',
+    quotationNumber: 'QUO00002',
+    businessArm: 'Solutions',
+    clientName: 'TechStart Ventures',
+    issueDate: '2024-12-18',
+    validUntil: '2025-01-18',
+    status: 'Draft',
+    items: [
+      { description: 'Custom CRM Development', quantity: 1, unitPrice: 25000, total: 25000 },
+      { description: 'Training & Support (6 months)', quantity: 1, unitPrice: 5000, total: 5000 },
+    ],
+    total: 30000,
+    createdAt: '2024-12-18T14:00:00Z',
+    updatedAt: '2024-12-18T14:00:00Z',
   },
 ];
 

@@ -1,10 +1,11 @@
 import { EntriesRepo } from '../interfaces/EntriesRepo';
-import { Invoice, Bill, InvoiceStatus, BillStatus, AppSettings } from '../types';
+import { Invoice, Bill, Quotation, InvoiceStatus, BillStatus, QuotationStatus, AppSettings } from '../types';
 import { delay, generateId, now, storageGet, storageSet, getMonthFromDate } from '../utils';
-import { seedInvoices, seedBills, seedSettings } from '../seed/seedData';
+import { seedInvoices, seedBills, seedQuotations, seedSettings } from '../seed/seedData';
 
 const INVOICES_KEY = 'invoices';
 const BILLS_KEY = 'bills';
+const QUOTATIONS_KEY = 'quotations';
 const SETTINGS_KEY = 'app_settings';
 
 export class EntriesLocalRepo implements EntriesRepo {
@@ -22,6 +23,14 @@ export class EntriesLocalRepo implements EntriesRepo {
 
   private saveBills(bills: Bill[]): void {
     storageSet(BILLS_KEY, bills);
+  }
+
+  private getQuotations(): Quotation[] {
+    return storageGet<Quotation[]>(QUOTATIONS_KEY, seedQuotations);
+  }
+
+  private saveQuotations(quotations: Quotation[]): void {
+    storageSet(QUOTATIONS_KEY, quotations);
   }
 
   private getSettingsData(): AppSettings {
@@ -118,6 +127,124 @@ export class EntriesLocalRepo implements EntriesRepo {
   async getUnpaidInvoicesCount(): Promise<number> {
     await delay();
     return this.getInvoices().filter(i => i.status !== 'Paid').length;
+  }
+
+  // ============================================
+  // QUOTATIONS
+  // ============================================
+
+  async getAllQuotations(): Promise<Quotation[]> {
+    await delay();
+    return this.getQuotations().sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }
+
+  async getQuotationsByUser(userId: string): Promise<Quotation[]> {
+    await delay();
+    return this.getQuotations()
+      .filter(q => q.createdBy === userId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async getQuotationById(id: string): Promise<Quotation | null> {
+    await delay();
+    return this.getQuotations().find(q => q.id === id) || null;
+  }
+
+  async createQuotation(quotation: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'quotationNumber'>): Promise<Quotation> {
+    await delay();
+    const quotations = this.getQuotations();
+    const quotationNumber = await this.getNextQuotationNumber();
+    
+    const newQuotation: Quotation = {
+      ...quotation,
+      id: generateId(),
+      quotationNumber,
+      createdAt: now(),
+      updatedAt: now(),
+    };
+    
+    quotations.push(newQuotation);
+    this.saveQuotations(quotations);
+    
+    return newQuotation;
+  }
+
+  async updateQuotation(id: string, updates: Partial<Quotation>): Promise<Quotation | null> {
+    await delay();
+    const quotations = this.getQuotations();
+    const index = quotations.findIndex(q => q.id === id);
+    
+    if (index === -1) {
+      return null;
+    }
+    
+    quotations[index] = { 
+      ...quotations[index], 
+      ...updates, 
+      updatedAt: now() 
+    };
+    this.saveQuotations(quotations);
+    
+    return quotations[index];
+  }
+
+  async updateQuotationStatus(id: string, status: QuotationStatus): Promise<Quotation | null> {
+    return this.updateQuotation(id, { status });
+  }
+
+  async convertQuotationToInvoice(quotationId: string): Promise<Invoice | null> {
+    await delay();
+    const quotation = await this.getQuotationById(quotationId);
+    if (!quotation || quotation.status === 'Converted') {
+      return null;
+    }
+
+    // Create invoice from quotation
+    const invoice = await this.createInvoice({
+      createdBy: quotation.createdBy,
+      creatorName: quotation.creatorName,
+      businessArm: quotation.businessArm,
+      clientName: quotation.clientName,
+      issueDate: now().split('T')[0],
+      status: 'Draft',
+      items: quotation.items,
+      total: quotation.total,
+      quotationId: quotation.id,
+    });
+
+    // Update quotation status
+    await this.updateQuotation(quotationId, { 
+      status: 'Converted', 
+      convertedInvoiceId: invoice.id 
+    });
+
+    return invoice;
+  }
+
+  async getNextQuotationNumber(): Promise<string> {
+    const settings = this.getSettingsData();
+    const currentYear = new Date().getFullYear();
+    
+    // Use quotationCounter if exists, else default to 0
+    let counter = (settings as any).quotationCounter || 0;
+    let counterYear = (settings as any).quotationCounterYear || currentYear;
+    
+    // Reset counter if new year
+    if (counterYear !== currentYear) {
+      counterYear = currentYear;
+      counter = 0;
+    }
+    
+    counter += 1;
+    this.saveSettings({ 
+      ...settings, 
+      quotationCounter: counter, 
+      quotationCounterYear: counterYear 
+    } as any);
+    
+    return `QUO${String(counter).padStart(5, '0')}`;
   }
 
   // ============================================

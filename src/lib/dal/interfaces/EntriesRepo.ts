@@ -1,4 +1,4 @@
-import { Invoice, Bill, InvoiceStatus, BillStatus, BusinessArm, AppSettings } from '../types';
+import { Invoice, Bill, Quotation, InvoiceStatus, BillStatus, QuotationStatus, BusinessArm, AppSettings } from '../types';
 
 export interface EntriesRepo {
   // ============================================
@@ -31,6 +31,34 @@ export interface EntriesRepo {
   
   // Get unpaid invoices count
   getUnpaidInvoicesCount(): Promise<number>;
+  
+  // ============================================
+  // QUOTATIONS
+  // ============================================
+  
+  // Get all quotations (admin)
+  getAllQuotations(): Promise<Quotation[]>;
+  
+  // Get quotations by user (staff - own only)
+  getQuotationsByUser(userId: string): Promise<Quotation[]>;
+  
+  // Get quotation by ID
+  getQuotationById(id: string): Promise<Quotation | null>;
+  
+  // Create quotation
+  createQuotation(quotation: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'quotationNumber'>): Promise<Quotation>;
+  
+  // Update quotation
+  updateQuotation(id: string, updates: Partial<Quotation>): Promise<Quotation | null>;
+  
+  // Update quotation status
+  updateQuotationStatus(id: string, status: QuotationStatus): Promise<Quotation | null>;
+  
+  // Convert quotation to invoice
+  convertQuotationToInvoice(quotationId: string): Promise<Invoice | null>;
+  
+  // Get next quotation number
+  getNextQuotationNumber(): Promise<string>;
   
   // ============================================
   // BILLS

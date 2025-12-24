@@ -5,11 +5,13 @@ import { statsLocalRepo } from '@/lib/dal/localStorage/StatsLocalRepo';
 import { requestsLocalRepo } from '@/lib/dal/localStorage/RequestsLocalRepo';
 import { entriesLocalRepo } from '@/lib/dal/localStorage/EntriesLocalRepo';
 import { payrollLocalRepo } from '@/lib/dal/localStorage/PayrollLocalRepo';
-import { MonthlyStats, AnyRequest, Payslip } from '@/lib/dal/types';
+import { staffLocalRepo } from '@/lib/dal/localStorage/StaffLocalRepo';
+import { MonthlyStats, AnyRequest, Payslip, LeaveBalance, TrainingEntitlement } from '@/lib/dal/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Progress } from '@/components/ui/progress';
 import { 
   Megaphone, 
   FileText, 
@@ -25,9 +27,10 @@ import {
   TrendingUp,
   TrendingDown,
   Clock,
-  ChevronRight
+  ChevronRight,
+  GraduationCap
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO, isBefore } from 'date-fns';
 
 const StaffHome = () => {
   const { user, isAdmin } = useAuth();
@@ -36,6 +39,8 @@ const StaffHome = () => {
   const [recentPayslips, setRecentPayslips] = useState<Payslip[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [unpaidInvoicesCount, setUnpaidInvoicesCount] = useState(0);
+  const [leaveBalance, setLeaveBalance] = useState<LeaveBalance | null>(null);
+  const [trainingEntitlement, setTrainingEntitlement] = useState<TrainingEntitlement | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -47,6 +52,7 @@ const StaffHome = () => {
     setIsLoading(true);
     try {
       const currentMonth = format(new Date(), 'yyyy-MM');
+      const currentYear = new Date().getFullYear();
       
       // Load stats
       const monthlyStats = await statsLocalRepo.getMonthlyStats(currentMonth);
@@ -59,6 +65,14 @@ const StaffHome = () => {
       // Load payslips
       const payslips = await payrollLocalRepo.getPayslipsByUser(user.id);
       setRecentPayslips(payslips.slice(0, 2));
+
+      // Load leave balance
+      const balance = await staffLocalRepo.getLeaveBalance(user.id, currentYear);
+      setLeaveBalance(balance);
+
+      // Load training entitlement
+      const entitlement = await staffLocalRepo.getTrainingEntitlement(user.id);
+      setTrainingEntitlement(entitlement);
       
       // Admin-only data
       if (isAdmin) {
@@ -80,6 +94,25 @@ const StaffHome = () => {
     return format(new Date(parseInt(year), parseInt(m) - 1), 'MMM');
   };
 
+  const getLeaveRemaining = (type: 'AL' | 'SL') => {
+    if (!leaveBalance) return 0;
+    if (type === 'AL') {
+      return leaveBalance.alTotal + leaveBalance.alCarryForward - leaveBalance.alUsed;
+    }
+    return leaveBalance.slTotal - leaveBalance.slUsed;
+  };
+
+  const getTrainingRemaining = () => {
+    if (!trainingEntitlement) return 0;
+    return (trainingEntitlement.overrideBalance ?? trainingEntitlement.annualAmount) - trainingEntitlement.usedAmount;
+  };
+
+  const isTrainingEligible = () => {
+    if (!trainingEntitlement) return false;
+    const eligibleDate = parseISO(trainingEntitlement.eligibleFrom);
+    return trainingEntitlement.overrideEligible || isBefore(eligibleDate, new Date());
+  };
+
   const netProfit = stats ? stats.revenue - stats.expenses : 0;
   const isProfit = netProfit >= 0;
 
@@ -94,6 +127,77 @@ const StaffHome = () => {
             Here's what's happening at AIHQ
           </p>
         </header>
+
+        {/* Leave & Training Balance Cards */}
+        {!isAdmin && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {isLoading ? (
+              <>
+                {[1, 2, 3].map((i) => (
+                  <Card key={i}>
+                    <CardContent className="p-4">
+                      <Skeleton className="h-4 w-20 mb-2" />
+                      <Skeleton className="h-6 w-16" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </>
+            ) : (
+              <>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-muted-foreground flex items-center gap-1">
+                        <Calendar className="h-3 w-3" /> Annual Leave
+                      </span>
+                      <span className="text-sm font-medium">{getLeaveRemaining('AL')} days</span>
+                    </div>
+                    <Progress 
+                      value={leaveBalance ? ((leaveBalance.alTotal + leaveBalance.alCarryForward - leaveBalance.alUsed) / (leaveBalance.alTotal + leaveBalance.alCarryForward)) * 100 : 0} 
+                      className="h-2"
+                    />
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-muted-foreground flex items-center gap-1">
+                        <Calendar className="h-3 w-3" /> Sick Leave
+                      </span>
+                      <span className="text-sm font-medium">{getLeaveRemaining('SL')} days</span>
+                    </div>
+                    <Progress 
+                      value={leaveBalance ? ((leaveBalance.slTotal - leaveBalance.slUsed) / leaveBalance.slTotal) * 100 : 0} 
+                      className="h-2"
+                    />
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-muted-foreground flex items-center gap-1">
+                        <GraduationCap className="h-3 w-3" /> Training Fund
+                      </span>
+                      {isTrainingEligible() ? (
+                        <span className="text-sm font-medium">RM {getTrainingRemaining().toLocaleString()}</span>
+                      ) : (
+                        <Badge variant="outline" className="text-xs">
+                          Eligible {trainingEntitlement ? format(parseISO(trainingEntitlement.eligibleFrom), 'MMM yyyy') : 'after 1 year'}
+                        </Badge>
+                      )}
+                    </div>
+                    {isTrainingEligible() && trainingEntitlement && (
+                      <Progress 
+                        value={(getTrainingRemaining() / trainingEntitlement.annualAmount) * 100} 
+                        className="h-2"
+                      />
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Quick Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -441,7 +545,7 @@ const StaffHome = () => {
                   </CardHeader>
                   <CardContent>
                     <CardDescription className="text-base">
-                      Staff management and portal settings.
+                      Staff management and configuration.
                       <Badge variant="outline" className="ml-2 text-xs">Admin</Badge>
                     </CardDescription>
                   </CardContent>
@@ -449,23 +553,6 @@ const StaffHome = () => {
               </Link>
             </>
           )}
-        </div>
-
-        {/* IT Support */}
-        <div className="mt-8">
-          <Card className="border-dashed">
-            <CardContent className="flex items-center justify-between py-4">
-              <div className="flex items-center gap-3">
-                <span className="text-muted-foreground">Need IT support?</span>
-              </div>
-              <Button variant="outline" size="sm" asChild>
-                <a href="mailto:wani@theaihq.net?subject=IT%20Support%20Request">
-                  Email IT Support
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </a>
-              </Button>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </div>

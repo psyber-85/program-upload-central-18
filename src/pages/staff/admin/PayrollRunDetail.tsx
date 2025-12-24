@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { payrollLocalRepo } from '@/lib/dal/localStorage/PayrollLocalRepo';
 import { staffLocalRepo } from '@/lib/dal/localStorage/StaffLocalRepo';
-import { PayrollRun, PayrollItem, UserProfile } from '@/lib/dal/types';
+import { requestsLocalRepo } from '@/lib/dal/localStorage/RequestsLocalRepo';
+import { PayrollRun, PayrollItem, UserProfile, ClaimRequest } from '@/lib/dal/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -52,11 +53,31 @@ const PayrollRunDetail = () => {
       // Get all active staff
       const activeStaff = await staffLocalRepo.getActiveStaff();
       
+      // Get approved claims for payroll (not yet included in any payroll)
+      const approvedClaims = await requestsLocalRepo.getApprovedClaimsForPayroll(run.month);
+      
+      // Group claims by userId
+      const claimsByUser: Record<string, ClaimRequest[]> = {};
+      for (const claim of approvedClaims) {
+        if (!claimsByUser[claim.userId]) {
+          claimsByUser[claim.userId] = [];
+        }
+        claimsByUser[claim.userId].push(claim);
+      }
+      
       // Generate payroll items for each staff
       for (const staff of activeStaff) {
         const epf = Math.round(staff.salaryBase * (staff.epfRate / 100));
         const socso = Math.round(staff.salaryBase * (staff.socsoRate / 100));
-        const netPay = staff.salaryBase - epf - socso;
+        
+        // Calculate claims for this staff member
+        const staffClaims = claimsByUser[staff.id] || [];
+        const claimsTotal = staffClaims.reduce((sum, claim) => sum + claim.amount, 0);
+        
+        // TODO: Add training claims when training claim feature is complete
+        const trainingClaimsTotal = 0;
+        
+        const netPay = staff.salaryBase - epf - socso + claimsTotal + trainingClaimsTotal;
         
         await payrollLocalRepo.addPayrollItem({
           runId: run.id,
@@ -65,13 +86,13 @@ const PayrollRunDetail = () => {
           baseSalary: staff.salaryBase,
           epf,
           socso,
-          claimsTotal: 0,
-          trainingClaimsTotal: 0,
+          claimsTotal,
+          trainingClaimsTotal,
           netPay,
         });
       }
       
-      toast({ title: 'Payroll items generated!' });
+      toast({ title: 'Payroll items generated with claims!' });
       loadData();
     } catch (error) {
       toast({ title: 'Failed to generate items', variant: 'destructive' });
@@ -84,6 +105,14 @@ const PayrollRunDetail = () => {
     if (!run || items.length === 0) return;
     setIsFinalizing(true);
     try {
+      // Get approved claims to mark as included
+      const approvedClaims = await requestsLocalRepo.getApprovedClaimsForPayroll(run.month);
+      
+      // Mark all included claims
+      for (const claim of approvedClaims) {
+        await requestsLocalRepo.markClaimIncludedInPayroll(claim.id, run.month);
+      }
+      
       // Finalize the run
       await payrollLocalRepo.finalizePayrollRun(run.id);
       
@@ -104,7 +133,7 @@ const PayrollRunDetail = () => {
       
       toast({ 
         title: 'Payroll finalized!',
-        description: 'Payslips have been created. Email notifications would be sent via SendGrid.',
+        description: `Payslips created and ${approvedClaims.length} claims marked as paid.`,
       });
       navigate('/staff/payroll');
     } catch (error) {

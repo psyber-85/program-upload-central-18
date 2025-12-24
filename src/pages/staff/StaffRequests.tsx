@@ -2,21 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { requestsLocalRepo } from '@/lib/dal/localStorage/RequestsLocalRepo';
-import { AnyRequest } from '@/lib/dal/types';
+import { AnyRequest, TrainingApplication } from '@/lib/dal/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Clock, CheckCircle, XCircle, ChevronRight } from 'lucide-react';
+import { Plus, Clock, CheckCircle, XCircle, ChevronRight, GraduationCap } from 'lucide-react';
 import { format } from 'date-fns';
+
+type DisplayRequest = (AnyRequest | TrainingApplication) & { displayType: 'Leave' | 'Claim' | 'Training' };
 
 const StaffRequests = () => {
   const { user, isAdmin } = useAuth();
-  const [requests, setRequests] = useState<AnyRequest[]>([]);
+  const [requests, setRequests] = useState<DisplayRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'mine'>('mine');
-  const [typeFilter, setTypeFilter] = useState<'All' | 'Leave' | 'Claim'>('All');
+  const [typeFilter, setTypeFilter] = useState<'All' | 'Leave' | 'Claim' | 'Training'>('All');
 
   useEffect(() => {
     loadRequests();
@@ -26,14 +28,22 @@ const StaffRequests = () => {
     if (!user) return;
     setIsLoading(true);
     try {
-      const [leaveRequests, claimRequests] = await Promise.all([
+      const [leaveRequests, claimRequests, trainingApps] = await Promise.all([
         requestsLocalRepo.getAllLeaveRequests(),
         requestsLocalRepo.getAllClaimRequests(),
+        requestsLocalRepo.getAllTrainingApplications(),
       ]);
-      const allRequests: AnyRequest[] = [...leaveRequests, ...claimRequests];
+
+      const allRequests: DisplayRequest[] = [
+        ...leaveRequests.map(r => ({ ...r, displayType: 'Leave' as const })),
+        ...claimRequests.map(r => ({ ...r, displayType: 'Claim' as const })),
+        ...trainingApps.map(r => ({ ...r, displayType: 'Training' as const, status: (r.status === 'Submitted' ? 'Pending' : r.status) as any })),
+      ];
+
       const filtered = isAdmin && filter === 'all' 
         ? allRequests 
         : allRequests.filter(r => r.userId === user.id);
+      
       setRequests(filtered.sort((a, b) => 
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       ));
@@ -45,28 +55,36 @@ const StaffRequests = () => {
   };
 
   const filteredRequests = requests.filter(r => 
-    typeFilter === 'All' || r.type === typeFilter
+    typeFilter === 'All' || r.displayType === typeFilter
   );
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'Pending':
+      case 'Submitted':
         return <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50"><Clock className="h-3 w-3 mr-1" /> Pending</Badge>;
       case 'Approved':
         return <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50"><CheckCircle className="h-3 w-3 mr-1" /> Approved</Badge>;
       case 'Rejected':
         return <Badge variant="outline" className="text-red-600 border-red-300 bg-red-50"><XCircle className="h-3 w-3 mr-1" /> Rejected</Badge>;
+      case 'Completed':
+        return <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-50"><CheckCircle className="h-3 w-3 mr-1" /> Completed</Badge>;
+      case 'Claimed':
+        return <Badge variant="outline" className="text-purple-600 border-purple-300 bg-purple-50"><CheckCircle className="h-3 w-3 mr-1" /> Claimed</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
   };
 
-  const getRequestSummary = (request: AnyRequest) => {
-    if (request.type === 'Leave') {
+  const getRequestSummary = (request: DisplayRequest) => {
+    if (request.displayType === 'Leave' && 'leaveType' in request) {
       return `${request.leaveType} Leave: ${format(new Date(request.startDate), 'MMM d')} - ${format(new Date(request.endDate), 'MMM d, yyyy')}`;
     }
-    if (request.type === 'Claim') {
+    if (request.displayType === 'Claim' && 'amount' in request && 'category' in request) {
       return `${request.category}: RM ${request.amount.toFixed(2)}`;
+    }
+    if (request.displayType === 'Training' && 'courseName' in request) {
+      return `${request.courseName} (RM ${request.cost.toLocaleString()})`;
     }
     return 'Request';
   };
@@ -111,6 +129,10 @@ const StaffRequests = () => {
             <TabsTrigger value="All">All</TabsTrigger>
             <TabsTrigger value="Leave">Leave</TabsTrigger>
             <TabsTrigger value="Claim">Claims</TabsTrigger>
+            <TabsTrigger value="Training">
+              <GraduationCap className="h-3 w-3 mr-1" />
+              Training
+            </TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -145,7 +167,7 @@ const StaffRequests = () => {
                   <CardContent className="p-4 flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <Badge variant="secondary" className="text-xs">{request.type}</Badge>
+                        <Badge variant="secondary" className="text-xs">{request.displayType}</Badge>
                         {getStatusBadge(request.status)}
                       </div>
                       <p className="font-medium truncate">{getRequestSummary(request)}</p>

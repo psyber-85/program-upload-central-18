@@ -102,6 +102,10 @@ export class EntriesLocalRepo implements EntriesRepo {
     return this.updateInvoiceStatus(id, 'Paid', paidDate);
   }
 
+  async markInvoiceSent(id: string): Promise<Invoice | null> {
+    return this.updateInvoiceStatus(id, 'Sent');
+  }
+
   async getPaidInvoicesForMonth(month: string): Promise<Invoice[]> {
     await delay();
     return this.getInvoices().filter(i => 

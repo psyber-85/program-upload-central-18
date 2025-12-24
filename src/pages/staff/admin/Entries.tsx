@@ -134,6 +134,16 @@ const Entries = () => {
     }
   };
 
+  const handleMarkInvoiceSent = async (id: string) => {
+    try {
+      await entriesLocalRepo.markInvoiceSent(id);
+      toast({ title: 'Invoice marked as sent!' });
+      loadData();
+    } catch (error) {
+      toast({ title: 'Failed to update invoice', variant: 'destructive' });
+    }
+  };
+
   const handleMarkBillPaid = async (id: string) => {
     try {
       await entriesLocalRepo.markBillPaid(id, format(new Date(), 'yyyy-MM-dd'));
@@ -297,11 +307,19 @@ const Entries = () => {
                           <TableCell className="text-right">RM {invoice.total.toLocaleString()}</TableCell>
                           <TableCell>{getInvoiceStatusBadge(invoice.status)}</TableCell>
                           <TableCell className="text-right">
-                            {invoice.status !== 'Paid' && (
-                              <Button size="sm" variant="outline" onClick={() => handleMarkInvoicePaid(invoice.id)}>
-                                Mark Paid
-                              </Button>
-                            )}
+                            <div className="flex gap-1 justify-end">
+                              {invoice.status === 'Draft' && (
+                                <Button size="sm" variant="outline" onClick={() => handleMarkInvoiceSent(invoice.id)}>
+                                  <Send className="h-3 w-3 mr-1" />
+                                  Send
+                                </Button>
+                              )}
+                              {invoice.status !== 'Paid' && (
+                                <Button size="sm" variant="outline" onClick={() => handleMarkInvoicePaid(invoice.id)}>
+                                  Mark Paid
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}

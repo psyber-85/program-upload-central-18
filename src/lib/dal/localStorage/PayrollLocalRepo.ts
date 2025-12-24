@@ -110,14 +110,14 @@ export class PayrollLocalRepo implements PayrollRepo {
   // PAYROLL ITEMS
   // ============================================
 
-  async getPayrollItemsByRun(runId: string): Promise<PayrollItem[]> {
+  async getPayrollItems(runId: string): Promise<PayrollItem[]> {
     await delay();
-    return this.getPayrollItems().filter(i => i.runId === runId);
+    return this.getPayrollItemsData().filter(i => i.runId === runId);
   }
 
   async addPayrollItem(item: Omit<PayrollItem, 'id'>): Promise<PayrollItem> {
     await delay();
-    const items = this.getPayrollItems();
+    const items = this.getPayrollItemsData();
     
     const newItem: PayrollItem = {
       ...item,
@@ -125,14 +125,14 @@ export class PayrollLocalRepo implements PayrollRepo {
     };
     
     items.push(newItem);
-    this.savePayrollItems(items);
+    this.savePayrollItemsData(items);
     
     return newItem;
   }
 
   async updatePayrollItem(id: string, updates: Partial<PayrollItem>): Promise<PayrollItem | null> {
     await delay();
-    const items = this.getPayrollItems();
+    const items = this.getPayrollItemsData();
     const index = items.findIndex(i => i.id === id);
     
     if (index === -1) {
@@ -140,28 +140,28 @@ export class PayrollLocalRepo implements PayrollRepo {
     }
     
     items[index] = { ...items[index], ...updates };
-    this.savePayrollItems(items);
+    this.savePayrollItemsData(items);
     
     return items[index];
   }
 
   async deletePayrollItem(id: string): Promise<boolean> {
     await delay();
-    const items = this.getPayrollItems();
+    const items = this.getPayrollItemsData();
     const filtered = items.filter(i => i.id !== id);
     
     if (filtered.length === items.length) {
       return false;
     }
     
-    this.savePayrollItems(filtered);
+    this.savePayrollItemsData(filtered);
     return true;
   }
 
   async clearPayrollItems(runId: string): Promise<boolean> {
     await delay();
-    const items = this.getPayrollItems().filter(i => i.runId !== runId);
-    this.savePayrollItems(items);
+    const items = this.getPayrollItemsData().filter(i => i.runId !== runId);
+    this.savePayrollItemsData(items);
     return true;
   }
 
@@ -171,19 +171,19 @@ export class PayrollLocalRepo implements PayrollRepo {
 
   async getPayslipsByUser(userId: string): Promise<Payslip[]> {
     await delay();
-    return this.getPayslips()
+    return this.getPayslipsData()
       .filter(p => p.userId === userId)
       .sort((a, b) => b.month.localeCompare(a.month));
   }
 
   async getPayslipById(id: string): Promise<Payslip | null> {
     await delay();
-    return this.getPayslips().find(p => p.id === id) || null;
+    return this.getPayslipsData().find(p => p.id === id) || null;
   }
 
   async createPayslip(payslip: Omit<Payslip, 'id' | 'createdAt'>): Promise<Payslip> {
     await delay();
-    const payslips = this.getPayslips();
+    const payslips = this.getPayslipsData();
     
     const newPayslip: Payslip = {
       ...payslip,
@@ -192,14 +192,14 @@ export class PayrollLocalRepo implements PayrollRepo {
     };
     
     payslips.push(newPayslip);
-    this.savePayslips(payslips);
+    this.savePayslipsData(payslips);
     
     return newPayslip;
   }
 
   async getPayslipsByRun(runId: string): Promise<Payslip[]> {
     await delay();
-    return this.getPayslips().filter(p => p.runId === runId);
+    return this.getPayslipsData().filter(p => p.runId === runId);
   }
 }
 

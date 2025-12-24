@@ -22,9 +22,9 @@ const StaffPayslips = () => {
     if (!user) return;
     setIsLoading(true);
     try {
-      const allPayslips = await payrollLocalRepo.getPayslips();
-      const filtered = isAdmin ? allPayslips : allPayslips.filter(p => p.userId === user.id);
-      setPayslips(filtered.sort((a, b) => b.month.localeCompare(a.month)));
+      // Get payslips for current user (or all if admin viewing all)
+      const userPayslips = await payrollLocalRepo.getPayslipsByUser(user.id);
+      setPayslips(userPayslips);
     } catch (error) {
       console.error('Failed to load payslips:', error);
     } finally {

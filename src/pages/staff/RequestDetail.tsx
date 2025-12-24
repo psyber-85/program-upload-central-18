@@ -30,9 +30,14 @@ const RequestDetail = () => {
     if (!id) return;
     setIsLoading(true);
     try {
-      const allRequests = await requestsLocalRepo.getAllRequests();
-      const found = allRequests.find(r => r.id === id);
-      setRequest(found || null);
+      // Try to find in leave requests first, then claims
+      const leaveRequest = await requestsLocalRepo.getLeaveRequestById(id);
+      if (leaveRequest) {
+        setRequest(leaveRequest);
+      } else {
+        const claimRequest = await requestsLocalRepo.getClaimRequestById(id);
+        setRequest(claimRequest);
+      }
     } catch (error) {
       console.error('Failed to load request:', error);
     } finally {
@@ -45,15 +50,17 @@ const RequestDetail = () => {
     setIsProcessing(true);
     try {
       if (request.type === 'Leave') {
-        await requestsLocalRepo.updateLeaveRequest(request.id, {
-          status: 'Approved',
-          adminComment: adminComment || undefined,
-        });
+        await requestsLocalRepo.updateLeaveRequestStatus(
+          request.id, 
+          'Approved', 
+          adminComment || undefined
+        );
       } else if (request.type === 'Claim') {
-        await requestsLocalRepo.updateClaimRequest(request.id, {
-          status: 'Approved',
-          adminComment: adminComment || undefined,
-        });
+        await requestsLocalRepo.updateClaimRequestStatus(
+          request.id, 
+          'Approved', 
+          adminComment || undefined
+        );
       }
       toast({ title: 'Request approved!' });
       navigate('/staff/requests');
@@ -72,15 +79,17 @@ const RequestDetail = () => {
     setIsProcessing(true);
     try {
       if (request.type === 'Leave') {
-        await requestsLocalRepo.updateLeaveRequest(request.id, {
-          status: 'Rejected',
-          adminComment,
-        });
+        await requestsLocalRepo.updateLeaveRequestStatus(
+          request.id, 
+          'Rejected', 
+          adminComment
+        );
       } else if (request.type === 'Claim') {
-        await requestsLocalRepo.updateClaimRequest(request.id, {
-          status: 'Rejected',
-          adminComment,
-        });
+        await requestsLocalRepo.updateClaimRequestStatus(
+          request.id, 
+          'Rejected', 
+          adminComment
+        );
       }
       toast({ title: 'Request rejected' });
       navigate('/staff/requests');

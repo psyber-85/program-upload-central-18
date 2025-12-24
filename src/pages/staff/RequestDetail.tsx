@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { requestsLocalRepo } from '@/lib/dal/localStorage/RequestsLocalRepo';
-import { AnyRequest, TrainingApplication } from '@/lib/dal/types';
+import { staffLocalRepo } from '@/lib/dal/localStorage/StaffLocalRepo';
+import { AnyRequest, TrainingApplication, LeaveRequest } from '@/lib/dal/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/hooks/use-toast';
 import { ArrowLeft, Clock, CheckCircle, XCircle, Loader2, ExternalLink, GraduationCap } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 
 type DisplayRequest = AnyRequest | TrainingApplication;
 
@@ -73,11 +74,34 @@ const RequestDetail = () => {
     setIsProcessing(true);
     try {
       if (requestCategory === 'leave') {
+        const leaveReq = request as LeaveRequest;
+        
+        // Approve the request
         await requestsLocalRepo.updateLeaveRequestStatus(
           request.id, 
           'Approved', 
           adminComment || undefined
         );
+        
+        // Deduct leave balance
+        const daysRequested = leaveReq.halfDay 
+          ? 0.5 
+          : differenceInDays(new Date(leaveReq.endDate), new Date(leaveReq.startDate)) + 1;
+        
+        const currentYear = new Date().getFullYear();
+        const currentBalance = await staffLocalRepo.getLeaveBalance(leaveReq.userId, currentYear);
+        
+        if (currentBalance) {
+          if (leaveReq.leaveType === 'AL') {
+            await staffLocalRepo.updateLeaveBalance(leaveReq.userId, currentYear, {
+              alUsed: currentBalance.alUsed + daysRequested,
+            });
+          } else if (leaveReq.leaveType === 'SL') {
+            await staffLocalRepo.updateLeaveBalance(leaveReq.userId, currentYear, {
+              slUsed: currentBalance.slUsed + daysRequested,
+            });
+          }
+        }
       } else if (requestCategory === 'claim') {
         await requestsLocalRepo.updateClaimRequestStatus(
           request.id, 

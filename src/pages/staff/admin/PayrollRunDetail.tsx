@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { payrollLocalRepo } from '@/lib/dal/localStorage/PayrollLocalRepo';
 import { staffLocalRepo } from '@/lib/dal/localStorage/StaffLocalRepo';
 import { requestsLocalRepo } from '@/lib/dal/localStorage/RequestsLocalRepo';
-import { PayrollRun, PayrollItem, UserProfile, ClaimRequest } from '@/lib/dal/types';
+import { PayrollRun, PayrollItem, ClaimRequest, TrainingApplication } from '@/lib/dal/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -56,6 +56,9 @@ const PayrollRunDetail = () => {
       // Get approved claims for payroll (not yet included in any payroll)
       const approvedClaims = await requestsLocalRepo.getApprovedClaimsForPayroll(run.month);
       
+      // Get claimed training for payroll
+      const claimedTraining = await requestsLocalRepo.getClaimedTrainingForPayroll();
+      
       // Group claims by userId
       const claimsByUser: Record<string, ClaimRequest[]> = {};
       for (const claim of approvedClaims) {
@@ -63,6 +66,15 @@ const PayrollRunDetail = () => {
           claimsByUser[claim.userId] = [];
         }
         claimsByUser[claim.userId].push(claim);
+      }
+      
+      // Group training by userId
+      const trainingByUser: Record<string, TrainingApplication[]> = {};
+      for (const training of claimedTraining) {
+        if (!trainingByUser[training.userId]) {
+          trainingByUser[training.userId] = [];
+        }
+        trainingByUser[training.userId].push(training);
       }
       
       // Generate payroll items for each staff
@@ -74,8 +86,9 @@ const PayrollRunDetail = () => {
         const staffClaims = claimsByUser[staff.id] || [];
         const claimsTotal = staffClaims.reduce((sum, claim) => sum + claim.amount, 0);
         
-        // TODO: Add training claims when training claim feature is complete
-        const trainingClaimsTotal = 0;
+        // Calculate training claims for this staff member
+        const staffTraining = trainingByUser[staff.id] || [];
+        const trainingClaimsTotal = staffTraining.reduce((sum, training) => sum + training.cost, 0);
         
         const netPay = staff.salaryBase - epf - socso + claimsTotal + trainingClaimsTotal;
         
@@ -92,7 +105,7 @@ const PayrollRunDetail = () => {
         });
       }
       
-      toast({ title: 'Payroll items generated with claims!' });
+      toast({ title: 'Payroll items generated with claims and training!' });
       loadData();
     } catch (error) {
       toast({ title: 'Failed to generate items', variant: 'destructive' });
@@ -108,9 +121,17 @@ const PayrollRunDetail = () => {
       // Get approved claims to mark as included
       const approvedClaims = await requestsLocalRepo.getApprovedClaimsForPayroll(run.month);
       
+      // Get claimed training to mark as included
+      const claimedTraining = await requestsLocalRepo.getClaimedTrainingForPayroll();
+      
       // Mark all included claims
       for (const claim of approvedClaims) {
         await requestsLocalRepo.markClaimIncludedInPayroll(claim.id, run.month);
+      }
+      
+      // Mark all included training
+      for (const training of claimedTraining) {
+        await requestsLocalRepo.markTrainingIncludedInPayroll(training.id, run.month);
       }
       
       // Finalize the run
@@ -133,7 +154,7 @@ const PayrollRunDetail = () => {
       
       toast({ 
         title: 'Payroll finalized!',
-        description: `Payslips created and ${approvedClaims.length} claims marked as paid.`,
+        description: `Payslips created, ${approvedClaims.length} claims and ${claimedTraining.length} training reimbursements marked as paid.`,
       });
       navigate('/staff/payroll');
     } catch (error) {

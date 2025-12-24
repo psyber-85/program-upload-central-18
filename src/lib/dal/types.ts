@@ -93,6 +93,7 @@ export interface TrainingApplication {
   approvedAt?: string;
   completedAt?: string;
   claimedAt?: string;
+  includedInPayrollMonth?: string; // 'YYYY-MM'
 }
 
 export interface TrainingEntitlement {

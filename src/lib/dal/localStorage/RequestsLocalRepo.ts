@@ -182,13 +182,38 @@ export class RequestsLocalRepo implements RequestsRepo {
     return requests[index];
   }
 
-  async getApprovedClaimsForPayroll(beforeMonth: string): Promise<ClaimRequest[]> {
+  async getApprovedClaimsForPayroll(month: string): Promise<ClaimRequest[]> {
     await delay();
     return this.getClaimRequests().filter(r => 
       r.status === 'Approved' && 
-      !r.includedInPayrollMonth &&
-      r.createdAt.slice(0, 7) < beforeMonth
+      !r.includedInPayrollMonth
     );
+  }
+
+  async getClaimedTrainingForPayroll(): Promise<TrainingApplication[]> {
+    await delay();
+    return this.getTrainingApps().filter(a => 
+      a.status === 'Claimed' && 
+      !a.includedInPayrollMonth
+    );
+  }
+
+  async markTrainingIncludedInPayroll(id: string, month: string): Promise<TrainingApplication | null> {
+    await delay();
+    const apps = this.getTrainingApps();
+    const index = apps.findIndex(a => a.id === id);
+    
+    if (index === -1) {
+      return null;
+    }
+    
+    apps[index] = {
+      ...apps[index],
+      includedInPayrollMonth: month,
+    };
+    
+    this.saveTrainingApps(apps);
+    return apps[index];
   }
 
   // ============================================

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { staffLocalRepo } from '@/lib/dal/localStorage/StaffLocalRepo';
-import { UserProfile, AppRole } from '@/lib/dal/types';
+import { entriesLocalRepo } from '@/lib/dal/localStorage/EntriesLocalRepo';
+import { UserProfile, AppRole, AppSettings } from '@/lib/dal/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,13 +12,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Settings as SettingsIcon, Users, Shield, User, Loader2, MoreHorizontal } from 'lucide-react';
+import { Plus, Users, Shield, User, Loader2, MoreHorizontal, FileText, Pencil } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { format } from 'date-fns';
 
 const Settings = () => {
   const [staff, setStaff] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
   
   // Add staff dialog
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -27,18 +29,39 @@ const Settings = () => {
   const [newBusinessArm, setNewBusinessArm] = useState<'Training' | 'Solutions'>('Training');
   const [newSalary, setNewSalary] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  
+  // Edit staff dialog
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingStaff, setEditingStaff] = useState<UserProfile | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editRole, setEditRole] = useState<AppRole>('staff');
+  const [editBusinessArm, setEditBusinessArm] = useState<'Training' | 'Solutions'>('Training');
+  const [editSalary, setEditSalary] = useState('');
+  const [editEpfRate, setEditEpfRate] = useState('');
+  const [editSocsoRate, setEditSocsoRate] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  
+  // Invoice counter
+  const [invoiceCounter, setInvoiceCounter] = useState('');
+  const [isSavingCounter, setIsSavingCounter] = useState(false);
 
   useEffect(() => {
-    loadStaff();
+    loadData();
   }, []);
 
-  const loadStaff = async () => {
+  const loadData = async () => {
     setIsLoading(true);
     try {
-      const allStaff = await staffLocalRepo.getAllStaff();
+      const [allStaff, appSettings] = await Promise.all([
+        staffLocalRepo.getAllStaff(),
+        entriesLocalRepo.getSettings(),
+      ]);
       setStaff(allStaff);
+      setSettings(appSettings);
+      setInvoiceCounter(String(appSettings.invoiceCounter));
     } catch (error) {
-      console.error('Failed to load staff:', error);
+      console.error('Failed to load data:', error);
     } finally {
       setIsLoading(false);
     }
@@ -72,7 +95,7 @@ const Settings = () => {
       toast({ title: 'Staff member added!' });
       setShowAddDialog(false);
       resetForm();
-      loadStaff();
+      loadData();
     } catch (error) {
       toast({ title: 'Failed to add staff', variant: 'destructive' });
     } finally {
@@ -89,7 +112,7 @@ const Settings = () => {
         await staffLocalRepo.reactivateStaff(staffMember.id);
         toast({ title: `${staffMember.name} reactivated` });
       }
-      loadStaff();
+      loadData();
     } catch (error) {
       toast({ title: 'Failed to update staff', variant: 'destructive' });
     }
@@ -101,6 +124,73 @@ const Settings = () => {
     setNewRole('staff');
     setNewBusinessArm('Training');
     setNewSalary('');
+  };
+
+  const openEditDialog = (member: UserProfile) => {
+    setEditingStaff(member);
+    setEditName(member.name);
+    setEditEmail(member.email);
+    setEditRole(member.role);
+    setEditBusinessArm(member.businessArm);
+    setEditSalary(String(member.salaryBase));
+    setEditEpfRate(String(member.epfRate));
+    setEditSocsoRate(String(member.socsoRate));
+    setShowEditDialog(true);
+  };
+
+  const handleEditStaff = async () => {
+    if (!editingStaff || !editName || !editEmail || !editSalary) {
+      toast({ title: 'Please fill all required fields', variant: 'destructive' });
+      return;
+    }
+
+    const salary = parseFloat(editSalary);
+    const epf = parseFloat(editEpfRate);
+    const socso = parseFloat(editSocsoRate);
+
+    if (isNaN(salary) || salary <= 0) {
+      toast({ title: 'Please enter a valid salary', variant: 'destructive' });
+      return;
+    }
+
+    setIsEditing(true);
+    try {
+      await staffLocalRepo.updateStaff(editingStaff.id, {
+        name: editName,
+        email: editEmail,
+        role: editRole,
+        businessArm: editBusinessArm,
+        salaryBase: salary,
+        epfRate: isNaN(epf) ? 11 : epf,
+        socsoRate: isNaN(socso) ? 2 : socso,
+      });
+      toast({ title: 'Staff member updated!' });
+      setShowEditDialog(false);
+      setEditingStaff(null);
+      loadData();
+    } catch (error) {
+      toast({ title: 'Failed to update staff', variant: 'destructive' });
+    } finally {
+      setIsEditing(false);
+    }
+  };
+
+  const handleSaveInvoiceCounter = async () => {
+    const counter = parseInt(invoiceCounter);
+    if (isNaN(counter) || counter < 0) {
+      toast({ title: 'Please enter a valid number', variant: 'destructive' });
+      return;
+    }
+
+    setIsSavingCounter(true);
+    try {
+      await entriesLocalRepo.updateSettings({ invoiceCounter: counter });
+      toast({ title: 'Invoice counter updated!' });
+    } catch (error) {
+      toast({ title: 'Failed to update', variant: 'destructive' });
+    } finally {
+      setIsSavingCounter(false);
+    }
   };
 
   return (
@@ -221,6 +311,10 @@ const Settings = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEditDialog(member)}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleToggleActive(member)}>
                               {member.isActive ? 'Deactivate' : 'Reactivate'}
                             </DropdownMenuItem>
@@ -232,6 +326,100 @@ const Settings = () => {
                 </TableBody>
               </Table>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Edit Staff Dialog */}
+        <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Staff Member</DialogTitle>
+              <DialogDescription>Update staff details</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label>Full Name</Label>
+                <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Role</Label>
+                  <Select value={editRole} onValueChange={(v) => setEditRole(v as AppRole)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="staff">Staff</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Business Arm</Label>
+                  <Select value={editBusinessArm} onValueChange={(v) => setEditBusinessArm(v as any)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Training">Training</SelectItem>
+                      <SelectItem value="Solutions">Solutions</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Monthly Salary (RM)</Label>
+                <Input type="number" value={editSalary} onChange={(e) => setEditSalary(e.target.value)} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>EPF Rate (%)</Label>
+                  <Input type="number" value={editEpfRate} onChange={(e) => setEditEpfRate(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>SOCSO Rate (%)</Label>
+                  <Input type="number" value={editSocsoRate} onChange={(e) => setEditSocsoRate(e.target.value)} />
+                </div>
+              </div>
+              <Button onClick={handleEditStaff} className="w-full" disabled={isEditing}>
+                {isEditing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Save Changes
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Invoice Settings Card */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Invoice Settings
+            </CardTitle>
+            <CardDescription>Configure invoice numbering</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-end gap-4 max-w-md">
+              <div className="flex-1 space-y-2">
+                <Label>Next Invoice Number</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">INV</span>
+                  <Input 
+                    type="number" 
+                    value={invoiceCounter} 
+                    onChange={(e) => setInvoiceCounter(e.target.value)}
+                    className="w-32"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Next invoice will be: INV{String(parseInt(invoiceCounter) + 1 || 1).padStart(5, '0')}
+                </p>
+              </div>
+              <Button onClick={handleSaveInvoiceCounter} disabled={isSavingCounter}>
+                {isSavingCounter && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Save
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

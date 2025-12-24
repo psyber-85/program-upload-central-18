@@ -2,15 +2,30 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 // Public pages
 import PublicHome from "./pages/PublicHome";
+import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
 // Staff Portal
 import PortalLayout from "./components/staff/PortalLayout";
+import ProtectedRoute from "./components/staff/ProtectedRoute";
 import StaffHome from "./pages/staff/StaffHome";
+import StaffRequests from "./pages/staff/StaffRequests";
+import NewRequest from "./pages/staff/NewRequest";
+import RequestDetail from "./pages/staff/RequestDetail";
+import StaffDocs from "./pages/staff/StaffDocs";
+import StaffPayslips from "./pages/staff/StaffPayslips";
+import PayslipDetail from "./pages/staff/PayslipDetail";
+
+// Admin pages
+import Payroll from "./pages/staff/admin/Payroll";
+import PayrollRunDetail from "./pages/staff/admin/PayrollRunDetail";
+import Entries from "./pages/staff/admin/Entries";
+import Settings from "./pages/staff/admin/Settings";
 
 // Marketing Portal
 import MarketingLayout from "./components/marketing/MarketingLayout";
@@ -28,27 +43,66 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/" element={<PublicHome />} />
-          
-          {/* Staff Portal routes */}
-          <Route path="/staff" element={<PortalLayout />}>
-            <Route index element={<StaffHome />} />
-          </Route>
-          
-          {/* Marketing Portal routes (nested under /staff/marketing) */}
-          <Route path="/staff/marketing" element={<MarketingLayout />}>
-            <Route index element={<MarketingDashboard />} />
-            <Route path="participant-manager" element={<Index />} />
-            <Route path="birthday-dashboard" element={<BirthdayDashboard />} />
-            <Route path="register-tracker" element={<RegisterTracker />} />
-            <Route path="crm-tracker" element={<CRMTracker />} />
-          </Route>
-          
-          {/* Catch-all */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/" element={<PublicHome />} />
+            <Route path="/login" element={<Login />} />
+            
+            {/* Staff Portal routes (protected) */}
+            <Route path="/staff" element={
+              <ProtectedRoute>
+                <PortalLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<StaffHome />} />
+              <Route path="requests" element={<StaffRequests />} />
+              <Route path="requests/new" element={<NewRequest />} />
+              <Route path="requests/:id" element={<RequestDetail />} />
+              <Route path="docs" element={<StaffDocs />} />
+              <Route path="payslips" element={<StaffPayslips />} />
+              <Route path="payslips/:id" element={<PayslipDetail />} />
+              
+              {/* Admin-only routes */}
+              <Route path="payroll" element={
+                <ProtectedRoute requireAdmin>
+                  <Payroll />
+                </ProtectedRoute>
+              } />
+              <Route path="payroll/:runId" element={
+                <ProtectedRoute requireAdmin>
+                  <PayrollRunDetail />
+                </ProtectedRoute>
+              } />
+              <Route path="entries" element={
+                <ProtectedRoute requireAdmin>
+                  <Entries />
+                </ProtectedRoute>
+              } />
+              <Route path="settings" element={
+                <ProtectedRoute requireAdmin>
+                  <Settings />
+                </ProtectedRoute>
+              } />
+            </Route>
+            
+            {/* Marketing Portal routes (protected, nested under /staff/marketing) */}
+            <Route path="/staff/marketing" element={
+              <ProtectedRoute>
+                <MarketingLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<MarketingDashboard />} />
+              <Route path="participant-manager" element={<Index />} />
+              <Route path="birthday-dashboard" element={<BirthdayDashboard />} />
+              <Route path="register-tracker" element={<RegisterTracker />} />
+              <Route path="crm-tracker" element={<CRMTracker />} />
+            </Route>
+            
+            {/* Catch-all */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

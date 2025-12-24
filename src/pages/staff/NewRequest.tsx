@@ -15,6 +15,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from '@/hooks/use-toast';
 import { ArrowLeft, Loader2, Calendar, Receipt, GraduationCap, AlertCircle } from 'lucide-react';
 import { format, differenceInDays, parseISO, isBefore } from 'date-fns';
+import FileUpload from '@/components/staff/FileUpload';
 
 type RequestFormType = 'Leave' | 'Claim' | 'Training';
 
@@ -37,6 +38,7 @@ const NewRequest = () => {
   const [claimAmount, setClaimAmount] = useState('');
   const [claimCategory, setClaimCategory] = useState('');
   const [claimDescription, setClaimDescription] = useState('');
+  const [claimAttachmentUrl, setClaimAttachmentUrl] = useState('');
 
   // Training form state
   const [courseName, setCourseName] = useState('');
@@ -44,8 +46,12 @@ const NewRequest = () => {
   const [cost, setCost] = useState('');
   const [courseLink, setCourseLink] = useState('');
   const [justification, setJustification] = useState('');
+  const [trainingAttachmentUrl, setTrainingAttachmentUrl] = useState('');
   const [trainingEntitlement, setTrainingEntitlement] = useState<TrainingEntitlement | null>(null);
   const [isEligible, setIsEligible] = useState(false);
+  
+  // Leave attachment
+  const [leaveAttachmentUrl, setLeaveAttachmentUrl] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -116,6 +122,7 @@ const NewRequest = () => {
         halfDay,
         reason: leaveReason,
         customLeaveType: leaveType === 'Custom' ? customLeaveType : undefined,
+        attachmentUrl: leaveAttachmentUrl || undefined,
       };
 
       await requestsLocalRepo.createLeaveRequest(leaveRequest);
@@ -151,6 +158,7 @@ const NewRequest = () => {
         category: claimCategory,
         description: claimDescription,
         autoApproved,
+        attachmentUrl: claimAttachmentUrl || undefined,
       };
 
       await requestsLocalRepo.createClaimRequest(claimRequest);
@@ -207,6 +215,7 @@ const NewRequest = () => {
         cost: costAmount,
         link: courseLink || undefined,
         justification,
+        attachmentUrl: trainingAttachmentUrl || undefined,
       });
       toast({ title: 'Training application submitted!' });
       navigate('/staff/requests');
@@ -403,6 +412,15 @@ const NewRequest = () => {
                   />
                 </div>
 
+                <FileUpload
+                  bucket="request-attachments"
+                  folder={user?.id || ''}
+                  label="Supporting Document (optional)"
+                  onUpload={(url) => setLeaveAttachmentUrl(url)}
+                  existingUrl={leaveAttachmentUrl}
+                  onRemove={() => setLeaveAttachmentUrl('')}
+                />
+
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Submit Leave Request
@@ -451,6 +469,15 @@ const NewRequest = () => {
                     required
                   />
                 </div>
+
+                <FileUpload
+                  bucket="request-attachments"
+                  folder={user?.id || ''}
+                  label="Receipt / Invoice (recommended)"
+                  onUpload={(url) => setClaimAttachmentUrl(url)}
+                  existingUrl={claimAttachmentUrl}
+                  onRemove={() => setClaimAttachmentUrl('')}
+                />
 
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -529,6 +556,15 @@ const NewRequest = () => {
                     required
                   />
                 </div>
+
+                <FileUpload
+                  bucket="request-attachments"
+                  folder={user?.id || ''}
+                  label="Course Quotation / Details (optional)"
+                  onUpload={(url) => setTrainingAttachmentUrl(url)}
+                  existingUrl={trainingAttachmentUrl}
+                  onRemove={() => setTrainingAttachmentUrl('')}
+                />
 
                 <Button type="submit" className="w-full" disabled={isSubmitting || !isEligible}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

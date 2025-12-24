@@ -131,10 +131,10 @@ const PayslipDetail = () => {
               </div>
             </div>
 
-            {/* Deductions */}
+            {/* Deductions (Employee) */}
             <div>
               <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider mb-3">
-                Deductions
+                Deductions (Employee)
               </h3>
               <div className="space-y-2">
                 <div className="flex justify-between">
@@ -151,6 +151,26 @@ const PayslipDetail = () => {
                 <span>Total Deductions</span>
                 <span className="text-red-600">- RM {deductions.toLocaleString()}</span>
               </div>
+            </div>
+
+            {/* Employer Contributions (Info only) */}
+            <div className="bg-muted/50 p-4 rounded-lg">
+              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider mb-3">
+                Employer Contributions (Info)
+              </h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span>EPF (Employer)</span>
+                  <span className="font-medium">RM {(payslip.employerEpf || 0).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>SOCSO (Employer)</span>
+                  <span className="font-medium">RM {(payslip.employerSocso || 0).toLocaleString()}</span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                * Employer contributions are paid by the company on your behalf
+              </p>
             </div>
 
             {/* Net Pay */}

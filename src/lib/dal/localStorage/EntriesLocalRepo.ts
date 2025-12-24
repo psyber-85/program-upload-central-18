@@ -1,11 +1,13 @@
 import { EntriesRepo } from '../interfaces/EntriesRepo';
-import { Invoice, Bill, Quotation, InvoiceStatus, BillStatus, QuotationStatus, AppSettings } from '../types';
+import { Invoice, Bill, Quotation, PurchaseOrder, Payment, InvoiceStatus, BillStatus, QuotationStatus, POStatus, AppSettings } from '../types';
 import { delay, generateId, now, storageGet, storageSet, getMonthFromDate } from '../utils';
-import { seedInvoices, seedBills, seedQuotations, seedSettings } from '../seed/seedData';
+import { seedInvoices, seedBills, seedQuotations, seedSettings, seedPurchaseOrders, seedPayments } from '../seed/seedData';
 
 const INVOICES_KEY = 'invoices';
 const BILLS_KEY = 'bills';
 const QUOTATIONS_KEY = 'quotations';
+const PURCHASE_ORDERS_KEY = 'purchase_orders';
+const PAYMENTS_KEY = 'payments';
 const SETTINGS_KEY = 'app_settings';
 
 export class EntriesLocalRepo implements EntriesRepo {
@@ -335,6 +337,165 @@ export class EntriesLocalRepo implements EntriesRepo {
     ).sort((a, b) => 
       new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime()
     );
+  }
+
+  // ============================================
+  // PURCHASE ORDERS
+  // ============================================
+
+  private getPurchaseOrders(): PurchaseOrder[] {
+    return storageGet<PurchaseOrder[]>(PURCHASE_ORDERS_KEY, seedPurchaseOrders);
+  }
+
+  private savePurchaseOrders(pos: PurchaseOrder[]): void {
+    storageSet(PURCHASE_ORDERS_KEY, pos);
+  }
+
+  async getAllPurchaseOrders(): Promise<PurchaseOrder[]> {
+    await delay();
+    return this.getPurchaseOrders().sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }
+
+  async getPurchaseOrderById(id: string): Promise<PurchaseOrder | null> {
+    await delay();
+    return this.getPurchaseOrders().find(p => p.id === id) || null;
+  }
+
+  async createPurchaseOrder(po: Omit<PurchaseOrder, 'id' | 'createdAt' | 'updatedAt' | 'poNumber'>): Promise<PurchaseOrder> {
+    await delay();
+    const pos = this.getPurchaseOrders();
+    const poNumber = await this.getNextPONumber();
+    
+    const newPO: PurchaseOrder = {
+      ...po,
+      id: generateId(),
+      poNumber,
+      createdAt: now(),
+      updatedAt: now(),
+    };
+    
+    pos.push(newPO);
+    this.savePurchaseOrders(pos);
+    
+    return newPO;
+  }
+
+  async updatePurchaseOrder(id: string, updates: Partial<PurchaseOrder>): Promise<PurchaseOrder | null> {
+    await delay();
+    const pos = this.getPurchaseOrders();
+    const index = pos.findIndex(p => p.id === id);
+    
+    if (index === -1) {
+      return null;
+    }
+    
+    pos[index] = { 
+      ...pos[index], 
+      ...updates, 
+      updatedAt: now() 
+    };
+    this.savePurchaseOrders(pos);
+    
+    return pos[index];
+  }
+
+  async updatePurchaseOrderStatus(id: string, status: POStatus): Promise<PurchaseOrder | null> {
+    return this.updatePurchaseOrder(id, { status });
+  }
+
+  async getNextPONumber(): Promise<string> {
+    const settings = this.getSettingsData() as any;
+    const currentYear = new Date().getFullYear();
+    
+    let counter = settings.poCounter || 0;
+    let counterYear = settings.poCounterYear || currentYear;
+    
+    if (counterYear !== currentYear) {
+      counterYear = currentYear;
+      counter = 0;
+    }
+    
+    counter += 1;
+    this.saveSettings({ 
+      ...settings, 
+      poCounter: counter, 
+      poCounterYear: counterYear 
+    } as any);
+    
+    return `PO${String(counter).padStart(5, '0')}`;
+  }
+
+  // ============================================
+  // PAYMENTS
+  // ============================================
+
+  private getPayments(): Payment[] {
+    return storageGet<Payment[]>(PAYMENTS_KEY, seedPayments);
+  }
+
+  private savePayments(payments: Payment[]): void {
+    storageSet(PAYMENTS_KEY, payments);
+  }
+
+  async getAllPayments(): Promise<Payment[]> {
+    await delay();
+    return this.getPayments().sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }
+
+  async getPaymentById(id: string): Promise<Payment | null> {
+    await delay();
+    return this.getPayments().find(p => p.id === id) || null;
+  }
+
+  async createPayment(payment: Omit<Payment, 'id' | 'createdAt' | 'paymentNumber'>): Promise<Payment> {
+    await delay();
+    const payments = this.getPayments();
+    const paymentNumber = await this.getNextPaymentNumber();
+    
+    const newPayment: Payment = {
+      ...payment,
+      id: generateId(),
+      paymentNumber,
+      createdAt: now(),
+    };
+    
+    payments.push(newPayment);
+    this.savePayments(payments);
+    
+    return newPayment;
+  }
+
+  async getPaymentsForMonth(month: string): Promise<Payment[]> {
+    await delay();
+    return this.getPayments().filter(p => 
+      getMonthFromDate(p.paymentDate) === month
+    );
+  }
+
+  async getNextPaymentNumber(): Promise<string> {
+    const settings = this.getSettingsData() as any;
+    const currentYear = new Date().getFullYear();
+    
+    let counter = settings.paymentCounter || 0;
+    let counterYear = settings.paymentCounterYear || currentYear;
+    
+    if (counterYear !== currentYear) {
+      counterYear = currentYear;
+      counter = 0;
+    }
+    
+    counter += 1;
+    this.saveSettings({ 
+      ...settings, 
+      paymentCounter: counter, 
+      paymentCounterYear: counterYear 
+    } as any);
+    
+    return `PAY${String(counter).padStart(5, '0')}`;
   }
 
   // ============================================

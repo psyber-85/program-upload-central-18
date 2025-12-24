@@ -2,20 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { requestsLocalRepo } from '@/lib/dal/localStorage/RequestsLocalRepo';
-import { AnyRequest, TrainingApplication } from '@/lib/dal/types';
+import { staffLocalRepo } from '@/lib/dal/localStorage/StaffLocalRepo';
+import { AnyRequest, TrainingApplication, UserProfile } from '@/lib/dal/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Clock, CheckCircle, XCircle, ChevronRight, GraduationCap } from 'lucide-react';
+import { Plus, Clock, CheckCircle, XCircle, ChevronRight, GraduationCap, User } from 'lucide-react';
 import { format } from 'date-fns';
 
-type DisplayRequest = (AnyRequest | TrainingApplication) & { displayType: 'Leave' | 'Claim' | 'Training' };
+type DisplayRequest = (AnyRequest | TrainingApplication) & { displayType: 'Leave' | 'Claim' | 'Training'; requestorName?: string };
 
 const StaffRequests = () => {
   const { user, isAdmin } = useAuth();
   const [requests, setRequests] = useState<DisplayRequest[]>([]);
+  const [staffMap, setStaffMap] = useState<Map<string, string>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'mine'>('mine');
   const [typeFilter, setTypeFilter] = useState<'All' | 'Leave' | 'Claim' | 'Training'>('All');
@@ -28,6 +30,12 @@ const StaffRequests = () => {
     if (!user) return;
     setIsLoading(true);
     try {
+      // Load staff data for name mapping
+      const allStaff = await staffLocalRepo.getAllStaff();
+      const nameMap = new Map<string, string>();
+      allStaff.forEach(s => nameMap.set(s.id, s.name));
+      setStaffMap(nameMap);
+
       const [leaveRequests, claimRequests, trainingApps] = await Promise.all([
         requestsLocalRepo.getAllLeaveRequests(),
         requestsLocalRepo.getAllClaimRequests(),
@@ -35,9 +43,22 @@ const StaffRequests = () => {
       ]);
 
       const allRequests: DisplayRequest[] = [
-        ...leaveRequests.map(r => ({ ...r, displayType: 'Leave' as const })),
-        ...claimRequests.map(r => ({ ...r, displayType: 'Claim' as const })),
-        ...trainingApps.map(r => ({ ...r, displayType: 'Training' as const, status: (r.status === 'Submitted' ? 'Pending' : r.status) as any })),
+        ...leaveRequests.map(r => ({ 
+          ...r, 
+          displayType: 'Leave' as const,
+          requestorName: nameMap.get(r.userId) 
+        })),
+        ...claimRequests.map(r => ({ 
+          ...r, 
+          displayType: 'Claim' as const,
+          requestorName: nameMap.get(r.userId) 
+        })),
+        ...trainingApps.map(r => ({ 
+          ...r, 
+          displayType: 'Training' as const, 
+          status: (r.status === 'Submitted' ? 'Pending' : r.status) as any,
+          requestorName: nameMap.get(r.userId) 
+        })),
       ];
 
       const filtered = isAdmin && filter === 'all' 
@@ -171,9 +192,15 @@ const StaffRequests = () => {
                         {getStatusBadge(request.status)}
                       </div>
                       <p className="font-medium truncate">{getRequestSummary(request)}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {format(new Date(request.createdAt), 'MMM d, yyyy')}
-                      </p>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>{format(new Date(request.createdAt), 'MMM d, yyyy')}</span>
+                        {isAdmin && filter === 'all' && request.requestorName && (
+                          <span className="flex items-center gap-1">
+                            <User className="h-3 w-3" />
+                            {request.requestorName}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <ChevronRight className="h-5 w-5 text-muted-foreground ml-2 flex-shrink-0" />
                   </CardContent>

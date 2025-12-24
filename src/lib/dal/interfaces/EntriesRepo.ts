@@ -1,106 +1,74 @@
-import { Invoice, Bill, Quotation, InvoiceStatus, BillStatus, QuotationStatus, BusinessArm, AppSettings } from '../types';
+import { Invoice, Bill, Quotation, PurchaseOrder, Payment, InvoiceStatus, BillStatus, QuotationStatus, POStatus, AppSettings } from '../types';
 
 export interface EntriesRepo {
   // ============================================
   // INVOICES
   // ============================================
   
-  // Get all invoices (admin)
   getAllInvoices(): Promise<Invoice[]>;
-  
-  // Get invoices by user (staff - own only)
   getInvoicesByUser(userId: string): Promise<Invoice[]>;
-  
-  // Get invoice by ID
   getInvoiceById(id: string): Promise<Invoice | null>;
-  
-  // Create invoice
   createInvoice(invoice: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt' | 'invoiceNumber'>): Promise<Invoice>;
-  
-  // Update invoice
   updateInvoice(id: string, updates: Partial<Invoice>): Promise<Invoice | null>;
-  
-  // Update invoice status
   updateInvoiceStatus(id: string, status: InvoiceStatus, paidDate?: string): Promise<Invoice | null>;
-  
-  // Mark invoice as paid
   markInvoicePaid(id: string, paidDate: string): Promise<Invoice | null>;
-  
-  // Get paid invoices for month (for revenue calculation)
+  markInvoiceSent(id: string): Promise<Invoice | null>;
   getPaidInvoicesForMonth(month: string): Promise<Invoice[]>;
-  
-  // Get unpaid invoices count
   getUnpaidInvoicesCount(): Promise<number>;
+  getNextInvoiceNumber(): Promise<string>;
   
   // ============================================
   // QUOTATIONS
   // ============================================
   
-  // Get all quotations (admin)
   getAllQuotations(): Promise<Quotation[]>;
-  
-  // Get quotations by user (staff - own only)
   getQuotationsByUser(userId: string): Promise<Quotation[]>;
-  
-  // Get quotation by ID
   getQuotationById(id: string): Promise<Quotation | null>;
-  
-  // Create quotation
   createQuotation(quotation: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt' | 'quotationNumber'>): Promise<Quotation>;
-  
-  // Update quotation
   updateQuotation(id: string, updates: Partial<Quotation>): Promise<Quotation | null>;
-  
-  // Update quotation status
   updateQuotationStatus(id: string, status: QuotationStatus): Promise<Quotation | null>;
-  
-  // Convert quotation to invoice
   convertQuotationToInvoice(quotationId: string): Promise<Invoice | null>;
-  
-  // Get next quotation number
   getNextQuotationNumber(): Promise<string>;
   
   // ============================================
   // BILLS
   // ============================================
   
-  // Get all bills (admin)
   getAllBills(): Promise<Bill[]>;
-  
-  // Get bills by user (staff - own only)
   getBillsByUser(userId: string): Promise<Bill[]>;
-  
-  // Get bill by ID
   getBillById(id: string): Promise<Bill | null>;
-  
-  // Create bill
   createBill(bill: Omit<Bill, 'id' | 'createdAt' | 'updatedAt'>): Promise<Bill>;
-  
-  // Update bill
   updateBill(id: string, updates: Partial<Bill>): Promise<Bill | null>;
-  
-  // Update bill status
   updateBillStatus(id: string, status: BillStatus, paidDate?: string): Promise<Bill | null>;
-  
-  // Mark bill as paid
   markBillPaid(id: string, paidDate: string): Promise<Bill | null>;
-  
-  // Get paid bills for month (for expense calculation)
   getPaidBillsForMonth(month: string): Promise<Bill[]>;
-  
-  // Get upcoming bills due
   getUpcomingBillsDue(days?: number): Promise<Bill[]>;
+  
+  // ============================================
+  // PURCHASE ORDERS
+  // ============================================
+  
+  getAllPurchaseOrders(): Promise<PurchaseOrder[]>;
+  getPurchaseOrderById(id: string): Promise<PurchaseOrder | null>;
+  createPurchaseOrder(po: Omit<PurchaseOrder, 'id' | 'createdAt' | 'updatedAt' | 'poNumber'>): Promise<PurchaseOrder>;
+  updatePurchaseOrder(id: string, updates: Partial<PurchaseOrder>): Promise<PurchaseOrder | null>;
+  updatePurchaseOrderStatus(id: string, status: POStatus): Promise<PurchaseOrder | null>;
+  getNextPONumber(): Promise<string>;
+  
+  // ============================================
+  // PAYMENTS
+  // ============================================
+  
+  getAllPayments(): Promise<Payment[]>;
+  getPaymentById(id: string): Promise<Payment | null>;
+  createPayment(payment: Omit<Payment, 'id' | 'createdAt' | 'paymentNumber'>): Promise<Payment>;
+  getPaymentsForMonth(month: string): Promise<Payment[]>;
+  getNextPaymentNumber(): Promise<string>;
   
   // ============================================
   // SETTINGS
   // ============================================
   
-  // Get app settings
   getSettings(): Promise<AppSettings>;
-  
-  // Update app settings
   updateSettings(updates: Partial<AppSettings>): Promise<AppSettings>;
-  
-  // Get next invoice number
-  getNextInvoiceNumber(): Promise<string>;
 }

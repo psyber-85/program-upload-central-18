@@ -129,6 +129,8 @@ export type AnyRequest = LeaveRequest | ClaimRequest;
 export type InvoiceStatus = 'Draft' | 'Sent' | 'Paid';
 export type BillStatus = 'Draft' | 'Paid';
 export type QuotationStatus = 'Draft' | 'Sent' | 'Accepted' | 'Rejected' | 'Converted';
+export type POStatus = 'Draft' | 'Sent' | 'Received' | 'Closed';
+export type PaymentMethod = 'Bank Transfer' | 'Cash' | 'Cheque' | 'Card';
 export type BusinessArm = 'Training' | 'Solutions';
 
 export interface InvoiceItem {
@@ -141,17 +143,23 @@ export interface InvoiceItem {
 export interface Invoice {
   id: string;
   createdBy: string;
-  creatorName?: string; // display name of creator
-  invoiceNumber: string; // INVxxxxx
-  businessArm: BusinessArm;
+  creatorName?: string;
+  invoiceNumber: string;
+  businessArm?: BusinessArm;
   clientName?: string;
+  clientEmail?: string;
+  clientAddress?: string;
+  clientPhone?: string;
+  reference?: string;
+  paymentTerms?: string;
+  notes?: string;
   issueDate: string;
   dueDate?: string;
   status: InvoiceStatus;
   items: InvoiceItem[];
   total: number;
   paidDate?: string;
-  quotationId?: string; // linked quotation if converted
+  quotationId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -160,15 +168,20 @@ export interface Quotation {
   id: string;
   createdBy: string;
   creatorName?: string;
-  quotationNumber: string; // QUOxxxxx
-  businessArm: BusinessArm;
+  quotationNumber: string;
+  businessArm?: BusinessArm;
   clientName?: string;
+  clientEmail?: string;
+  clientAddress?: string;
+  clientPhone?: string;
+  reference?: string;
+  notes?: string;
   issueDate: string;
   validUntil?: string;
   status: QuotationStatus;
   items: InvoiceItem[];
   total: number;
-  convertedInvoiceId?: string; // linked invoice after conversion
+  convertedInvoiceId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -185,6 +198,49 @@ export interface Bill {
   attachmentMeta?: ReceiptMeta;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  poNumber: string;
+  vendorName: string;
+  vendorEmail?: string;
+  vendorAddress?: string;
+  items: InvoiceItem[];
+  total: number;
+  status: POStatus;
+  expectedDelivery?: string;
+  notes?: string;
+  createdBy: string;
+  creatorName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface Payment {
+  id: string;
+  paymentNumber: string;
+  billId?: string;
+  poId?: string;
+  vendorName: string;
+  amount: number;
+  paymentDate: string;
+  paymentMethod: PaymentMethod;
+  reference?: string;
+  notes?: string;
+  createdBy: string;
+  creatorName?: string;
+  createdAt: string;
 }
 
 // ============================================

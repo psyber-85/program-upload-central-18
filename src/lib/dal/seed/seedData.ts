@@ -8,6 +8,8 @@ import {
   Invoice,
   Bill,
   Quotation,
+  PurchaseOrder,
+  Payment,
   PayrollRun,
   PayrollItem,
   Payslip,
@@ -524,6 +526,96 @@ export const seedDocs: DocLink[] = [
     url: 'https://docs.google.com/document/d/brand-guidelines',
     description: 'Logo usage, colors, and branding standards',
     createdAt: '2024-03-15T00:00:00Z',
+  },
+];
+
+// ============================================
+// PURCHASE ORDERS
+// ============================================
+
+export const seedPurchaseOrders: PurchaseOrder[] = [
+  {
+    id: 'po-001',
+    poNumber: 'PO00001',
+    vendorName: 'TechSupply Sdn Bhd',
+    vendorEmail: 'sales@techsupply.com',
+    vendorAddress: '45 Industrial Park, Shah Alam',
+    items: [
+      { description: 'Dell Latitude Laptop', quantity: 2, unitPrice: 4500, total: 9000 },
+      { description: 'USB-C Docking Station', quantity: 2, unitPrice: 500, total: 1000 },
+    ],
+    total: 10000,
+    status: 'Received',
+    expectedDelivery: '2024-11-20',
+    notes: 'For new team members',
+    createdBy: 'user-admin-001',
+    creatorName: 'Ahmad Rizal',
+    createdAt: '2024-11-10T10:00:00Z',
+    updatedAt: '2024-11-20T14:00:00Z',
+  },
+  {
+    id: 'po-002',
+    poNumber: 'PO00002',
+    vendorName: 'Office Depot Malaysia',
+    vendorEmail: 'orders@officedepot.my',
+    items: [
+      { description: 'Ergonomic Office Chairs', quantity: 5, unitPrice: 800, total: 4000 },
+    ],
+    total: 4000,
+    status: 'Sent',
+    expectedDelivery: '2025-01-10',
+    createdBy: 'user-admin-001',
+    creatorName: 'Ahmad Rizal',
+    createdAt: '2024-12-18T09:00:00Z',
+    updatedAt: '2024-12-18T09:00:00Z',
+  },
+];
+
+// ============================================
+// PAYMENTS
+// ============================================
+
+export const seedPayments: Payment[] = [
+  {
+    id: 'pay-001',
+    paymentNumber: 'PAY00001',
+    billId: 'bill-001',
+    vendorName: 'TM Net',
+    amount: 200,
+    paymentDate: '2024-11-20',
+    paymentMethod: 'Bank Transfer',
+    reference: 'TRX-12345',
+    notes: 'November internet bill',
+    createdBy: 'user-admin-001',
+    creatorName: 'Ahmad Rizal',
+    createdAt: '2024-11-20T10:00:00Z',
+  },
+  {
+    id: 'pay-002',
+    paymentNumber: 'PAY00002',
+    billId: 'bill-002',
+    vendorName: 'AWS',
+    amount: 850,
+    paymentDate: '2024-12-01',
+    paymentMethod: 'Card',
+    reference: 'AWS-INV-DEC24',
+    createdBy: 'user-admin-001',
+    creatorName: 'Ahmad Rizal',
+    createdAt: '2024-12-01T11:00:00Z',
+  },
+  {
+    id: 'pay-003',
+    paymentNumber: 'PAY00003',
+    poId: 'po-001',
+    vendorName: 'TechSupply Sdn Bhd',
+    amount: 10000,
+    paymentDate: '2024-11-22',
+    paymentMethod: 'Bank Transfer',
+    reference: 'PO-PAYMENT-001',
+    notes: 'Full payment for laptops and docking stations',
+    createdBy: 'user-admin-001',
+    creatorName: 'Ahmad Rizal',
+    createdAt: '2024-11-22T15:00:00Z',
   },
 ];
 

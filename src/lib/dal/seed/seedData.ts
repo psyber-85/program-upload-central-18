@@ -363,9 +363,12 @@ export const seedPayrollItems: PayrollItem[] = [
     baseSalary: 8000,
     epf: 880,
     socso: 160,
+    employerEpf: 1040, // 13%
+    employerSocso: 160,
     claimsTotal: 0,
     trainingClaimsTotal: 0,
     netPay: 6960,
+    totalCompanyCost: 9200, // salary + employer contributions
   },
   {
     id: 'payitem-002',
@@ -375,9 +378,12 @@ export const seedPayrollItems: PayrollItem[] = [
     baseSalary: 4500,
     epf: 495,
     socso: 90,
+    employerEpf: 585, // 13%
+    employerSocso: 90,
     claimsTotal: 0,
     trainingClaimsTotal: 0,
     netPay: 3915,
+    totalCompanyCost: 5175,
   },
   {
     id: 'payitem-003',
@@ -387,9 +393,12 @@ export const seedPayrollItems: PayrollItem[] = [
     baseSalary: 5000,
     epf: 550,
     socso: 100,
+    employerEpf: 650, // 13%
+    employerSocso: 100,
     claimsTotal: 0,
     trainingClaimsTotal: 0,
     netPay: 4350,
+    totalCompanyCost: 5750,
   },
   {
     id: 'payitem-004',
@@ -399,9 +408,12 @@ export const seedPayrollItems: PayrollItem[] = [
     baseSalary: 4000,
     epf: 440,
     socso: 80,
+    employerEpf: 520, // 13%
+    employerSocso: 80,
     claimsTotal: 0,
     trainingClaimsTotal: 0,
     netPay: 3480,
+    totalCompanyCost: 4600,
   },
 ];
 
@@ -413,6 +425,8 @@ export const seedPayslips: Payslip[] = seedPayrollItems.map(item => ({
   baseSalary: item.baseSalary,
   epf: item.epf,
   socso: item.socso,
+  employerEpf: item.employerEpf,
+  employerSocso: item.employerSocso,
   claimsTotal: item.claimsTotal,
   trainingClaimsTotal: item.trainingClaimsTotal,
   netPay: item.netPay,

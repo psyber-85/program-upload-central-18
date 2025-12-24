@@ -20,6 +20,7 @@ import RequestDetail from "./pages/staff/RequestDetail";
 import StaffDocs from "./pages/staff/StaffDocs";
 import StaffPayslips from "./pages/staff/StaffPayslips";
 import PayslipDetail from "./pages/staff/PayslipDetail";
+import MyEntries from "./pages/staff/MyEntries";
 
 // Admin pages
 import Payroll from "./pages/staff/admin/Payroll";
@@ -62,7 +63,7 @@ const App = () => (
               <Route path="docs" element={<StaffDocs />} />
               <Route path="payslips" element={<StaffPayslips />} />
               <Route path="payslips/:id" element={<PayslipDetail />} />
-              
+              <Route path="my-entries" element={<MyEntries />} />
               {/* Admin-only routes */}
               <Route path="payroll" element={
                 <ProtectedRoute requireAdmin>

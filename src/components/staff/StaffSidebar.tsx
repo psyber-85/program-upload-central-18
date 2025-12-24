@@ -29,6 +29,7 @@ interface NavItem {
 const mainNavItems: NavItem[] = [
   { label: 'Home', path: '/staff', icon: Home },
   { label: 'Requests', path: '/staff/requests', icon: ClipboardList },
+  { label: 'My Invoices', path: '/staff/my-entries', icon: FileText },
   { label: 'Documents', path: '/staff/docs', icon: FileText },
   { label: 'My Payslips', path: '/staff/payslips', icon: Receipt },
 ];

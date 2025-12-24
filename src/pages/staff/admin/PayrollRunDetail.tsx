@@ -82,6 +82,11 @@ const PayrollRunDetail = () => {
         const epf = Math.round(staff.salaryBase * (staff.epfRate / 100));
         const socso = Math.round(staff.salaryBase * (staff.socsoRate / 100));
         
+        // Employer contributions (default: EPF 13%, SOCSO same as employee rate)
+        const employerEpfRate = 13; // Standard employer EPF rate
+        const employerEpf = Math.round(staff.salaryBase * (employerEpfRate / 100));
+        const employerSocso = socso; // Employer pays same as employee for SOCSO
+        
         // Calculate claims for this staff member
         const staffClaims = claimsByUser[staff.id] || [];
         const claimsTotal = staffClaims.reduce((sum, claim) => sum + claim.amount, 0);
@@ -91,6 +96,7 @@ const PayrollRunDetail = () => {
         const trainingClaimsTotal = staffTraining.reduce((sum, training) => sum + training.cost, 0);
         
         const netPay = staff.salaryBase - epf - socso + claimsTotal + trainingClaimsTotal;
+        const totalCompanyCost = staff.salaryBase + employerEpf + employerSocso + claimsTotal + trainingClaimsTotal;
         
         await payrollLocalRepo.addPayrollItem({
           runId: run.id,
@@ -99,9 +105,12 @@ const PayrollRunDetail = () => {
           baseSalary: staff.salaryBase,
           epf,
           socso,
+          employerEpf,
+          employerSocso,
           claimsTotal,
           trainingClaimsTotal,
           netPay,
+          totalCompanyCost,
         });
       }
       
@@ -146,6 +155,8 @@ const PayrollRunDetail = () => {
           baseSalary: item.baseSalary,
           epf: item.epf,
           socso: item.socso,
+          employerEpf: item.employerEpf,
+          employerSocso: item.employerSocso,
           claimsTotal: item.claimsTotal,
           trainingClaimsTotal: item.trainingClaimsTotal,
           netPay: item.netPay,
@@ -259,10 +270,13 @@ const PayrollRunDetail = () => {
                       <TableRow>
                         <TableHead>Staff</TableHead>
                         <TableHead className="text-right">Base Salary</TableHead>
-                        <TableHead className="text-right">EPF</TableHead>
-                        <TableHead className="text-right">SOCSO</TableHead>
+                        <TableHead className="text-right">EPF (E)</TableHead>
+                        <TableHead className="text-right">SOCSO (E)</TableHead>
+                        <TableHead className="text-right">EPF (ER)</TableHead>
+                        <TableHead className="text-right">SOCSO (ER)</TableHead>
                         <TableHead className="text-right">Claims</TableHead>
                         <TableHead className="text-right">Net Pay</TableHead>
+                        <TableHead className="text-right">Company Cost</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -272,19 +286,28 @@ const PayrollRunDetail = () => {
                           <TableCell className="text-right">RM {item.baseSalary.toLocaleString()}</TableCell>
                           <TableCell className="text-right text-red-600">-RM {item.epf.toLocaleString()}</TableCell>
                           <TableCell className="text-right text-red-600">-RM {item.socso.toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">RM {item.employerEpf.toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">RM {item.employerSocso.toLocaleString()}</TableCell>
                           <TableCell className="text-right text-green-600">
-                            {item.claimsTotal > 0 ? `+RM ${item.claimsTotal.toLocaleString()}` : '-'}
+                            {(item.claimsTotal + item.trainingClaimsTotal) > 0 ? `+RM ${(item.claimsTotal + item.trainingClaimsTotal).toLocaleString()}` : '-'}
                           </TableCell>
                           <TableCell className="text-right font-bold">RM {item.netPay.toLocaleString()}</TableCell>
+                          <TableCell className="text-right font-semibold text-primary">RM {item.totalCompanyCost.toLocaleString()}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
                 
-                <div className="mt-6 pt-4 border-t flex justify-between items-center">
-                  <span className="font-semibold">Total Net Payroll</span>
-                  <span className="text-xl font-bold text-primary">RM {totalNetPay.toLocaleString()}</span>
+                <div className="mt-6 pt-4 border-t space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium text-muted-foreground">Total Net Payroll (to employees)</span>
+                    <span className="text-lg font-bold">RM {totalNetPay.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold">Total Company Cost (incl. employer contributions)</span>
+                    <span className="text-xl font-bold text-primary">RM {items.reduce((sum, item) => sum + item.totalCompanyCost, 0).toLocaleString()}</span>
+                  </div>
                 </div>
               </>
             )}

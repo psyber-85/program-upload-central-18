@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft, Clock, CheckCircle, XCircle, Loader2, ExternalLink, GraduationCap } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle, XCircle, Loader2, ExternalLink, GraduationCap, FileText, Image } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 
 type DisplayRequest = AnyRequest | TrainingApplication;
@@ -310,6 +310,23 @@ const RequestDetail = () => {
                   <Label className="text-muted-foreground">Reason</Label>
                   <p className="font-medium">{request.reason}</p>
                 </div>
+                {request.attachmentUrl && (
+                  <div>
+                    <Label className="text-muted-foreground">Attachment</Label>
+                    <a 
+                      href={request.attachmentUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 mt-1 text-primary hover:underline"
+                    >
+                      {request.attachmentUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) 
+                        ? <Image className="h-4 w-4" />
+                        : <FileText className="h-4 w-4" />
+                      }
+                      View Document
+                    </a>
+                  </div>
+                )}
               </>
             )}
 
@@ -331,6 +348,23 @@ const RequestDetail = () => {
                 </div>
                 {request.autoApproved && (
                   <Badge variant="secondary" className="text-green-600">Auto-approved (≤RM30)</Badge>
+                )}
+                {request.attachmentUrl && (
+                  <div>
+                    <Label className="text-muted-foreground">Receipt / Invoice</Label>
+                    <a 
+                      href={request.attachmentUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 mt-1 text-primary hover:underline"
+                    >
+                      {request.attachmentUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) 
+                        ? <Image className="h-4 w-4" />
+                        : <FileText className="h-4 w-4" />
+                      }
+                      View Document
+                    </a>
+                  </div>
                 )}
               </>
             )}
@@ -370,6 +404,23 @@ const RequestDetail = () => {
                   <Label className="text-muted-foreground">Justification</Label>
                   <p className="font-medium">{request.justification}</p>
                 </div>
+                {request.attachmentUrl && (
+                  <div>
+                    <Label className="text-muted-foreground">Supporting Document</Label>
+                    <a 
+                      href={request.attachmentUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 mt-1 text-primary hover:underline"
+                    >
+                      {request.attachmentUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) 
+                        ? <Image className="h-4 w-4" />
+                        : <FileText className="h-4 w-4" />
+                      }
+                      View Document
+                    </a>
+                  </div>
+                )}
                 {request.approvedAt && (
                   <div>
                     <Label className="text-muted-foreground">Approved On</Label>

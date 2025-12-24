@@ -53,6 +53,7 @@ export interface LeaveRequest extends RequestBase {
   halfDay: boolean;
   reason: string;
   customLeaveType?: string;
+  attachmentUrl?: string; // optional document upload
 }
 
 export interface ReceiptMeta {
@@ -71,6 +72,7 @@ export interface ClaimRequest extends RequestBase {
   autoApproved: boolean;
   includedInPayrollMonth?: string; // 'YYYY-MM'
   linkedTrainingAppId?: string;
+  attachmentUrl?: string; // optional receipt upload
 }
 
 export type TrainingApplicationStatus = 
@@ -94,6 +96,7 @@ export interface TrainingApplication {
   completedAt?: string;
   claimedAt?: string;
   includedInPayrollMonth?: string; // 'YYYY-MM'
+  attachmentUrl?: string; // optional justification document
 }
 
 export interface TrainingEntitlement {
@@ -184,11 +187,14 @@ export interface PayrollItem {
   userId: string;
   userName: string;
   baseSalary: number;
-  epf: number;
-  socso: number;
+  epf: number; // employee contribution
+  socso: number; // employee contribution
+  employerEpf: number; // employer contribution (default 13%)
+  employerSocso: number; // employer contribution
   claimsTotal: number;
   trainingClaimsTotal: number;
   netPay: number;
+  totalCompanyCost: number; // salary + employer contributions
 }
 
 export interface Payslip {
@@ -199,6 +205,8 @@ export interface Payslip {
   baseSalary: number;
   epf: number;
   socso: number;
+  employerEpf: number;
+  employerSocso: number;
   claimsTotal: number;
   trainingClaimsTotal: number;
   netPay: number;

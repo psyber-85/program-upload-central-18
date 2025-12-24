@@ -128,6 +128,7 @@ export type AnyRequest = LeaveRequest | ClaimRequest;
 
 export type InvoiceStatus = 'Draft' | 'Sent' | 'Paid';
 export type BillStatus = 'Draft' | 'Paid';
+export type QuotationStatus = 'Draft' | 'Sent' | 'Accepted' | 'Rejected' | 'Converted';
 export type BusinessArm = 'Training' | 'Solutions';
 
 export interface InvoiceItem {
@@ -140,6 +141,7 @@ export interface InvoiceItem {
 export interface Invoice {
   id: string;
   createdBy: string;
+  creatorName?: string; // display name of creator
   invoiceNumber: string; // INVxxxxx
   businessArm: BusinessArm;
   clientName?: string;
@@ -149,6 +151,24 @@ export interface Invoice {
   items: InvoiceItem[];
   total: number;
   paidDate?: string;
+  quotationId?: string; // linked quotation if converted
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Quotation {
+  id: string;
+  createdBy: string;
+  creatorName?: string;
+  quotationNumber: string; // QUOxxxxx
+  businessArm: BusinessArm;
+  clientName?: string;
+  issueDate: string;
+  validUntil?: string;
+  status: QuotationStatus;
+  items: InvoiceItem[];
+  total: number;
+  convertedInvoiceId?: string; // linked invoice after conversion
   createdAt: string;
   updatedAt: string;
 }

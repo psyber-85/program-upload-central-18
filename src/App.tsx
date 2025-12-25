@@ -72,9 +72,11 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           {/* ============================================ */}
-          {/* PLACEMENT SYSTEM - Primary Public Site      */}
-          {/* Completely isolated from Staff Portal       */}
+          {/* PLACEMENT SYSTEM - All routes wrapped in    */}
+          {/* PlacementAuthProvider for shared context    */}
           {/* ============================================ */}
+          
+          {/* Public Site */}
           <Route element={
             <PlacementAuthProvider>
               <PublicLayout />
@@ -86,49 +88,33 @@ const App = () => (
             <Route path="/contact" element={<Contact />} />
           </Route>
           
-          {/* Placement Login (standalone, no layout) */}
+          {/* Placement Login (standalone) */}
           <Route path="/login" element={
             <PlacementAuthProvider>
               <PlacementLogin />
             </PlacementAuthProvider>
           } />
 
-          {/* ============================================ */}
-          {/* EMPLOYER PORTAL - For company users         */}
-          {/* ============================================ */}
-          <Route path="/employer" element={
-            <PlacementAuthProvider>
-              <EmployerProtectedRoute>
-                <EmployerLayout />
-              </EmployerProtectedRoute>
-            </PlacementAuthProvider>
-          }>
-            <Route index element={<EmployerDashboard />} />
-            <Route path="roles" element={<EmployerRoles />} />
-            <Route path="roles/new" element={<NewRole />} />
-            <Route path="roles/:roleId" element={<RoleDetail />} />
+          {/* Employer Portal */}
+          <Route element={<PlacementAuthProvider><EmployerProtectedRoute><EmployerLayout /></EmployerProtectedRoute></PlacementAuthProvider>}>
+            <Route path="/employer" element={<EmployerDashboard />} />
+            <Route path="/employer/roles" element={<EmployerRoles />} />
+            <Route path="/employer/roles/new" element={<NewRole />} />
+            <Route path="/employer/roles/:roleId" element={<RoleDetail />} />
           </Route>
 
-          {/* ============================================ */}
-          {/* OPS CONSOLE - For AIHQ operations           */}
-          {/* ============================================ */}
-          <Route path="/ops" element={
-            <PlacementAuthProvider>
-              <OpsProtectedRoute>
-                <OpsLayout />
-              </OpsProtectedRoute>
-            </PlacementAuthProvider>
-          }>
-            <Route index element={<OpsDashboard />} />
-            <Route path="employers" element={<OpsEmployers />} />
-            <Route path="employers/:companyId" element={<OpsEmployerDetail />} />
-            <Route path="roles" element={<OpsRoles />} />
-            <Route path="roles/:roleId" element={<OpsRoleDetail />} />
-            <Route path="candidates" element={<OpsCandidates />} />
-            <Route path="candidates/:candidateId" element={<OpsCandidateDetail />} />
-            <Route path="loi-queue" element={<LOIQueue />} />
-            <Route path="programme" element={<OpsProgramme />} />
-            <Route path="reports" element={<OpsReports />} />
+          {/* Ops Console */}
+          <Route element={<PlacementAuthProvider><OpsProtectedRoute><OpsLayout /></OpsProtectedRoute></PlacementAuthProvider>}>
+            <Route path="/ops" element={<OpsDashboard />} />
+            <Route path="/ops/employers" element={<OpsEmployers />} />
+            <Route path="/ops/employers/:companyId" element={<OpsEmployerDetail />} />
+            <Route path="/ops/roles" element={<OpsRoles />} />
+            <Route path="/ops/roles/:roleId" element={<OpsRoleDetail />} />
+            <Route path="/ops/candidates" element={<OpsCandidates />} />
+            <Route path="/ops/candidates/:candidateId" element={<OpsCandidateDetail />} />
+            <Route path="/ops/loi-queue" element={<LOIQueue />} />
+            <Route path="/ops/programme" element={<OpsProgramme />} />
+            <Route path="/ops/reports" element={<OpsReports />} />
           </Route>
 
           {/* ============================================ */}

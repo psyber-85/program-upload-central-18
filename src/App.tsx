@@ -66,6 +66,27 @@ import { OpsReports } from "./pages/placement/ops/Reports";
 
 const queryClient = new QueryClient();
 
+// Wrapper components to ensure proper context hierarchy
+function PlacementEmployerRoutes() {
+  return (
+    <PlacementAuthProvider>
+      <EmployerProtectedRoute>
+        <EmployerLayout />
+      </EmployerProtectedRoute>
+    </PlacementAuthProvider>
+  );
+}
+
+function PlacementOpsRoutes() {
+  return (
+    <PlacementAuthProvider>
+      <OpsProtectedRoute>
+        <OpsLayout />
+      </OpsProtectedRoute>
+    </PlacementAuthProvider>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -98,7 +119,7 @@ const App = () => (
           } />
 
           {/* Employer Portal */}
-          <Route element={<PlacementAuthProvider><EmployerProtectedRoute><EmployerLayout /></EmployerProtectedRoute></PlacementAuthProvider>}>
+          <Route element={<PlacementEmployerRoutes />}>
             <Route path="/employer" element={<EmployerDashboard />} />
             <Route path="/employer/roles" element={<EmployerRoles />} />
             <Route path="/employer/roles/new" element={<NewRole />} />
@@ -110,7 +131,7 @@ const App = () => (
           </Route>
 
           {/* Ops Console - Note: /ops/loi per superprompt spec */}
-          <Route element={<PlacementAuthProvider><OpsProtectedRoute><OpsLayout /></OpsProtectedRoute></PlacementAuthProvider>}>
+          <Route element={<PlacementOpsRoutes />}>
             <Route path="/ops" element={<OpsDashboard />} />
             <Route path="/ops/employers" element={<OpsEmployers />} />
             <Route path="/ops/employers/:companyId" element={<OpsEmployerDetail />} />

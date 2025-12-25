@@ -1,7 +1,7 @@
 // LocalStorage implementations for Placement System
 import type {
   EmployerCompany, EmployerUser, PlacementUser, RoleOpening, CandidateProfile,
-  CandidateSubmission, LOIRecord, SelectionRecord, ProgrammeTracker,
+  CandidateSubmission, LOIRecord, SelectionRecord, ProgrammeTracker, GrantSupportCase,
   ActivityLog, TaskItem, TalentRequest, RoleFilters, CandidateFilters, SubmissionFilters
 } from '../types';
 import type * as I from '../interfaces';
@@ -194,6 +194,7 @@ export const selectionLocalRepo: I.ISelectionRepo = {
 
 // Programme Repository
 export const programmeLocalRepo: I.IProgrammeRepo = {
+  async getAll() { return getStore<ProgrammeTracker>('programmeTrackers'); },
   async getBySelectionId(selectionId) { return getStore<ProgrammeTracker>('programmeTrackers').find(p => p.selectionId === selectionId) || null; },
   async getByCompanyId(companyId) { return getStore<ProgrammeTracker>('programmeTrackers').filter(p => p.companyId === companyId); },
   async create(data) {
@@ -210,6 +211,28 @@ export const programmeLocalRepo: I.IProgrammeRepo = {
     trackers[idx] = { ...trackers[idx], ...data, updatedAt: new Date().toISOString() };
     setStore('programmeTrackers', trackers);
     return trackers[idx];
+  }
+};
+
+// Grant Support Repository
+export const grantLocalRepo: I.IGrantRepo = {
+  async getAll() { return getStore<GrantSupportCase>('grantCases'); },
+  async getByRoleId(roleId) { return getStore<GrantSupportCase>('grantCases').find(g => g.roleId === roleId) || null; },
+  async getByCompanyId(companyId) { return getStore<GrantSupportCase>('grantCases').filter(g => g.companyId === companyId); },
+  async create(data) {
+    const cases = getStore<GrantSupportCase>('grantCases');
+    const newCase: GrantSupportCase = { ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    cases.push(newCase);
+    setStore('grantCases', cases);
+    return newCase;
+  },
+  async update(id, data) {
+    const cases = getStore<GrantSupportCase>('grantCases');
+    const idx = cases.findIndex(g => g.id === id);
+    if (idx === -1) throw new Error('Grant case not found');
+    cases[idx] = { ...cases[idx], ...data, updatedAt: new Date().toISOString() };
+    setStore('grantCases', cases);
+    return cases[idx];
   }
 };
 

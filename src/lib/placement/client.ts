@@ -14,6 +14,7 @@ export {
   loiLocalRepo as loiRepo,
   selectionLocalRepo as selectionRepo,
   programmeLocalRepo as programmeRepo,
+  grantLocalRepo as grantRepo,
   activityLocalRepo as activityRepo,
   taskLocalRepo as taskRepo,
   talentRequestLocalRepo as talentRequestRepo,

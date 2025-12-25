@@ -1,19 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
-  ArrowLeft, Edit, Users, MapPin, Briefcase, Clock, DollarSign, 
-  FileText, AlertCircle, CheckCircle, Calendar
+  ArrowLeft, Users, MapPin, Briefcase, DollarSign, 
+  CheckCircle, Calendar, GraduationCap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { usePlacementAuth } from '@/contexts/PlacementAuthContext';
-import { roleRepo, submissionRepo } from '@/lib/placement/client';
+import { roleRepo, submissionRepo, loiRepo } from '@/lib/placement/client';
 import { CandidatePipeline } from '@/components/placement/employer/CandidatePipeline';
-import type { RoleOpening, CandidateSubmission, RoleStatus, LOIStatus } from '@/lib/placement/types';
+import { LOIBanner } from '@/components/placement/shared/LOIBanner';
+import type { RoleOpening, CandidateSubmission, RoleStatus } from '@/lib/placement/types';
 
 const statusColors: Record<RoleStatus, string> = {
   DRAFT: 'bg-muted text-muted-foreground',
@@ -23,14 +23,6 @@ const statusColors: Record<RoleStatus, string> = {
   SELECTED: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
   PLACED: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
   CLOSED: 'bg-zinc-100 text-zinc-800 dark:bg-zinc-900/30 dark:text-zinc-400',
-};
-
-const loiStatusInfo: Record<LOIStatus, { label: string; color: string; icon: React.ElementType }> = {
-  NOT_REQUESTED: { label: 'Not Required Yet', color: 'text-muted-foreground', icon: Clock },
-  REQUESTED: { label: 'LOI Required', color: 'text-amber-600', icon: AlertCircle },
-  DOWNLOADED: { label: 'Downloaded', color: 'text-blue-600', icon: FileText },
-  UPLOADED_SIGNED: { label: 'Pending Verification', color: 'text-purple-600', icon: Clock },
-  VERIFIED: { label: 'Verified', color: 'text-green-600', icon: CheckCircle },
 };
 
 export function RoleDetail() {
@@ -98,6 +90,15 @@ export function RoleDetail() {
     }
   }
 
+  // LOI Banner handlers - navigate to dedicated LOI page
+  function handleDownloadLOI() {
+    navigate(`/employer/roles/${roleId}/loi`);
+  }
+
+  function handleUploadLOI() {
+    navigate(`/employer/roles/${roleId}/loi`);
+  }
+
   if (loading) {
     return (
       <div className="p-6 space-y-6">
@@ -111,8 +112,9 @@ export function RoleDetail() {
 
   if (!role) return null;
 
-  const loiInfo = loiStatusInfo[role.loiStatus];
-  const LOIIcon = loiInfo.icon;
+  const isSelected = role.status === 'SELECTED' || role.status === 'PLACED';
+  const showLOIBanner = role.loiStatus !== 'VERIFIED' && ['OPEN', 'INTERVIEWING', 'SELECTING'].includes(role.status);
+  const showProgrammeSection = isSelected;
 
   return (
     <div className="p-6 space-y-6">
@@ -150,29 +152,36 @@ export function RoleDetail() {
         </div>
       </div>
 
-      {/* LOI Status Banner */}
-      {role.loiStatus !== 'VERIFIED' && ['OPEN', 'INTERVIEWING', 'SELECTING'].includes(role.status) && (
-        <Card className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/20">
+      {/* LOI Status Banner - Using shared component */}
+      {showLOIBanner && (
+        <LOIBanner 
+          status={role.loiStatus}
+          onDownload={handleDownloadLOI}
+          onUpload={handleUploadLOI}
+        />
+      )}
+
+      {/* Programme Section - Only shown after selection */}
+      {showProgrammeSection && (
+        <Card className="border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/20">
           <CardContent className="py-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <LOIIcon className={`h-5 w-5 ${loiInfo.color}`} />
+                <GraduationCap className="h-5 w-5 text-green-600" />
                 <div>
-                  <p className="font-medium">Letter of Intent: {loiInfo.label}</p>
+                  <p className="font-medium text-green-800 dark:text-green-400">
+                    Programme & Training Active
+                  </p>
                   <p className="text-sm text-muted-foreground">
-                    {role.loiStatus === 'NOT_REQUESTED' && 'LOI is required before shortlisting candidates'}
-                    {role.loiStatus === 'REQUESTED' && 'Please download and sign the LOI to proceed'}
-                    {role.loiStatus === 'DOWNLOADED' && 'Upload the signed LOI to continue'}
-                    {role.loiStatus === 'UPLOADED_SIGNED' && 'AIHQ is reviewing your LOI'}
+                    Placement confirmed. View training progress and programme details.
                   </p>
                 </div>
               </div>
-              {role.loiStatus !== 'UPLOADED_SIGNED' && (
-                <Button variant="outline" size="sm">
-                  {role.loiStatus === 'NOT_REQUESTED' ? 'Download LOI' : 
-                   role.loiStatus === 'REQUESTED' ? 'Download LOI' : 'Upload Signed LOI'}
-                </Button>
-              )}
+              <Button variant="outline" size="sm" asChild>
+                <Link to={`/employer/roles/${roleId}/training`}>
+                  View Training
+                </Link>
+              </Button>
             </div>
           </CardContent>
         </Card>

@@ -322,6 +322,49 @@ export interface TrainingMilestone {
 }
 
 // ============================================
+// GRANT SUPPORT CASE (Per Superprompt)
+// ============================================
+
+export type GrantSupportStatus = 
+  | 'NOT_APPLICABLE'
+  | 'POTENTIAL'
+  | 'IN_PROGRESS'
+  | 'SUBMITTED'
+  | 'APPROVED'
+  | 'REJECTED';
+
+export interface GrantSupportCase {
+  id: string;
+  companyId: string;
+  roleId: string;
+  candidateId: string;
+  
+  // Denormalized
+  companyName: string;
+  roleName: string;
+  candidateName: string;
+  
+  status: GrantSupportStatus;
+  
+  // Details
+  grantType?: string;
+  estimatedAmount?: number;
+  approvedAmount?: number;
+  
+  // Tracking
+  submittedAt?: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  rejectionReason?: string;
+  
+  // Internal notes (Ops only)
+  notes?: string;
+  
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================
 // ACTIVITY & TASK TYPES
 // ============================================
 

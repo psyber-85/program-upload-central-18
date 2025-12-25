@@ -38,6 +38,16 @@ import { RequestTalent } from "./pages/placement/public/RequestTalent";
 import { Contact } from "./pages/placement/public/Contact";
 import { PlacementLogin } from "./pages/placement/PlacementLogin";
 
+// Placement - Employer Portal
+import { EmployerProtectedRoute } from "./components/placement/employer/EmployerProtectedRoute";
+import { EmployerLayout } from "./components/placement/employer/EmployerLayout";
+import { EmployerDashboard } from "./pages/placement/employer/Dashboard";
+
+// Placement - Ops Console
+import { OpsProtectedRoute } from "./components/placement/ops/OpsProtectedRoute";
+import { OpsLayout } from "./components/placement/ops/OpsLayout";
+import { OpsDashboard } from "./pages/placement/ops/Dashboard";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -69,11 +79,33 @@ const App = () => (
             </PlacementAuthProvider>
           } />
 
-          {/* Employer Portal routes - To be implemented in Phase 4 */}
-          {/* <Route path="/employer/*" ... /> */}
+          {/* ============================================ */}
+          {/* EMPLOYER PORTAL - For company users         */}
+          {/* ============================================ */}
+          <Route path="/employer" element={
+            <PlacementAuthProvider>
+              <EmployerProtectedRoute>
+                <EmployerLayout />
+              </EmployerProtectedRoute>
+            </PlacementAuthProvider>
+          }>
+            <Route index element={<EmployerDashboard />} />
+            {/* More routes in Phase 4 */}
+          </Route>
 
-          {/* Ops Console routes - To be implemented in Phase 7 */}
-          {/* <Route path="/ops/*" ... /> */}
+          {/* ============================================ */}
+          {/* OPS CONSOLE - For AIHQ operations           */}
+          {/* ============================================ */}
+          <Route path="/ops" element={
+            <PlacementAuthProvider>
+              <OpsProtectedRoute>
+                <OpsLayout />
+              </OpsProtectedRoute>
+            </PlacementAuthProvider>
+          }>
+            <Route index element={<OpsDashboard />} />
+            {/* More routes in Phase 7 */}
+          </Route>
 
           {/* ============================================ */}
           {/* STAFF PORTAL - Internal Tool                */}

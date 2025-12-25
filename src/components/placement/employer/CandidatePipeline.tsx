@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { User, Star, Calendar, MessageSquare, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { User, Star, Calendar, MessageSquare, CheckCircle, XCircle, AlertCircle, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -149,6 +150,7 @@ export function CandidatePipeline({ submissions, roleId, loiVerified, onUpdate }
                   <CandidateCard
                     key={submission.id}
                     submission={submission}
+                    roleId={roleId}
                     loiVerified={loiVerified}
                     onShortlist={() => openActionDialog(submission, 'shortlist')}
                     onSchedule={() => openActionDialog(submission, 'schedule')}
@@ -236,6 +238,7 @@ export function CandidatePipeline({ submissions, roleId, loiVerified, onUpdate }
 
 interface CandidateCardProps {
   submission: CandidateSubmission;
+  roleId: string;
   loiVerified: boolean;
   onShortlist: () => void;
   onSchedule: () => void;
@@ -243,19 +246,22 @@ interface CandidateCardProps {
   onSelect: () => void;
 }
 
-function CandidateCard({ submission, loiVerified, onShortlist, onSchedule, onReject, onSelect }: CandidateCardProps) {
+function CandidateCard({ submission, roleId, loiVerified, onShortlist, onSchedule, onReject, onSelect }: CandidateCardProps) {
   const stage = submission.stage;
 
   return (
     <Card className={`border-l-4 ${stageColors[stage]}`}>
       <CardContent className="p-3 space-y-2">
         <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2">
+          <Link 
+            to={`/employer/roles/${roleId}/candidate/${submission.id}`}
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          >
             <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
               <User className="h-4 w-4 text-primary" />
             </div>
             <div>
-              <p className="font-medium text-sm leading-tight">{submission.candidateDisplayName}</p>
+              <p className="font-medium text-sm leading-tight hover:underline">{submission.candidateDisplayName}</p>
               {submission.employerRating && (
                 <div className="flex items-center gap-0.5">
                   {[...Array(5)].map((_, i) => (
@@ -267,7 +273,13 @@ function CandidateCard({ submission, loiVerified, onShortlist, onSchedule, onRej
                 </div>
               )}
             </div>
-          </div>
+          </Link>
+          <Link 
+            to={`/employer/roles/${roleId}/candidate/${submission.id}`}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <ExternalLink className="h-3 w-3" />
+          </Link>
         </div>
 
         {submission.interviewScheduledAt && (

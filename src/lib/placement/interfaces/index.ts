@@ -1,7 +1,7 @@
 // Repository interfaces for Placement System
 import type {
   EmployerCompany, EmployerUser, PlacementUser, RoleOpening, CandidateProfile,
-  CandidateSubmission, LOIRecord, SelectionRecord, ProgrammeTracker,
+  CandidateSubmission, LOIRecord, SelectionRecord, ProgrammeTracker, GrantSupportCase,
   ActivityLog, TaskItem, TalentRequest, RoleFilters, CandidateFilters, SubmissionFilters
 } from '../types';
 
@@ -63,8 +63,17 @@ export interface ISelectionRepo {
 export interface IProgrammeRepo {
   getBySelectionId(selectionId: string): Promise<ProgrammeTracker | null>;
   getByCompanyId(companyId: string): Promise<ProgrammeTracker[]>;
+  getAll(): Promise<ProgrammeTracker[]>;
   create(tracker: Omit<ProgrammeTracker, 'id' | 'createdAt' | 'updatedAt'>): Promise<ProgrammeTracker>;
   update(id: string, data: Partial<ProgrammeTracker>): Promise<ProgrammeTracker>;
+}
+
+export interface IGrantRepo {
+  getAll(): Promise<GrantSupportCase[]>;
+  getByRoleId(roleId: string): Promise<GrantSupportCase | null>;
+  getByCompanyId(companyId: string): Promise<GrantSupportCase[]>;
+  create(grant: Omit<GrantSupportCase, 'id' | 'createdAt' | 'updatedAt'>): Promise<GrantSupportCase>;
+  update(id: string, data: Partial<GrantSupportCase>): Promise<GrantSupportCase>;
 }
 
 export interface IActivityRepo {

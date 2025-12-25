@@ -1,49 +1,71 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowRight, Users, Building2, GraduationCap, TrendingUp, CheckCircle2, Zap } from 'lucide-react';
+import { 
+  ArrowRight, Users, Building2, CheckCircle2, 
+  FileText, BarChart3, MessageSquare, ClipboardList,
+  Lightbulb, UserCheck, GraduationCap
+} from 'lucide-react';
 
 export function Landing() {
-  const stats = [
-    { value: '500+', label: 'Candidates Placed' },
-    { value: '120+', label: 'Partner Companies' },
-    { value: '95%', label: 'Placement Success' },
-    { value: '4.8', label: 'Employer Rating' },
-  ];
-
-  const features = [
+  // Future-ready examples per superprompt
+  const futureReadyExamples = [
     {
-      icon: GraduationCap,
-      title: 'AI-Trained Talent',
-      description: 'Access candidates who have completed rigorous AI and tech training programmes.',
+      icon: ClipboardList,
+      title: 'Ops / Admin',
+      description: 'SOP drafting, reporting summaries, process documentation',
     },
     {
-      icon: Users,
-      title: 'Pre-Screened Candidates',
-      description: 'Every candidate is vetted and matched to your specific requirements.',
+      icon: MessageSquare,
+      title: 'Marketing / Comms',
+      description: 'Content drafts, customer replies, feedback analysis',
     },
     {
-      icon: TrendingUp,
-      title: 'Ongoing Support',
-      description: 'We provide training tracking and grant support throughout the placement.',
+      icon: BarChart3,
+      title: 'Reporting',
+      description: 'Data cleanup, management reporting, insight summaries',
     },
     {
-      icon: Zap,
-      title: 'Fast Matching',
-      description: 'Get matched candidates within days, not weeks.',
+      icon: FileText,
+      title: 'Project Management',
+      description: 'Meeting summaries, action tracking, documentation',
     },
   ];
 
+  // What "future-ready" means
+  const futureReadyBullets = [
+    'Comfortable using AI tools for everyday work tasks',
+    'Can draft, summarize, and organize with AI assistance',
+    'Understands practical applications — not deep tech specialists',
+  ];
+
+  // How it works steps
   const steps = [
-    { step: '01', title: 'Submit Your Role', description: 'Tell us about your hiring needs and requirements.' },
-    { step: '02', title: 'Review Candidates', description: 'We match and present pre-screened candidates.' },
-    { step: '03', title: 'Interview & Select', description: 'Interview candidates and make your selection.' },
-    { step: '04', title: 'Onboard & Train', description: 'We support the training and placement process.' },
+    { step: '01', title: 'Role & JD', description: 'Share your hiring needs with job scope and requirements.' },
+    { step: '02', title: 'CVs', description: 'We match and present pre-screened, employer-safe CVs.' },
+    { step: '03', title: 'Interviews', description: 'Interview candidates with AIHQ coordination support.' },
+    { step: '04', title: 'Selection', description: 'Select your hire. AIHQ handles placement follow-through.' },
+  ];
+
+  // Why different from superficial workshops
+  const differences = [
+    {
+      traditional: 'One-day AI workshops',
+      aihq: 'Structured programmes with real work application',
+    },
+    {
+      traditional: 'Generic tool introductions',
+      aihq: 'Role-specific AI capability building',
+    },
+    {
+      traditional: 'Certificates without practice',
+      aihq: 'Demonstrated competency through projects',
+    },
   ];
 
   return (
     <div>
-      {/* Hero Section */}
+      {/* Hero Section - Per superprompt: NOT deep tech */}
       <section className="relative overflow-hidden bg-gradient-to-b from-muted/50 to-background py-20 md:py-32">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center space-y-6">
@@ -54,13 +76,15 @@ export function Landing() {
               </span>
               Now accepting employer applications
             </div>
+            {/* SUPERPROMPT HEADLINE */}
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight">
-              Hire AI-Ready Talent{' '}
-              <span className="text-primary">for Your Business</span>
+              Hire future-ready staff —{' '}
+              <span className="text-primary">not deep tech specialists</span>
             </h1>
+            {/* SUPERPROMPT SUBTEXT */}
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-              Connect with pre-trained, job-ready candidates from Singapore's leading AI training programmes. 
-              We handle the matching, you get the talent.
+              Practical AI capability for everyday work. Hire as usual. 
+              AIHQ supports interviews, placement coordination, and post-hire training.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
               <Button size="lg" asChild>
@@ -76,39 +100,46 @@ export function Landing() {
         </div>
       </section>
 
-      {/* Stats Section */}
-      <section className="py-12 border-y border-border bg-muted/30">
+      {/* Section 1: What "future-ready" means */}
+      <section className="py-16 border-y border-border bg-muted/30">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {stats.map((stat) => (
-              <div key={stat.label} className="text-center">
-                <div className="text-3xl md:text-4xl font-bold text-primary">{stat.value}</div>
-                <div className="text-sm text-muted-foreground mt-1">{stat.label}</div>
+          <div className="max-w-3xl mx-auto">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Lightbulb className="h-5 w-5 text-primary" />
               </div>
-            ))}
+              <h2 className="text-2xl font-bold">What "future-ready" means</h2>
+            </div>
+            <ul className="space-y-4">
+              {futureReadyBullets.map((bullet, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                  <span className="text-muted-foreground text-lg">{bullet}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* Section 2: Examples (cards) - Per superprompt */}
       <section className="py-20">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4">Why Partner With Us?</h2>
+            <h2 className="text-3xl font-bold mb-4">Practical AI for everyday roles</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              We bridge the gap between trained talent and growing businesses, 
-              making hiring simpler and more effective.
+              Our candidates are trained to apply AI to real work tasks — not build AI systems.
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {features.map((feature) => (
-              <Card key={feature.title} className="border-border/50 hover:border-primary/50 transition-colors">
+            {futureReadyExamples.map((example) => (
+              <Card key={example.title} className="border-border/50 hover:border-primary/50 transition-colors">
                 <CardContent className="pt-6">
                   <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4">
-                    <feature.icon className="h-6 w-6 text-primary" />
+                    <example.icon className="h-6 w-6 text-primary" />
                   </div>
-                  <h3 className="font-semibold mb-2">{feature.title}</h3>
-                  <p className="text-sm text-muted-foreground">{feature.description}</p>
+                  <h3 className="font-semibold mb-2">{example.title}</h3>
+                  <p className="text-sm text-muted-foreground">{example.description}</p>
                 </CardContent>
               </Card>
             ))}
@@ -116,13 +147,13 @@ export function Landing() {
         </div>
       </section>
 
-      {/* How It Works Preview */}
+      {/* Section 3: How It Works (Simple) */}
       <section className="py-20 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold mb-4">How It Works</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              A simple, streamlined process to get you the talent you need.
+              A familiar HR process with AIHQ coordination support.
             </p>
           </div>
           <div className="grid md:grid-cols-4 gap-8">
@@ -145,8 +176,34 @@ export function Landing() {
         </div>
       </section>
 
-      {/* For Employers Section */}
+      {/* Section 4: Why it's different from superficial workshops */}
       <section className="py-20">
+        <div className="container mx-auto px-4">
+          <div className="max-w-3xl mx-auto">
+            <h2 className="text-3xl font-bold mb-8 text-center">
+              Why it's different from superficial workshops
+            </h2>
+            <div className="space-y-4">
+              {differences.map((diff, i) => (
+                <div key={i} className="grid md:grid-cols-2 gap-4 items-center">
+                  <div className="p-4 rounded-lg bg-muted/50 border border-border">
+                    <p className="text-sm text-muted-foreground line-through">{diff.traditional}</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                    <p className="text-sm font-medium flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0" />
+                      {diff.aihq}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* For Employers Section */}
+      <section className="py-20 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
@@ -157,8 +214,8 @@ export function Landing() {
               </p>
               <ul className="space-y-4">
                 {[
-                  'Access to government grant support for eligible placements',
-                  'Dedicated account management throughout the process',
+                  'Access to government grant support for eligible placements (subject to approval)',
+                  'Dedicated coordination throughout the hiring process',
                   'Structured training programmes for seamless onboarding',
                   'Transparent pipeline with real-time updates',
                 ].map((item) => (
@@ -179,12 +236,12 @@ export function Landing() {
                 <CardContent className="p-8">
                   <Building2 className="h-12 w-12 text-primary mb-4" />
                   <blockquote className="text-lg mb-4">
-                    "AIHQ Placement helped us find three AI engineers in under a month. 
+                    "AIHQ Placement helped us find staff who could actually apply AI to their daily work. 
                     The candidates were well-prepared and hit the ground running."
                   </blockquote>
                   <div>
-                    <div className="font-semibold">Sarah Tan</div>
-                    <div className="text-sm text-muted-foreground">CTO, TechVentures Pte Ltd</div>
+                    <div className="font-semibold">HR Manager</div>
+                    <div className="text-sm text-muted-foreground">Singapore SME</div>
                   </div>
                 </CardContent>
               </Card>
@@ -198,14 +255,14 @@ export function Landing() {
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-4">Ready to Find Your Next Hire?</h2>
           <p className="text-primary-foreground/80 max-w-2xl mx-auto mb-8">
-            Submit your talent request today and we'll match you with qualified candidates within days.
+            Submit your talent request today and we'll match you with qualified candidates.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" variant="secondary" asChild>
               <Link to="/request-talent">Request Talent</Link>
             </Button>
             <Button size="lg" variant="outline" className="bg-transparent border-primary-foreground/30 hover:bg-primary-foreground/10" asChild>
-              <Link to="/contact">Contact Us</Link>
+              <Link to="/contact">Talk to AIHQ</Link>
             </Button>
           </div>
         </div>

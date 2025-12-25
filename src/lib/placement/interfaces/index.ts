@@ -8,6 +8,7 @@ import type {
 export interface ICompanyRepo {
   getAll(): Promise<EmployerCompany[]>;
   getById(id: string): Promise<EmployerCompany | null>;
+  getUsers(companyId: string): Promise<EmployerUser[]>;
   create(company: Omit<EmployerCompany, 'id' | 'createdAt' | 'updatedAt'>): Promise<EmployerCompany>;
   update(id: string, data: Partial<EmployerCompany>): Promise<EmployerCompany>;
 }
@@ -50,6 +51,7 @@ export interface ILOIRepo {
   getByRoleId(roleId: string): Promise<LOIRecord | null>;
   create(record: Omit<LOIRecord, 'id' | 'createdAt' | 'updatedAt'>): Promise<LOIRecord>;
   update(id: string, data: Partial<LOIRecord>): Promise<LOIRecord>;
+  updateStatus(roleId: string, status: import('../types').LOIStatus): Promise<void>;
 }
 
 export interface ISelectionRepo {

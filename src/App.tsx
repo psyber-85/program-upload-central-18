@@ -46,10 +46,18 @@ import { EmployerRoles } from "./pages/placement/employer/Roles";
 import { NewRole } from "./pages/placement/employer/NewRole";
 import { RoleDetail } from "./pages/placement/employer/RoleDetail";
 
+import { RoleTraining } from "./pages/placement/employer/RoleTraining";
+
 // Placement - Ops Console
 import { OpsProtectedRoute } from "./components/placement/ops/OpsProtectedRoute";
 import { OpsLayout } from "./components/placement/ops/OpsLayout";
 import { OpsDashboard } from "./pages/placement/ops/Dashboard";
+import { OpsEmployers } from "./pages/placement/ops/Employers";
+import { OpsRoles } from "./pages/placement/ops/Roles";
+import { OpsCandidates } from "./pages/placement/ops/Candidates";
+import { LOIQueue } from "./pages/placement/ops/LOIQueue";
+import { OpsProgramme } from "./pages/placement/ops/Programme";
+import { OpsReports } from "./pages/placement/ops/Reports";
 
 const queryClient = new QueryClient();
 

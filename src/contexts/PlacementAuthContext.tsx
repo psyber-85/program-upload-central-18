@@ -1,4 +1,5 @@
 // Placement Auth Context - Completely isolated from Staff AuthContext
+// Provides authentication state for placement system (employer & ops portals)
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { PlacementSession, PlacementUserRole } from '@/lib/placement/types';
 import { initializeMockData } from '@/lib/placement/mockDb';

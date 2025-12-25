@@ -53,8 +53,11 @@ import { OpsProtectedRoute } from "./components/placement/ops/OpsProtectedRoute"
 import { OpsLayout } from "./components/placement/ops/OpsLayout";
 import { OpsDashboard } from "./pages/placement/ops/Dashboard";
 import { OpsEmployers } from "./pages/placement/ops/Employers";
+import { OpsEmployerDetail } from "./pages/placement/ops/EmployerDetail";
 import { OpsRoles } from "./pages/placement/ops/Roles";
+import { OpsRoleDetail } from "./pages/placement/ops/RoleDetail";
 import { OpsCandidates } from "./pages/placement/ops/Candidates";
+import { OpsCandidateDetail } from "./pages/placement/ops/CandidateDetail";
 import { LOIQueue } from "./pages/placement/ops/LOIQueue";
 import { OpsProgramme } from "./pages/placement/ops/Programme";
 import { OpsReports } from "./pages/placement/ops/Reports";
@@ -117,7 +120,15 @@ const App = () => (
             </PlacementAuthProvider>
           }>
             <Route index element={<OpsDashboard />} />
-            {/* More routes in Phase 7 */}
+            <Route path="employers" element={<OpsEmployers />} />
+            <Route path="employers/:companyId" element={<OpsEmployerDetail />} />
+            <Route path="roles" element={<OpsRoles />} />
+            <Route path="roles/:roleId" element={<OpsRoleDetail />} />
+            <Route path="candidates" element={<OpsCandidates />} />
+            <Route path="candidates/:candidateId" element={<OpsCandidateDetail />} />
+            <Route path="loi-queue" element={<LOIQueue />} />
+            <Route path="programme" element={<OpsProgramme />} />
+            <Route path="reports" element={<OpsReports />} />
           </Route>
 
           {/* ============================================ */}

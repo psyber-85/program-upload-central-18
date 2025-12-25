@@ -1,5 +1,6 @@
 // Placement System - Repository Client
 // Export current implementations (easy to swap to Supabase later)
+// All repos exported individually for use across the app
 
 export { initializeMockData, resetMockData } from './mockDb';
 

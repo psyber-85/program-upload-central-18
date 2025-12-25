@@ -48,6 +48,7 @@ import { RoleDetail } from "./pages/placement/employer/RoleDetail";
 import { RoleTraining } from "./pages/placement/employer/RoleTraining";
 import { RoleLOI } from "./pages/placement/employer/RoleLOI";
 import { EmployerSettings } from "./pages/placement/employer/EmployerSettings";
+import { EmployerCandidateDetail } from "./pages/placement/employer/CandidateDetail";
 
 // Placement - Ops Console
 import { OpsProtectedRoute } from "./components/placement/ops/OpsProtectedRoute";
@@ -104,6 +105,7 @@ const App = () => (
             <Route path="/employer/roles/:roleId" element={<RoleDetail />} />
             <Route path="/employer/roles/:roleId/loi" element={<RoleLOI />} />
             <Route path="/employer/roles/:roleId/training" element={<RoleTraining />} />
+            <Route path="/employer/roles/:roleId/candidate/:submissionId" element={<EmployerCandidateDetail />} />
             <Route path="/employer/settings" element={<EmployerSettings />} />
           </Route>
 

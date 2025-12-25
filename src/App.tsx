@@ -42,6 +42,9 @@ import { PlacementLogin } from "./pages/placement/PlacementLogin";
 import { EmployerProtectedRoute } from "./components/placement/employer/EmployerProtectedRoute";
 import { EmployerLayout } from "./components/placement/employer/EmployerLayout";
 import { EmployerDashboard } from "./pages/placement/employer/Dashboard";
+import { EmployerRoles } from "./pages/placement/employer/Roles";
+import { NewRole } from "./pages/placement/employer/NewRole";
+import { RoleDetail } from "./pages/placement/employer/RoleDetail";
 
 // Placement - Ops Console
 import { OpsProtectedRoute } from "./components/placement/ops/OpsProtectedRoute";
@@ -90,7 +93,9 @@ const App = () => (
             </PlacementAuthProvider>
           }>
             <Route index element={<EmployerDashboard />} />
-            {/* More routes in Phase 4 */}
+            <Route path="roles" element={<EmployerRoles />} />
+            <Route path="roles/new" element={<NewRole />} />
+            <Route path="roles/:roleId" element={<RoleDetail />} />
           </Route>
 
           {/* ============================================ */}

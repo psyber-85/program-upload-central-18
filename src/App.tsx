@@ -45,8 +45,9 @@ import { EmployerDashboard } from "./pages/placement/employer/Dashboard";
 import { EmployerRoles } from "./pages/placement/employer/Roles";
 import { NewRole } from "./pages/placement/employer/NewRole";
 import { RoleDetail } from "./pages/placement/employer/RoleDetail";
-
 import { RoleTraining } from "./pages/placement/employer/RoleTraining";
+import { RoleLOI } from "./pages/placement/employer/RoleLOI";
+import { EmployerSettings } from "./pages/placement/employer/EmployerSettings";
 
 // Placement - Ops Console
 import { OpsProtectedRoute } from "./components/placement/ops/OpsProtectedRoute";
@@ -101,9 +102,12 @@ const App = () => (
             <Route path="/employer/roles" element={<EmployerRoles />} />
             <Route path="/employer/roles/new" element={<NewRole />} />
             <Route path="/employer/roles/:roleId" element={<RoleDetail />} />
+            <Route path="/employer/roles/:roleId/loi" element={<RoleLOI />} />
+            <Route path="/employer/roles/:roleId/training" element={<RoleTraining />} />
+            <Route path="/employer/settings" element={<EmployerSettings />} />
           </Route>
 
-          {/* Ops Console */}
+          {/* Ops Console - Note: /ops/loi per superprompt spec */}
           <Route element={<PlacementAuthProvider><OpsProtectedRoute><OpsLayout /></OpsProtectedRoute></PlacementAuthProvider>}>
             <Route path="/ops" element={<OpsDashboard />} />
             <Route path="/ops/employers" element={<OpsEmployers />} />
@@ -112,7 +116,7 @@ const App = () => (
             <Route path="/ops/roles/:roleId" element={<OpsRoleDetail />} />
             <Route path="/ops/candidates" element={<OpsCandidates />} />
             <Route path="/ops/candidates/:candidateId" element={<OpsCandidateDetail />} />
-            <Route path="/ops/loi-queue" element={<LOIQueue />} />
+            <Route path="/ops/loi" element={<LOIQueue />} />
             <Route path="/ops/programme" element={<OpsProgramme />} />
             <Route path="/ops/reports" element={<OpsReports />} />
           </Route>

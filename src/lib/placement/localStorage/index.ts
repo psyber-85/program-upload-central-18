@@ -25,6 +25,7 @@ function generateId(): string {
 export const companyLocalRepo: I.ICompanyRepo = {
   async getAll() { return getStore<EmployerCompany>('companies'); },
   async getById(id) { return getStore<EmployerCompany>('companies').find(c => c.id === id) || null; },
+  async getUsers(companyId) { return getStore<EmployerUser>('employerUsers').filter(u => u.companyId === companyId); },
   async create(data) {
     const companies = getStore<EmployerCompany>('companies');
     const newCompany: EmployerCompany = { ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
@@ -151,6 +152,23 @@ export const loiLocalRepo: I.ILOIRepo = {
     records[idx] = { ...records[idx], ...data, updatedAt: new Date().toISOString() };
     setStore('loiRecords', records);
     return records[idx];
+  },
+  async updateStatus(roleId, status) {
+    // First update the role's LOI status
+    const roles = getStore<RoleOpening>('roles');
+    const roleIdx = roles.findIndex(r => r.id === roleId);
+    if (roleIdx !== -1) {
+      roles[roleIdx] = { ...roles[roleIdx], loiStatus: status, updatedAt: new Date().toISOString() };
+      setStore('roles', roles);
+    }
+    
+    // Also update the LOI record if it exists
+    const records = getStore<LOIRecord>('loiRecords');
+    const loiIdx = records.findIndex(l => l.roleId === roleId);
+    if (loiIdx !== -1) {
+      records[loiIdx] = { ...records[loiIdx], status, updatedAt: new Date().toISOString() };
+      setStore('loiRecords', records);
+    }
   }
 };
 

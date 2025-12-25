@@ -39,6 +39,7 @@ export interface EmployerCompany {
   name: string;
   industry: string;
   size: string; // e.g., "50-100", "100-500"
+  location: string;
   website?: string;
   address?: string;
   contactEmail: string;

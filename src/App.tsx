@@ -4,9 +4,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { PlacementAuthProvider } from "@/contexts/PlacementAuthContext";
 
-// Staff Portal imports (existing)
+// Public pages
+import PublicHome from "./pages/PublicHome";
+import Login from "./pages/Login";
+import NotFound from "./pages/NotFound";
+
+// Staff Portal
 import PortalLayout from "./components/staff/PortalLayout";
 import ProtectedRoute from "./components/staff/ProtectedRoute";
 import StaffHome from "./pages/staff/StaffHome";
@@ -17,75 +21,22 @@ import StaffDocs from "./pages/staff/StaffDocs";
 import StaffPayslips from "./pages/staff/StaffPayslips";
 import PayslipDetail from "./pages/staff/PayslipDetail";
 import MyEntries from "./pages/staff/MyEntries";
+
+// Admin pages
 import Payroll from "./pages/staff/admin/Payroll";
 import PayrollRunDetail from "./pages/staff/admin/PayrollRunDetail";
 import Entries from "./pages/staff/admin/Entries";
 import Settings from "./pages/staff/admin/Settings";
+
+// Marketing Portal
 import MarketingLayout from "./components/marketing/MarketingLayout";
 import MarketingDashboard from "./pages/staff/marketing/MarketingDashboard";
 import Index from "./pages/Index";
 import BirthdayDashboard from "./pages/BirthdayDashboard";
 import RegisterTracker from "./pages/RegisterTracker";
 import CRMTracker from "./pages/CRMTracker";
-import Login from "./pages/Login";
-import NotFound from "./pages/NotFound";
-
-// Placement System imports (new - completely isolated)
-import { PublicLayout } from "./components/placement/public/PublicLayout";
-import { Landing } from "./pages/placement/public/Landing";
-import { HowItWorks } from "./pages/placement/public/HowItWorks";
-import { RequestTalent } from "./pages/placement/public/RequestTalent";
-import { Contact } from "./pages/placement/public/Contact";
-import { PlacementLogin } from "./pages/placement/PlacementLogin";
-
-// Placement - Employer Portal
-import { EmployerProtectedRoute } from "./components/placement/employer/EmployerProtectedRoute";
-import { EmployerLayout } from "./components/placement/employer/EmployerLayout";
-import { EmployerDashboard } from "./pages/placement/employer/Dashboard";
-import { EmployerRoles } from "./pages/placement/employer/Roles";
-import { NewRole } from "./pages/placement/employer/NewRole";
-import { RoleDetail } from "./pages/placement/employer/RoleDetail";
-import { RoleTraining } from "./pages/placement/employer/RoleTraining";
-import { RoleLOI } from "./pages/placement/employer/RoleLOI";
-import { EmployerSettings } from "./pages/placement/employer/EmployerSettings";
-import { EmployerCandidateDetail } from "./pages/placement/employer/CandidateDetail";
-
-// Placement - Ops Console
-import { OpsProtectedRoute } from "./components/placement/ops/OpsProtectedRoute";
-import { OpsLayout } from "./components/placement/ops/OpsLayout";
-import { OpsDashboard } from "./pages/placement/ops/Dashboard";
-import { OpsEmployers } from "./pages/placement/ops/Employers";
-import { OpsEmployerDetail } from "./pages/placement/ops/EmployerDetail";
-import { OpsRoles } from "./pages/placement/ops/Roles";
-import { OpsRoleDetail } from "./pages/placement/ops/RoleDetail";
-import { OpsCandidates } from "./pages/placement/ops/Candidates";
-import { OpsCandidateDetail } from "./pages/placement/ops/CandidateDetail";
-import { LOIQueue } from "./pages/placement/ops/LOIQueue";
-import { OpsProgramme } from "./pages/placement/ops/Programme";
-import { OpsReports } from "./pages/placement/ops/Reports";
 
 const queryClient = new QueryClient();
-
-// Wrapper components to ensure proper context hierarchy
-function PlacementEmployerRoutes() {
-  return (
-    <PlacementAuthProvider>
-      <EmployerProtectedRoute>
-        <EmployerLayout />
-      </EmployerProtectedRoute>
-    </PlacementAuthProvider>
-  );
-}
-
-function PlacementOpsRoutes() {
-  return (
-    <PlacementAuthProvider>
-      <OpsProtectedRoute>
-        <OpsLayout />
-      </OpsProtectedRoute>
-    </PlacementAuthProvider>
-  );
-}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -93,123 +44,66 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          {/* ============================================ */}
-          {/* PLACEMENT SYSTEM - All routes wrapped in    */}
-          {/* PlacementAuthProvider for shared context    */}
-          {/* ============================================ */}
-          
-          {/* Public Site */}
-          <Route element={
-            <PlacementAuthProvider>
-              <PublicLayout />
-            </PlacementAuthProvider>
-          }>
-            <Route path="/" element={<Landing />} />
-            <Route path="/how-it-works" element={<HowItWorks />} />
-            <Route path="/request-talent" element={<RequestTalent />} />
-            <Route path="/contact" element={<Contact />} />
-          </Route>
-          
-          {/* Placement Login (standalone) */}
-          <Route path="/login" element={
-            <PlacementAuthProvider>
-              <PlacementLogin />
-            </PlacementAuthProvider>
-          } />
-
-          {/* Employer Portal */}
-          <Route element={<PlacementEmployerRoutes />}>
-            <Route path="/employer" element={<EmployerDashboard />} />
-            <Route path="/employer/roles" element={<EmployerRoles />} />
-            <Route path="/employer/roles/new" element={<NewRole />} />
-            <Route path="/employer/roles/:roleId" element={<RoleDetail />} />
-            <Route path="/employer/roles/:roleId/loi" element={<RoleLOI />} />
-            <Route path="/employer/roles/:roleId/training" element={<RoleTraining />} />
-            <Route path="/employer/roles/:roleId/candidate/:submissionId" element={<EmployerCandidateDetail />} />
-            <Route path="/employer/settings" element={<EmployerSettings />} />
-          </Route>
-
-          {/* Ops Console - Note: /ops/loi per superprompt spec */}
-          <Route element={<PlacementOpsRoutes />}>
-            <Route path="/ops" element={<OpsDashboard />} />
-            <Route path="/ops/employers" element={<OpsEmployers />} />
-            <Route path="/ops/employers/:companyId" element={<OpsEmployerDetail />} />
-            <Route path="/ops/roles" element={<OpsRoles />} />
-            <Route path="/ops/roles/:roleId" element={<OpsRoleDetail />} />
-            <Route path="/ops/candidates" element={<OpsCandidates />} />
-            <Route path="/ops/candidates/:candidateId" element={<OpsCandidateDetail />} />
-            <Route path="/ops/loi" element={<LOIQueue />} />
-            <Route path="/ops/programme" element={<OpsProgramme />} />
-            <Route path="/ops/reports" element={<OpsReports />} />
-          </Route>
-
-          {/* ============================================ */}
-          {/* STAFF PORTAL - Internal Tool                */}
-          {/* Accessed via /staff/*                       */}
-          {/* ============================================ */}
-          <Route path="/staff/login" element={
-            <AuthProvider>
-              <Login />
-            </AuthProvider>
-          } />
-
-          <Route path="/staff" element={
-            <AuthProvider>
+        <AuthProvider>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/" element={<PublicHome />} />
+            <Route path="/login" element={<Login />} />
+            
+            {/* Staff Portal routes (protected) */}
+            <Route path="/staff" element={
               <ProtectedRoute>
                 <PortalLayout />
               </ProtectedRoute>
-            </AuthProvider>
-          }>
-            <Route index element={<StaffHome />} />
-            <Route path="requests" element={<StaffRequests />} />
-            <Route path="requests/new" element={<NewRequest />} />
-            <Route path="requests/:id" element={<RequestDetail />} />
-            <Route path="docs" element={<StaffDocs />} />
-            <Route path="payslips" element={<StaffPayslips />} />
-            <Route path="payslips/:id" element={<PayslipDetail />} />
-            <Route path="my-entries" element={<MyEntries />} />
-            {/* Admin-only routes */}
-            <Route path="payroll" element={
-              <ProtectedRoute requireAdmin>
-                <Payroll />
-              </ProtectedRoute>
-            } />
-            <Route path="payroll/:runId" element={
-              <ProtectedRoute requireAdmin>
-                <PayrollRunDetail />
-              </ProtectedRoute>
-            } />
-            <Route path="entries" element={
-              <ProtectedRoute requireAdmin>
-                <Entries />
-              </ProtectedRoute>
-            } />
-            <Route path="settings" element={
-              <ProtectedRoute requireAdmin>
-                <Settings />
-              </ProtectedRoute>
-            } />
-          </Route>
-          
-          {/* Marketing Portal routes (nested under /staff/marketing) */}
-          <Route path="/staff/marketing" element={
-            <AuthProvider>
+            }>
+              <Route index element={<StaffHome />} />
+              <Route path="requests" element={<StaffRequests />} />
+              <Route path="requests/new" element={<NewRequest />} />
+              <Route path="requests/:id" element={<RequestDetail />} />
+              <Route path="docs" element={<StaffDocs />} />
+              <Route path="payslips" element={<StaffPayslips />} />
+              <Route path="payslips/:id" element={<PayslipDetail />} />
+              <Route path="my-entries" element={<MyEntries />} />
+              {/* Admin-only routes */}
+              <Route path="payroll" element={
+                <ProtectedRoute requireAdmin>
+                  <Payroll />
+                </ProtectedRoute>
+              } />
+              <Route path="payroll/:runId" element={
+                <ProtectedRoute requireAdmin>
+                  <PayrollRunDetail />
+                </ProtectedRoute>
+              } />
+              <Route path="entries" element={
+                <ProtectedRoute requireAdmin>
+                  <Entries />
+                </ProtectedRoute>
+              } />
+              <Route path="settings" element={
+                <ProtectedRoute requireAdmin>
+                  <Settings />
+                </ProtectedRoute>
+              } />
+            </Route>
+            
+            {/* Marketing Portal routes (protected, nested under /staff/marketing) */}
+            <Route path="/staff/marketing" element={
               <ProtectedRoute>
                 <MarketingLayout />
               </ProtectedRoute>
-            </AuthProvider>
-          }>
-            <Route index element={<MarketingDashboard />} />
-            <Route path="participant-manager" element={<Index />} />
-            <Route path="birthday-dashboard" element={<BirthdayDashboard />} />
-            <Route path="register-tracker" element={<RegisterTracker />} />
-            <Route path="crm-tracker" element={<CRMTracker />} />
-          </Route>
-
-          {/* Catch-all */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+            }>
+              <Route index element={<MarketingDashboard />} />
+              <Route path="participant-manager" element={<Index />} />
+              <Route path="birthday-dashboard" element={<BirthdayDashboard />} />
+              <Route path="register-tracker" element={<RegisterTracker />} />
+              <Route path="crm-tracker" element={<CRMTracker />} />
+            </Route>
+            
+            {/* Catch-all */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

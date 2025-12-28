@@ -51,7 +51,7 @@ export class PayrollLocalRepo implements PayrollRepo {
     return this.getPayrollRuns().find(r => r.month === month) || null;
   }
 
-  async createPayrollRun(month: string): Promise<PayrollRun> {
+  async createPayrollRun(month: string, totalWorkDays?: number): Promise<PayrollRun> {
     await delay();
     const runs = this.getPayrollRuns();
     
@@ -60,12 +60,28 @@ export class PayrollLocalRepo implements PayrollRepo {
       month,
       status: 'Draft',
       createdAt: now(),
+      totalWorkDays,
     };
     
     runs.push(newRun);
     this.savePayrollRuns(runs);
     
     return newRun;
+  }
+
+  async updatePayrollRun(id: string, updates: Partial<Pick<PayrollRun, 'totalWorkDays'>>): Promise<PayrollRun | null> {
+    await delay();
+    const runs = this.getPayrollRuns();
+    const index = runs.findIndex(r => r.id === id);
+    
+    if (index === -1) {
+      return null;
+    }
+    
+    runs[index] = { ...runs[index], ...updates };
+    this.savePayrollRuns(runs);
+    
+    return runs[index];
   }
 
   async finalizePayrollRun(id: string): Promise<PayrollRun | null> {

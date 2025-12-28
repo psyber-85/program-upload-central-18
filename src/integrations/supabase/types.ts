@@ -965,14 +965,17 @@ export type Database = {
           base_salary: number
           claims_total: number | null
           created_at: string | null
+          days_worked: number | null
           employer_epf: number | null
           employer_socso: number | null
           epf: number | null
           id: string
           net_pay: number
+          original_salary: number | null
           run_id: string
           socso: number | null
           total_company_cost: number
+          total_days: number | null
           training_claims_total: number | null
           user_id: string
           user_name: string
@@ -981,14 +984,17 @@ export type Database = {
           base_salary?: number
           claims_total?: number | null
           created_at?: string | null
+          days_worked?: number | null
           employer_epf?: number | null
           employer_socso?: number | null
           epf?: number | null
           id?: string
           net_pay?: number
+          original_salary?: number | null
           run_id: string
           socso?: number | null
           total_company_cost?: number
+          total_days?: number | null
           training_claims_total?: number | null
           user_id: string
           user_name: string
@@ -997,14 +1003,17 @@ export type Database = {
           base_salary?: number
           claims_total?: number | null
           created_at?: string | null
+          days_worked?: number | null
           employer_epf?: number | null
           employer_socso?: number | null
           epf?: number | null
           id?: string
           net_pay?: number
+          original_salary?: number | null
           run_id?: string
           socso?: number | null
           total_company_cost?: number
+          total_days?: number | null
           training_claims_total?: number | null
           user_id?: string
           user_name?: string
@@ -1026,6 +1035,7 @@ export type Database = {
           id: string
           month: string
           status: Database["public"]["Enums"]["sp_payroll_status"] | null
+          total_work_days: number | null
           updated_at: string | null
         }
         Insert: {
@@ -1034,6 +1044,7 @@ export type Database = {
           id?: string
           month: string
           status?: Database["public"]["Enums"]["sp_payroll_status"] | null
+          total_work_days?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -1042,6 +1053,7 @@ export type Database = {
           id?: string
           month?: string
           status?: Database["public"]["Enums"]["sp_payroll_status"] | null
+          total_work_days?: number | null
           updated_at?: string | null
         }
         Relationships: []

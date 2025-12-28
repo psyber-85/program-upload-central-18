@@ -43,14 +43,30 @@ class PayrollSupabaseRepo implements PayrollRepo {
     return this.mapPayrollRun(data);
   }
 
-  async createPayrollRun(month: string): Promise<PayrollRun> {
+  async createPayrollRun(month: string, totalWorkDays?: number): Promise<PayrollRun> {
     const { data, error } = await supabase
       .from('sp_payroll_runs')
-      .insert({ month })
+      .insert({ month, total_work_days: totalWorkDays })
       .select()
       .single();
 
     if (error) throw new Error(error.message);
+
+    return this.mapPayrollRun(data);
+  }
+
+  async updatePayrollRun(id: string, updates: Partial<Pick<PayrollRun, 'totalWorkDays'>>): Promise<PayrollRun | null> {
+    const updateData: Record<string, unknown> = {};
+    if (updates.totalWorkDays !== undefined) updateData.total_work_days = updates.totalWorkDays;
+
+    const { data, error } = await supabase
+      .from('sp_payroll_runs')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) return null;
 
     return this.mapPayrollRun(data);
   }
@@ -111,6 +127,9 @@ class PayrollSupabaseRepo implements PayrollRepo {
         training_claims_total: item.trainingClaimsTotal,
         net_pay: item.netPay,
         total_company_cost: item.totalCompanyCost,
+        days_worked: item.daysWorked,
+        total_days: item.totalDays,
+        original_salary: item.originalSalary,
       })
       .select()
       .single();
@@ -132,6 +151,9 @@ class PayrollSupabaseRepo implements PayrollRepo {
     if (updates.trainingClaimsTotal !== undefined) updateData.training_claims_total = updates.trainingClaimsTotal;
     if (updates.netPay !== undefined) updateData.net_pay = updates.netPay;
     if (updates.totalCompanyCost !== undefined) updateData.total_company_cost = updates.totalCompanyCost;
+    if (updates.daysWorked !== undefined) updateData.days_worked = updates.daysWorked;
+    if (updates.totalDays !== undefined) updateData.total_days = updates.totalDays;
+    if (updates.originalSalary !== undefined) updateData.original_salary = updates.originalSalary;
 
     const { data, error } = await supabase
       .from('sp_payroll_items')
@@ -238,6 +260,7 @@ class PayrollSupabaseRepo implements PayrollRepo {
       status: data.status as PayrollRunStatus,
       createdAt: data.created_at as string,
       finalizedAt: data.finalized_at as string | undefined,
+      totalWorkDays: data.total_work_days as number | undefined,
     };
   }
 
@@ -256,6 +279,9 @@ class PayrollSupabaseRepo implements PayrollRepo {
       trainingClaimsTotal: Number(data.training_claims_total) || 0,
       netPay: Number(data.net_pay) || 0,
       totalCompanyCost: Number(data.total_company_cost) || 0,
+      daysWorked: data.days_worked as number | undefined,
+      totalDays: data.total_days as number | undefined,
+      originalSalary: Number(data.original_salary) || 0,
     };
   }
 

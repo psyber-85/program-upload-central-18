@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { payrollLocalRepo } from '@/lib/dal/localStorage/PayrollLocalRepo';
+import { payrollSupabaseRepo } from '@/lib/dal';
 import { Payslip } from '@/lib/dal/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +23,7 @@ const StaffPayslips = () => {
     setIsLoading(true);
     try {
       // Get payslips for current user (or all if admin viewing all)
-      const userPayslips = await payrollLocalRepo.getPayslipsByUser(user.id);
+      const userPayslips = await payrollSupabaseRepo.getPayslipsByUser(user.id);
       setPayslips(userPayslips);
     } catch (error) {
       console.error('Failed to load payslips:', error);

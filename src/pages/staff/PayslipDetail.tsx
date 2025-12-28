@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { payrollLocalRepo } from '@/lib/dal/localStorage/PayrollLocalRepo';
+import { payrollSupabaseRepo } from '@/lib/dal';
 import { Payslip } from '@/lib/dal/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,7 @@ const PayslipDetail = () => {
     if (!id) return;
     setIsLoading(true);
     try {
-      const found = await payrollLocalRepo.getPayslipById(id);
+      const found = await payrollSupabaseRepo.getPayslipById(id);
       setPayslip(found);
     } catch (error) {
       console.error('Failed to load payslip:', error);

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { staffLocalRepo } from '@/lib/dal/localStorage/StaffLocalRepo';
-import { entriesLocalRepo } from '@/lib/dal/localStorage/EntriesLocalRepo';
+import { staffSupabaseRepo, entriesSupabaseRepo } from '@/lib/dal';
 import { UserProfile, AppRole, AppSettings } from '@/lib/dal/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -71,8 +70,8 @@ const Settings = () => {
     setIsLoading(true);
     try {
       const [allStaff, appSettings] = await Promise.all([
-        staffLocalRepo.getAllStaff(),
-        entriesLocalRepo.getSettings(),
+        staffSupabaseRepo.getAllStaff(),
+        entriesSupabaseRepo.getSettings(),
       ]);
       setStaff(allStaff);
       setSettings(appSettings);
@@ -100,7 +99,7 @@ const Settings = () => {
     if (sendWelcomeEmail) setIsSendingEmail(true);
     
     try {
-      await staffLocalRepo.addStaff({
+      await staffSupabaseRepo.addStaff({
         name: newName,
         email: newEmail,
         role: newRole,
@@ -162,10 +161,10 @@ const Settings = () => {
   const handleToggleActive = async (staffMember: UserProfile) => {
     try {
       if (staffMember.isActive) {
-        await staffLocalRepo.deactivateStaff(staffMember.id);
+        await staffSupabaseRepo.deactivateStaff(staffMember.id);
         toast({ title: `${staffMember.name} deactivated` });
       } else {
-        await staffLocalRepo.reactivateStaff(staffMember.id);
+        await staffSupabaseRepo.reactivateStaff(staffMember.id);
         toast({ title: `${staffMember.name} reactivated` });
       }
       loadData();
@@ -213,7 +212,7 @@ const Settings = () => {
 
     setIsEditing(true);
     try {
-      await staffLocalRepo.updateStaff(editingStaff.id, {
+      await staffSupabaseRepo.updateStaff(editingStaff.id, {
         name: editName,
         email: editEmail,
         role: editRole,
@@ -242,7 +241,7 @@ const Settings = () => {
 
     setIsSavingCounter(true);
     try {
-      await entriesLocalRepo.updateSettings({ invoiceCounter: counter });
+      await entriesSupabaseRepo.updateSettings({ invoiceCounter: counter });
       toast({ title: 'Invoice counter updated!' });
     } catch (error) {
       toast({ title: 'Failed to update', variant: 'destructive' });

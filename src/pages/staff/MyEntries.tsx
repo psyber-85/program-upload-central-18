@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { entriesLocalRepo } from '@/lib/dal/localStorage/EntriesLocalRepo';
+import { entriesSupabaseRepo } from '@/lib/dal';
 import { useAuth } from '@/contexts/AuthContext';
 import { Invoice, Quotation } from '@/lib/dal/types';
 import { Card, CardContent } from '@/components/ui/card';
@@ -51,8 +51,8 @@ const MyEntries = () => {
     setIsLoading(true);
     try {
       const [allInvoices, allQuotations] = await Promise.all([
-        entriesLocalRepo.getAllInvoices(),
-        entriesLocalRepo.getAllQuotations(),
+        entriesSupabaseRepo.getAllInvoices(),
+        entriesSupabaseRepo.getAllQuotations(),
       ]);
       // Filter to only show user's own entries
       setInvoices(allInvoices.filter(inv => inv.createdBy === user.id));
@@ -78,7 +78,7 @@ const MyEntries = () => {
 
     setIsCreatingQuotation(true);
     try {
-      await entriesLocalRepo.createQuotation({
+      await entriesSupabaseRepo.createQuotation({
         createdBy: user.id,
         creatorName: user.name,
         businessArm: quotationBusinessArm,
@@ -114,7 +114,7 @@ const MyEntries = () => {
 
     setIsCreatingInvoice(true);
     try {
-      await entriesLocalRepo.createInvoice({
+      await entriesSupabaseRepo.createInvoice({
         createdBy: user.id,
         creatorName: user.name,
         businessArm: invoiceBusinessArm,
@@ -137,7 +137,7 @@ const MyEntries = () => {
 
   const handleMarkQuotationSent = async (id: string) => {
     try {
-      await entriesLocalRepo.updateQuotationStatus(id, 'Sent');
+      await entriesSupabaseRepo.updateQuotationStatus(id, 'Sent');
       toast({ title: 'Quotation marked as sent!' });
       loadData();
     } catch (error) {
@@ -147,7 +147,7 @@ const MyEntries = () => {
 
   const handleConvertToInvoice = async (quotationId: string) => {
     try {
-      const invoice = await entriesLocalRepo.convertQuotationToInvoice(quotationId);
+      const invoice = await entriesSupabaseRepo.convertQuotationToInvoice(quotationId);
       if (invoice) {
         toast({ title: 'Quotation converted to invoice!' });
         setActiveTab('invoices');
@@ -162,7 +162,7 @@ const MyEntries = () => {
 
   const handleMarkInvoiceSent = async (id: string) => {
     try {
-      await entriesLocalRepo.markInvoiceSent(id);
+      await entriesSupabaseRepo.markInvoiceSent(id);
       toast({ title: 'Invoice marked as sent!' });
       loadData();
     } catch (error) {

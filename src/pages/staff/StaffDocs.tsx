@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { docsLocalRepo } from '@/lib/dal/localStorage/DocsLocalRepo';
+import { docsSupabaseRepo } from '@/lib/dal';
 import { DocLink } from '@/lib/dal/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,7 +20,7 @@ const StaffDocs = () => {
   const loadDocs = async () => {
     setIsLoading(true);
     try {
-      const allDocs = await docsLocalRepo.getAllDocs();
+      const allDocs = await docsSupabaseRepo.getAllDocs();
       setDocs(allDocs);
     } catch (error) {
       console.error('Failed to load docs:', error);

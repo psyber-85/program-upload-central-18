@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { entriesLocalRepo } from '@/lib/dal/localStorage/EntriesLocalRepo';
+import { entriesSupabaseRepo } from '@/lib/dal';
 import { useAuth } from '@/contexts/AuthContext';
 import { Invoice, Bill, Quotation, PurchaseOrder, Payment } from '@/lib/dal/types';
 import { Card, CardContent } from '@/components/ui/card';
@@ -67,11 +67,11 @@ const Entries = () => {
     setIsLoading(true);
     try {
       const [allInvoices, allBills, allQuotations, allPOs, allPayments] = await Promise.all([
-        entriesLocalRepo.getAllInvoices(),
-        entriesLocalRepo.getAllBills(),
-        entriesLocalRepo.getAllQuotations(),
-        entriesLocalRepo.getAllPurchaseOrders(),
-        entriesLocalRepo.getAllPayments(),
+        entriesSupabaseRepo.getAllInvoices(),
+        entriesSupabaseRepo.getAllBills(),
+        entriesSupabaseRepo.getAllQuotations(),
+        entriesSupabaseRepo.getAllPurchaseOrders(),
+        entriesSupabaseRepo.getAllPayments(),
       ]);
       setInvoices(allInvoices);
       setBills(allBills);
@@ -107,7 +107,7 @@ const Entries = () => {
     }
     setIsCreatingInvoice(true);
     try {
-      await entriesLocalRepo.createInvoice({
+      await entriesSupabaseRepo.createInvoice({
         createdBy: user.id,
         creatorName: user.name,
         businessArm: invoiceBusinessArm,
@@ -140,7 +140,7 @@ const Entries = () => {
     }
     setIsCreatingBill(true);
     try {
-      await entriesLocalRepo.createBill({ createdBy: user.id, vendorName: billVendor, category: billCategory, amount, status: 'Draft' });
+      await entriesSupabaseRepo.createBill({ createdBy: user.id, vendorName: billVendor, category: billCategory, amount, status: 'Draft' });
       toast({ title: 'Bill created!' });
       setShowBillDialog(false);
       setBillVendor(''); setBillCategory(''); setBillAmount('');
@@ -164,7 +164,7 @@ const Entries = () => {
     }
     setIsCreatingPO(true);
     try {
-      await entriesLocalRepo.createPurchaseOrder({
+      await entriesSupabaseRepo.createPurchaseOrder({
         vendorName: poVendor,
         items: [{ description: poDescription, quantity: 1, unitPrice: amount, total: amount }],
         total: amount,
@@ -195,7 +195,7 @@ const Entries = () => {
     }
     setIsCreatingPayment(true);
     try {
-      await entriesLocalRepo.createPayment({
+      await entriesSupabaseRepo.createPayment({
         vendorName: paymentVendor,
         amount,
         paymentDate: format(new Date(), 'yyyy-MM-dd'),
@@ -216,25 +216,25 @@ const Entries = () => {
   };
 
   const handleMarkInvoicePaid = async (id: string) => {
-    await entriesLocalRepo.markInvoicePaid(id, format(new Date(), 'yyyy-MM-dd'));
+    await entriesSupabaseRepo.markInvoicePaid(id, format(new Date(), 'yyyy-MM-dd'));
     toast({ title: 'Invoice marked as paid!' });
     loadData();
   };
 
   const handleMarkInvoiceSent = async (id: string) => {
-    await entriesLocalRepo.markInvoiceSent(id);
+    await entriesSupabaseRepo.markInvoiceSent(id);
     toast({ title: 'Invoice marked as sent!' });
     loadData();
   };
 
   const handleMarkBillPaid = async (id: string) => {
-    await entriesLocalRepo.markBillPaid(id, format(new Date(), 'yyyy-MM-dd'));
+    await entriesSupabaseRepo.markBillPaid(id, format(new Date(), 'yyyy-MM-dd'));
     toast({ title: 'Bill marked as paid!' });
     loadData();
   };
 
   const handleUpdatePOStatus = async (id: string, status: 'Sent' | 'Received' | 'Closed') => {
-    await entriesLocalRepo.updatePurchaseOrderStatus(id, status);
+    await entriesSupabaseRepo.updatePurchaseOrderStatus(id, status);
     toast({ title: `PO marked as ${status}!` });
     loadData();
   };

@@ -12,17 +12,17 @@ const POSITIONS = {
   docNumber: { top: '178px', right: '48px' },
   docDate: { top: '200px', right: '48px' },
   
-  // Recipient section - BLUE: directly below "ATTN TO:" and client name
-  attnLabel: { top: '228px', left: '48px' },
-  recipientName: { top: '248px', left: '48px' },
-  recipientEmail: { top: '268px', left: '48px' },
-  recipientTitle: { top: '288px', left: '48px' },
+  // BLUE: Recipient section - client details area (between ATTN TO and table header)
+  attnLabel: { top: '225px', left: '48px' },
+  recipientName: { top: '250px', left: '48px' },
+  recipientEmail: { top: '275px', left: '48px' },
+  recipientTitle: { top: '300px', left: '48px' },
   
-  // Table content area - GREEN: inside table body (below black DESCRIPTION/COST header ~460px)
-  tableContent: { top: '510px', left: '50px', descWidth: '490px', costRight: '48px' },
+  // GREEN: Table content area - inside table body below black DESCRIPTION/COST header
+  tableContent: { top: '490px', left: '48px', costRight: '48px' },
   
-  // Total value - RED: aligned with "Total :" row at the bottom right
-  totalValue: { bottom: '152px', right: '48px' },
+  // RED: Total amount value - aligned with "Total :" row at the bottom right
+  totalValue: { bottom: '160px', right: '55px' },
 };
 
 function generateTemplateStyles(): string {

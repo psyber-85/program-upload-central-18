@@ -87,9 +87,54 @@ class StaffSupabaseRepo implements StaffRepo {
   }
 
   async addStaff(staff: Omit<UserProfile, 'id'>): Promise<UserProfile> {
-    // Note: In real implementation, you'd use Supabase Admin API to create user
-    // For now, we assume the user already exists in auth.users
-    throw new Error('Use Supabase Admin API to create staff. Profile will be created via trigger.');
+    // Generate a new UUID for the staff member
+    const newId = crypto.randomUUID();
+    
+    // Insert into sp_staff_profiles
+    const { error: profileError } = await supabase
+      .from('sp_staff_profiles')
+      .insert({
+        id: newId,
+        name: staff.name,
+        email: staff.email,
+        business_arm: staff.businessArm,
+        join_date: staff.joinDate,
+        is_active: staff.isActive ?? true,
+        salary_base: staff.salaryBase,
+        epf_rate: staff.epfRate ?? 11,
+        socso_rate: staff.socsoRate ?? 2,
+        avatar_url: staff.avatarUrl || null,
+      });
+
+    if (profileError) {
+      console.error('Error adding staff profile:', profileError.message);
+      throw new Error(profileError.message);
+    }
+
+    // Insert role into sp_user_roles
+    const { error: roleError } = await supabase
+      .from('sp_user_roles')
+      .insert({
+        user_id: newId,
+        role: staff.role,
+      });
+
+    if (roleError) {
+      console.error('Error adding staff role:', roleError.message);
+      // Don't throw here, profile was created successfully
+    }
+
+    // Initialize leave balance for current year
+    const currentYear = new Date().getFullYear();
+    await this.initializeLeaveBalance(newId, currentYear);
+
+    // Initialize training entitlement
+    await this.initializeTrainingEntitlement(newId, staff.joinDate);
+
+    return {
+      id: newId,
+      ...staff,
+    };
   }
 
   async updateStaff(id: string, updates: Partial<UserProfile>): Promise<UserProfile | null> {

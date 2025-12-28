@@ -86,54 +86,51 @@ class StaffSupabaseRepo implements StaffRepo {
     return this.getStaffById(profile.id);
   }
 
-  async addStaff(staff: Omit<UserProfile, 'id'>): Promise<UserProfile> {
-    // Generate a new UUID for the staff member
-    const newId = crypto.randomUUID();
-    
-    // Insert into sp_staff_profiles
-    const { error: profileError } = await supabase
-      .from('sp_staff_profiles')
-      .insert({
-        id: newId,
+  async addStaff(staff: Omit<UserProfile, 'id'> & { password: string }): Promise<UserProfile> {
+    // Call edge function to create staff account with auth credentials
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await supabase.functions.invoke('create-staff-account', {
+      body: {
         name: staff.name,
         email: staff.email,
-        business_arm: staff.businessArm,
-        join_date: staff.joinDate,
-        is_active: staff.isActive ?? true,
-        salary_base: staff.salaryBase,
-        epf_rate: staff.epfRate ?? 11,
-        socso_rate: staff.socsoRate ?? 2,
-        avatar_url: staff.avatarUrl || null,
-      });
-
-    if (profileError) {
-      console.error('Error adding staff profile:', profileError.message);
-      throw new Error(profileError.message);
-    }
-
-    // Insert role into sp_user_roles
-    const { error: roleError } = await supabase
-      .from('sp_user_roles')
-      .insert({
-        user_id: newId,
+        password: staff.password,
         role: staff.role,
-      });
+        businessArm: staff.businessArm,
+        joinDate: staff.joinDate,
+        salaryBase: staff.salaryBase,
+        epfRate: staff.epfRate,
+        socsoRate: staff.socsoRate,
+      },
+    });
 
-    if (roleError) {
-      console.error('Error adding staff role:', roleError.message);
-      // Don't throw here, profile was created successfully
+    if (response.error) {
+      console.error('Error creating staff account:', response.error);
+      throw new Error(response.error.message || 'Failed to create staff account');
     }
 
-    // Initialize leave balance for current year
-    const currentYear = new Date().getFullYear();
-    await this.initializeLeaveBalance(newId, currentYear);
+    const result = response.data;
 
-    // Initialize training entitlement
-    await this.initializeTrainingEntitlement(newId, staff.joinDate);
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to create staff account');
+    }
 
     return {
-      id: newId,
-      ...staff,
+      id: result.user.id,
+      name: result.user.name,
+      email: result.user.email,
+      role: result.user.role,
+      businessArm: result.user.businessArm,
+      joinDate: result.user.joinDate,
+      isActive: result.user.isActive,
+      salaryBase: result.user.salaryBase,
+      epfRate: result.user.epfRate,
+      socsoRate: result.user.socsoRate,
     };
   }
 

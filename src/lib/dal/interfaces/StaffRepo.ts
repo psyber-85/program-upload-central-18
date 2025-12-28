@@ -13,8 +13,8 @@ export interface StaffRepo {
   // Get staff by email
   getStaffByEmail(email: string): Promise<UserProfile | null>;
   
-  // Add new staff member
-  addStaff(staff: Omit<UserProfile, 'id'>): Promise<UserProfile>;
+  // Add new staff member (password required for Supabase, optional for localStorage)
+  addStaff(staff: Omit<UserProfile, 'id'> & { password?: string }): Promise<UserProfile>;
   
   // Update staff member
   updateStaff(id: string, updates: Partial<UserProfile>): Promise<UserProfile | null>;

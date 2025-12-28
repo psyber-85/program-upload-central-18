@@ -55,10 +55,10 @@ const TryHirePrivacy = () => {
               <p className="text-slate-600">
                 If you have any questions about this privacy policy or wish to request deletion of your data, please contact us at{' '}
                 <a 
-                  href="mailto:hello@theaihq.net" 
+                  href="mailto:info@theaihq.net" 
                   className="text-emerald-600 hover:text-emerald-700 underline"
                 >
-                  hello@theaihq.net
+                  info@theaihq.net
                 </a>
               </p>
             </section>

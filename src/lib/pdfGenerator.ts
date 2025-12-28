@@ -1,41 +1,42 @@
 import { Invoice, Quotation, PurchaseOrder, Payment, Payslip } from './dal/types';
 import { format } from 'date-fns';
 
-// Template background image path
-const TEMPLATE_BG = '/images/document-template.png';
+// Base64 encoded template image - embedded to ensure it loads in print window
+// This is the document-template.png converted to base64
+const TEMPLATE_BASE64 = 'URL_PLACEHOLDER';
 
-// Position coordinates for text overlay (in mm for A4)
+// Accurate position coordinates based on template layout (A4: 794px × 1123px at 96dpi)
 const POSITIONS = {
-  // Document type and info (top section after header)
-  docTitle: { top: '215px', left: '50px' },
-  docNumber: { top: '215px', right: '50px' },
-  docDate: { top: '235px', right: '50px' },
+  // Document type and info - positioned below header, above table
+  docTitle: { top: '178px', left: '48px' },
+  docNumber: { top: '178px', right: '48px' },
+  docDate: { top: '200px', right: '48px' },
   
-  // Recipient section
-  attnLabel: { top: '280px', left: '50px' },
-  recipientName: { top: '300px', left: '50px' },
-  recipientEmail: { top: '320px', left: '50px' },
-  recipientTitle: { top: '340px', left: '50px' },
+  // Recipient section - between doc info and table
+  attnLabel: { top: '228px', left: '48px' },
+  recipientName: { top: '246px', left: '48px' },
+  recipientEmail: { top: '264px', left: '48px' },
+  recipientTitle: { top: '282px', left: '48px' },
   
-  // Table area
-  tableHeader: { top: '390px', left: '50px', right: '50px' },
-  tableContent: { top: '430px', left: '50px', right: '50px' },
+  // Table content area - inside the existing table structure (below header row)
+  // Table header is at ~320px, content starts at ~358px
+  tableContent: { top: '358px', left: '48px', right: '48px' },
   
-  // Footer area
-  footerLeft: { bottom: '130px', left: '50px' },
-  total: { bottom: '130px', right: '50px' },
-  signature: { bottom: '80px', right: '50px' },
+  // Total value - positioned to the right of the "Total :" label in footer
+  // The "Total :" label is part of the template, we just add the value
+  totalValue: { bottom: '215px', right: '65px' },
 };
 
 function generateTemplateStyles(): string {
   return `
     <style>
       @media print {
-        body { 
-          -webkit-print-color-adjust: exact; 
-          print-color-adjust: exact;
-          margin: 0;
-          padding: 0;
+        html, body { 
+          -webkit-print-color-adjust: exact !important; 
+          print-color-adjust: exact !important;
+          color-adjust: exact !important;
+          margin: 0 !important;
+          padding: 0 !important;
         }
         @page { 
           size: A4; 
@@ -47,20 +48,27 @@ function generateTemplateStyles(): string {
         margin: 0; 
         padding: 0; 
       }
-      body { 
+      html, body { 
         font-family: 'Segoe UI', Arial, sans-serif; 
         font-size: 12px; 
         color: #333;
         width: 210mm;
-        height: 297mm;
+        min-height: 297mm;
         position: relative;
-        background-image: url('${TEMPLATE_BG}');
+      }
+      .page {
+        width: 210mm;
+        min-height: 297mm;
+        position: relative;
+        background-image: url('${TEMPLATE_BASE64}');
         background-size: 100% 100%;
         background-repeat: no-repeat;
-        background-position: center;
+        background-position: top left;
       }
       .overlay {
         position: absolute;
+        top: 0;
+        left: 0;
         width: 100%;
         height: 100%;
       }
@@ -68,15 +76,16 @@ function generateTemplateStyles(): string {
         position: absolute;
         top: ${POSITIONS.docTitle.top};
         left: ${POSITIONS.docTitle.left};
-        font-size: 24px;
+        font-size: 22px;
         font-weight: bold;
         color: #1a1a1a;
+        letter-spacing: 1px;
       }
       .doc-number {
         position: absolute;
         top: ${POSITIONS.docNumber.top};
         right: ${POSITIONS.docNumber.right};
-        font-size: 14px;
+        font-size: 13px;
         font-weight: bold;
         color: #333;
         text-align: right;
@@ -85,24 +94,25 @@ function generateTemplateStyles(): string {
         position: absolute;
         top: ${POSITIONS.docDate.top};
         right: ${POSITIONS.docDate.right};
-        font-size: 12px;
-        color: #666;
+        font-size: 11px;
+        color: #555;
         text-align: right;
       }
       .attn-label {
         position: absolute;
         top: ${POSITIONS.attnLabel.top};
         left: ${POSITIONS.attnLabel.left};
-        font-size: 11px;
+        font-size: 10px;
         font-weight: bold;
         color: #666;
         text-transform: uppercase;
+        letter-spacing: 0.5px;
       }
       .recipient-name {
         position: absolute;
         top: ${POSITIONS.recipientName.top};
         left: ${POSITIONS.recipientName.left};
-        font-size: 14px;
+        font-size: 13px;
         font-weight: bold;
         color: #333;
       }
@@ -110,86 +120,59 @@ function generateTemplateStyles(): string {
         position: absolute;
         top: ${POSITIONS.recipientEmail.top};
         left: ${POSITIONS.recipientEmail.left};
-        font-size: 12px;
-        color: #666;
+        font-size: 11px;
+        color: #555;
       }
       .recipient-title {
         position: absolute;
         top: ${POSITIONS.recipientTitle.top};
         left: ${POSITIONS.recipientTitle.left};
-        font-size: 12px;
-        color: #666;
+        font-size: 11px;
+        color: #555;
       }
-      .table-container {
+      .table-content {
         position: absolute;
         top: ${POSITIONS.tableContent.top};
         left: ${POSITIONS.tableContent.left};
         right: ${POSITIONS.tableContent.right};
-        width: calc(100% - 100px);
+        width: calc(100% - 96px);
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      th {
-        background: #1a1a1a;
-        color: white;
-        padding: 10px 12px;
-        text-align: left;
+      .table-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 12px;
+        border-bottom: 1px solid #e8e8e8;
         font-size: 11px;
-        font-weight: bold;
-        text-transform: uppercase;
       }
-      th:last-child {
-        text-align: right;
-        width: 120px;
+      .table-row:last-child {
+        border-bottom: none;
       }
-      td {
-        padding: 10px 12px;
-        border-bottom: 1px solid #e5e5e5;
-        font-size: 12px;
-      }
-      td:last-child {
-        text-align: right;
-      }
-      .footer-left {
-        position: absolute;
-        bottom: ${POSITIONS.footerLeft.bottom};
-        left: ${POSITIONS.footerLeft.left};
-        font-size: 10px;
-        color: #666;
-        line-height: 1.6;
-        max-width: 300px;
-      }
-      .total-section {
-        position: absolute;
-        bottom: ${POSITIONS.total.bottom};
-        right: ${POSITIONS.total.right};
-        text-align: right;
-      }
-      .total-label {
-        font-size: 14px;
+      .table-row .desc {
+        flex: 1;
         color: #333;
-        margin-bottom: 5px;
       }
-      .total-amount {
-        font-size: 20px;
+      .table-row .cost {
+        width: 120px;
+        text-align: right;
+        color: #333;
+        font-weight: 500;
+      }
+      .table-row.section-header .desc {
         font-weight: bold;
         color: #1a1a1a;
       }
-      .signature-area {
-        position: absolute;
-        bottom: ${POSITIONS.signature.bottom};
-        right: ${POSITIONS.signature.right};
-        text-align: right;
-        font-size: 11px;
-        color: #666;
+      .table-row.subtotal .desc,
+      .table-row.subtotal .cost {
+        font-weight: bold;
       }
-      .signature-line {
-        border-top: 1px solid #333;
-        width: 150px;
-        margin-left: auto;
-        margin-bottom: 5px;
+      .total-value {
+        position: absolute;
+        bottom: ${POSITIONS.totalValue.bottom};
+        right: ${POSITIONS.totalValue.right};
+        font-size: 16px;
+        font-weight: bold;
+        color: #1a1a1a;
+        text-align: right;
       }
     </style>
   `;
@@ -199,60 +182,65 @@ function formatCurrency(amount: number): string {
   return `RM ${amount.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+// Helper to load image as base64
+async function getTemplateBase64(): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      } else {
+        resolve('/images/document-template.png');
+      }
+    };
+    img.onerror = () => {
+      resolve('/images/document-template.png');
+    };
+    img.src = '/images/document-template.png';
+  });
+}
+
 // ============================================
 // INVOICE PDF
 // ============================================
-export function generateInvoicePDF(invoice: Invoice): void {
+export async function generateInvoicePDF(invoice: Invoice): Promise<void> {
+  const templateBase64 = await getTemplateBase64();
+  
   const html = `
     <!DOCTYPE html>
     <html>
     <head>
       <title>Invoice ${invoice.invoiceNumber}</title>
-      ${generateTemplateStyles()}
+      ${generateTemplateStyles().replace(TEMPLATE_BASE64, templateBase64)}
     </head>
     <body>
-      <div class="overlay">
-        <div class="doc-title">INVOICE</div>
-        <div class="doc-number">${invoice.invoiceNumber}</div>
-        <div class="doc-date">Date: ${format(new Date(invoice.issueDate), 'dd MMM yyyy')}</div>
-        
-        <div class="attn-label">ATTN TO:</div>
-        <div class="recipient-name">${invoice.clientName || 'N/A'}</div>
-        <div class="recipient-email">${invoice.clientEmail || ''}</div>
-        <div class="recipient-title">${invoice.reference || ''}</div>
-        
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Description</th>
-                <th>Cost</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${invoice.items.map(item => `
-                <tr>
-                  <td>${item.description}${item.quantity > 1 ? ` (x${item.quantity})` : ''}</td>
-                  <td>${formatCurrency(item.total)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-        
-        <div class="footer-left">
-          All prices are in MYR (Malaysian Ringgit).<br>
-          SST: Not Registered
-        </div>
-        
-        <div class="total-section">
-          <div class="total-label">Total</div>
-          <div class="total-amount">${formatCurrency(invoice.total)}</div>
-        </div>
-        
-        <div class="signature-area">
-          <div class="signature-line"></div>
-          Authorized Signature
+      <div class="page">
+        <div class="overlay">
+          <div class="doc-title">INVOICE</div>
+          <div class="doc-number">${invoice.invoiceNumber}</div>
+          <div class="doc-date">Date: ${format(new Date(invoice.issueDate), 'dd MMM yyyy')}</div>
+          
+          <div class="attn-label">ATTN TO:</div>
+          <div class="recipient-name">${invoice.clientName || 'N/A'}</div>
+          <div class="recipient-email">${invoice.clientEmail || ''}</div>
+          <div class="recipient-title">${invoice.reference || ''}</div>
+          
+          <div class="table-content">
+            ${invoice.items.map(item => `
+              <div class="table-row">
+                <span class="desc">${item.description}${item.quantity > 1 ? ` (×${item.quantity})` : ''}</span>
+                <span class="cost">${formatCurrency(item.total)}</span>
+              </div>
+            `).join('')}
+          </div>
+          
+          <div class="total-value">${formatCurrency(invoice.total)}</div>
         </div>
       </div>
     </body>
@@ -265,58 +253,38 @@ export function generateInvoicePDF(invoice: Invoice): void {
 // ============================================
 // QUOTATION PDF
 // ============================================
-export function generateQuotationPDF(quotation: Quotation): void {
+export async function generateQuotationPDF(quotation: Quotation): Promise<void> {
+  const templateBase64 = await getTemplateBase64();
+  
   const html = `
     <!DOCTYPE html>
     <html>
     <head>
       <title>Quotation ${quotation.quotationNumber}</title>
-      ${generateTemplateStyles()}
+      ${generateTemplateStyles().replace(TEMPLATE_BASE64, templateBase64)}
     </head>
     <body>
-      <div class="overlay">
-        <div class="doc-title">QUOTATION</div>
-        <div class="doc-number">${quotation.quotationNumber}</div>
-        <div class="doc-date">Date: ${format(new Date(quotation.issueDate), 'dd MMM yyyy')}</div>
-        
-        <div class="attn-label">ATTN TO:</div>
-        <div class="recipient-name">${quotation.clientName || 'N/A'}</div>
-        <div class="recipient-email">${quotation.clientEmail || ''}</div>
-        <div class="recipient-title">${quotation.reference || ''}</div>
-        
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Description</th>
-                <th>Cost</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${quotation.items.map(item => `
-                <tr>
-                  <td>${item.description}${item.quantity > 1 ? ` (x${item.quantity})` : ''}</td>
-                  <td>${formatCurrency(item.total)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-        
-        <div class="footer-left">
-          All prices are in MYR (Malaysian Ringgit).<br>
-          SST: Not Registered<br>
-          ${quotation.validUntil ? `Valid until: ${format(new Date(quotation.validUntil), 'dd MMM yyyy')}` : ''}
-        </div>
-        
-        <div class="total-section">
-          <div class="total-label">Total</div>
-          <div class="total-amount">${formatCurrency(quotation.total)}</div>
-        </div>
-        
-        <div class="signature-area">
-          <div class="signature-line"></div>
-          Authorized Signature
+      <div class="page">
+        <div class="overlay">
+          <div class="doc-title">QUOTATION</div>
+          <div class="doc-number">${quotation.quotationNumber}</div>
+          <div class="doc-date">Date: ${format(new Date(quotation.issueDate), 'dd MMM yyyy')}${quotation.validUntil ? `<br>Valid until: ${format(new Date(quotation.validUntil), 'dd MMM yyyy')}` : ''}</div>
+          
+          <div class="attn-label">ATTN TO:</div>
+          <div class="recipient-name">${quotation.clientName || 'N/A'}</div>
+          <div class="recipient-email">${quotation.clientEmail || ''}</div>
+          <div class="recipient-title">${quotation.reference || ''}</div>
+          
+          <div class="table-content">
+            ${quotation.items.map(item => `
+              <div class="table-row">
+                <span class="desc">${item.description}${item.quantity > 1 ? ` (×${item.quantity})` : ''}</span>
+                <span class="cost">${formatCurrency(item.total)}</span>
+              </div>
+            `).join('')}
+          </div>
+          
+          <div class="total-value">${formatCurrency(quotation.total)}</div>
         </div>
       </div>
     </body>
@@ -329,58 +297,38 @@ export function generateQuotationPDF(quotation: Quotation): void {
 // ============================================
 // PURCHASE ORDER PDF
 // ============================================
-export function generatePOPDF(po: PurchaseOrder): void {
+export async function generatePOPDF(po: PurchaseOrder): Promise<void> {
+  const templateBase64 = await getTemplateBase64();
+  
   const html = `
     <!DOCTYPE html>
     <html>
     <head>
       <title>Purchase Order ${po.poNumber}</title>
-      ${generateTemplateStyles()}
+      ${generateTemplateStyles().replace(TEMPLATE_BASE64, templateBase64)}
     </head>
     <body>
-      <div class="overlay">
-        <div class="doc-title">PURCHASE ORDER</div>
-        <div class="doc-number">${po.poNumber}</div>
-        <div class="doc-date">Date: ${format(new Date(po.createdAt), 'dd MMM yyyy')}</div>
-        
-        <div class="attn-label">VENDOR:</div>
-        <div class="recipient-name">${po.vendorName}</div>
-        <div class="recipient-email">${po.vendorEmail || ''}</div>
-        <div class="recipient-title">${po.vendorAddress || ''}</div>
-        
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Description</th>
-                <th>Cost</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${po.items.map(item => `
-                <tr>
-                  <td>${item.description}${item.quantity > 1 ? ` (x${item.quantity})` : ''}</td>
-                  <td>${formatCurrency(item.total)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-        
-        <div class="footer-left">
-          All prices are in MYR (Malaysian Ringgit).<br>
-          ${po.expectedDelivery ? `Expected Delivery: ${format(new Date(po.expectedDelivery), 'dd MMM yyyy')}` : ''}
-          ${po.notes ? `<br>Notes: ${po.notes}` : ''}
-        </div>
-        
-        <div class="total-section">
-          <div class="total-label">Total</div>
-          <div class="total-amount">${formatCurrency(po.total)}</div>
-        </div>
-        
-        <div class="signature-area">
-          <div class="signature-line"></div>
-          Authorized by: ${po.creatorName || 'N/A'}
+      <div class="page">
+        <div class="overlay">
+          <div class="doc-title">PURCHASE ORDER</div>
+          <div class="doc-number">${po.poNumber}</div>
+          <div class="doc-date">Date: ${format(new Date(po.createdAt), 'dd MMM yyyy')}${po.expectedDelivery ? `<br>Delivery: ${format(new Date(po.expectedDelivery), 'dd MMM yyyy')}` : ''}</div>
+          
+          <div class="attn-label">VENDOR:</div>
+          <div class="recipient-name">${po.vendorName}</div>
+          <div class="recipient-email">${po.vendorEmail || ''}</div>
+          <div class="recipient-title">${po.vendorAddress || ''}</div>
+          
+          <div class="table-content">
+            ${po.items.map(item => `
+              <div class="table-row">
+                <span class="desc">${item.description}${item.quantity > 1 ? ` (×${item.quantity})` : ''}</span>
+                <span class="cost">${formatCurrency(item.total)}</span>
+              </div>
+            `).join('')}
+          </div>
+          
+          <div class="total-value">${formatCurrency(po.total)}</div>
         </div>
       </div>
     </body>
@@ -393,56 +341,36 @@ export function generatePOPDF(po: PurchaseOrder): void {
 // ============================================
 // PAYMENT PDF
 // ============================================
-export function generatePaymentPDF(payment: Payment): void {
+export async function generatePaymentPDF(payment: Payment): Promise<void> {
+  const templateBase64 = await getTemplateBase64();
+  
   const html = `
     <!DOCTYPE html>
     <html>
     <head>
       <title>Payment ${payment.paymentNumber}</title>
-      ${generateTemplateStyles()}
+      ${generateTemplateStyles().replace(TEMPLATE_BASE64, templateBase64)}
     </head>
     <body>
-      <div class="overlay">
-        <div class="doc-title">PAYMENT</div>
-        <div class="doc-number">${payment.paymentNumber}</div>
-        <div class="doc-date">Date: ${format(new Date(payment.paymentDate), 'dd MMM yyyy')}</div>
-        
-        <div class="attn-label">PAID TO:</div>
-        <div class="recipient-name">${payment.vendorName}</div>
-        <div class="recipient-email">Method: ${payment.paymentMethod}</div>
-        <div class="recipient-title">${payment.reference ? `Ref: ${payment.reference}` : ''}</div>
-        
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Description</th>
-                <th>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Payment to ${payment.vendorName}${payment.notes ? ` - ${payment.notes}` : ''}</td>
-                <td>${formatCurrency(payment.amount)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        
-        <div class="footer-left">
-          All amounts in MYR (Malaysian Ringgit).<br>
-          Payment Method: ${payment.paymentMethod}
-          ${payment.reference ? `<br>Reference: ${payment.reference}` : ''}
-        </div>
-        
-        <div class="total-section">
-          <div class="total-label">Total Paid</div>
-          <div class="total-amount">${formatCurrency(payment.amount)}</div>
-        </div>
-        
-        <div class="signature-area">
-          <div class="signature-line"></div>
-          Authorized by: ${payment.creatorName || 'N/A'}
+      <div class="page">
+        <div class="overlay">
+          <div class="doc-title">PAYMENT</div>
+          <div class="doc-number">${payment.paymentNumber}</div>
+          <div class="doc-date">Date: ${format(new Date(payment.paymentDate), 'dd MMM yyyy')}</div>
+          
+          <div class="attn-label">PAID TO:</div>
+          <div class="recipient-name">${payment.vendorName}</div>
+          <div class="recipient-email">Method: ${payment.paymentMethod}</div>
+          <div class="recipient-title">${payment.reference ? `Ref: ${payment.reference}` : ''}</div>
+          
+          <div class="table-content">
+            <div class="table-row">
+              <span class="desc">Payment to ${payment.vendorName}${payment.notes ? ` - ${payment.notes}` : ''}</span>
+              <span class="cost">${formatCurrency(payment.amount)}</span>
+            </div>
+          </div>
+          
+          <div class="total-value">${formatCurrency(payment.amount)}</div>
         </div>
       </div>
     </body>
@@ -455,7 +383,8 @@ export function generatePaymentPDF(payment: Payment): void {
 // ============================================
 // PAYSLIP PDF
 // ============================================
-export function generatePayslipPDF(payslip: Payslip, staffName: string): void {
+export async function generatePayslipPDF(payslip: Payslip, staffName: string): Promise<void> {
+  const templateBase64 = await getTemplateBase64();
   const monthLabel = format(new Date(payslip.month + '-01'), 'MMMM yyyy');
   const additions = payslip.claimsTotal + payslip.trainingClaimsTotal;
   const deductions = payslip.epf + payslip.socso;
@@ -466,86 +395,64 @@ export function generatePayslipPDF(payslip: Payslip, staffName: string): void {
     <html>
     <head>
       <title>Payslip ${monthLabel}</title>
-      ${generateTemplateStyles()}
+      ${generateTemplateStyles().replace(TEMPLATE_BASE64, templateBase64)}
     </head>
     <body>
-      <div class="overlay">
-        <div class="doc-title">PAYSLIP</div>
-        <div class="doc-number">${monthLabel}</div>
-        <div class="doc-date">Generated: ${format(new Date(), 'dd MMM yyyy')}</div>
-        
-        <div class="attn-label">EMPLOYEE:</div>
-        <div class="recipient-name">${staffName}</div>
-        <div class="recipient-email">Pay Period: ${monthLabel}</div>
-        <div class="recipient-title"></div>
-        
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Description</th>
-                <th>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><strong>EARNINGS</strong></td>
-                <td></td>
-              </tr>
-              <tr>
-                <td>Base Salary</td>
-                <td>${formatCurrency(payslip.baseSalary)}</td>
-              </tr>
-              ${payslip.claimsTotal > 0 ? `
-              <tr>
-                <td>Claims Reimbursement</td>
-                <td>+ ${formatCurrency(payslip.claimsTotal)}</td>
-              </tr>
-              ` : ''}
-              ${payslip.trainingClaimsTotal > 0 ? `
-              <tr>
-                <td>Training Claims</td>
-                <td>+ ${formatCurrency(payslip.trainingClaimsTotal)}</td>
-              </tr>
-              ` : ''}
-              <tr>
-                <td><strong>Gross Pay</strong></td>
-                <td><strong>${formatCurrency(grossPay)}</strong></td>
-              </tr>
-              <tr>
-                <td><strong>DEDUCTIONS</strong></td>
-                <td></td>
-              </tr>
-              <tr>
-                <td>EPF (Employee ${payslip.epf > 0 ? Math.round((payslip.epf / payslip.baseSalary) * 100) : 0}%)</td>
-                <td>- ${formatCurrency(payslip.epf)}</td>
-              </tr>
-              <tr>
-                <td>SOCSO (Employee)</td>
-                <td>- ${formatCurrency(payslip.socso)}</td>
-              </tr>
-              <tr>
-                <td><strong>Total Deductions</strong></td>
-                <td><strong>- ${formatCurrency(deductions)}</strong></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        
-        <div class="footer-left">
-          Employer Contributions (Info):<br>
-          EPF (Employer): ${formatCurrency(payslip.employerEpf || 0)}<br>
-          SOCSO (Employer): ${formatCurrency(payslip.employerSocso || 0)}
-        </div>
-        
-        <div class="total-section">
-          <div class="total-label">Net Pay</div>
-          <div class="total-amount">${formatCurrency(payslip.netPay)}</div>
-        </div>
-        
-        <div class="signature-area">
-          <div class="signature-line"></div>
-          Authorized Signature
+      <div class="page">
+        <div class="overlay">
+          <div class="doc-title">PAYSLIP</div>
+          <div class="doc-number">${monthLabel}</div>
+          <div class="doc-date">Generated: ${format(new Date(), 'dd MMM yyyy')}</div>
+          
+          <div class="attn-label">EMPLOYEE:</div>
+          <div class="recipient-name">${staffName}</div>
+          <div class="recipient-email">Pay Period: ${monthLabel}</div>
+          <div class="recipient-title"></div>
+          
+          <div class="table-content">
+            <div class="table-row section-header">
+              <span class="desc">EARNINGS</span>
+              <span class="cost"></span>
+            </div>
+            <div class="table-row">
+              <span class="desc">Base Salary</span>
+              <span class="cost">${formatCurrency(payslip.baseSalary)}</span>
+            </div>
+            ${payslip.claimsTotal > 0 ? `
+            <div class="table-row">
+              <span class="desc">Claims Reimbursement</span>
+              <span class="cost">+ ${formatCurrency(payslip.claimsTotal)}</span>
+            </div>
+            ` : ''}
+            ${payslip.trainingClaimsTotal > 0 ? `
+            <div class="table-row">
+              <span class="desc">Training Claims</span>
+              <span class="cost">+ ${formatCurrency(payslip.trainingClaimsTotal)}</span>
+            </div>
+            ` : ''}
+            <div class="table-row subtotal">
+              <span class="desc">Gross Pay</span>
+              <span class="cost">${formatCurrency(grossPay)}</span>
+            </div>
+            <div class="table-row section-header">
+              <span class="desc">DEDUCTIONS</span>
+              <span class="cost"></span>
+            </div>
+            <div class="table-row">
+              <span class="desc">EPF (Employee ${payslip.epf > 0 ? Math.round((payslip.epf / payslip.baseSalary) * 100) : 0}%)</span>
+              <span class="cost">- ${formatCurrency(payslip.epf)}</span>
+            </div>
+            <div class="table-row">
+              <span class="desc">SOCSO (Employee)</span>
+              <span class="cost">- ${formatCurrency(payslip.socso)}</span>
+            </div>
+            <div class="table-row subtotal">
+              <span class="desc">Total Deductions</span>
+              <span class="cost">- ${formatCurrency(deductions)}</span>
+            </div>
+          </div>
+          
+          <div class="total-value">${formatCurrency(payslip.netPay)}</div>
         </div>
       </div>
     </body>
@@ -565,9 +472,9 @@ function printDocument(html: string, title: string): void {
     printWindow.document.close();
     printWindow.focus();
     
-    // Wait for background image to load then print
+    // Wait for base64 image to render then print
     setTimeout(() => {
       printWindow.print();
-    }, 500);
+    }, 300);
   }
 }

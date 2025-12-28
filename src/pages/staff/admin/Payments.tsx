@@ -399,7 +399,7 @@ const Payments = () => {
                               <TableCell>{getStatusBadge(po.status)}</TableCell>
                               <TableCell className="text-right">
                                 <div className="flex gap-1 justify-end flex-wrap">
-                                  <Button size="sm" variant="ghost" onClick={() => generatePOPDF(po)}><Download className="h-3 w-3" /></Button>
+                                  <Button size="sm" variant="ghost" onClick={async () => await generatePOPDF(po)}><Download className="h-3 w-3" /></Button>
                                   <Button 
                                     size="sm" 
                                     variant="default" 

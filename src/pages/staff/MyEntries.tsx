@@ -711,7 +711,7 @@ const MyEntries = () => {
                           <TableCell>{getQuotationStatusBadge(quotation.status)}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex gap-1 justify-end flex-wrap">
-                              <Button size="sm" variant="ghost" onClick={() => generateQuotationPDF(quotation)}>
+                              <Button size="sm" variant="ghost" onClick={async () => await generateQuotationPDF(quotation)}>
                                 <Download className="h-3 w-3 mr-1" />
                                 PDF
                               </Button>
@@ -777,7 +777,7 @@ const MyEntries = () => {
                           <TableCell>{getInvoiceStatusBadge(invoice.status)}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex gap-1 justify-end flex-wrap">
-                              <Button size="sm" variant="ghost" onClick={() => generateInvoicePDF(invoice)}>
+                              <Button size="sm" variant="ghost" onClick={async () => await generateInvoicePDF(invoice)}>
                                 <Download className="h-3 w-3 mr-1" />
                                 PDF
                               </Button>

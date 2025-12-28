@@ -23,7 +23,7 @@ const TryHireHome = () => {
             <p className="text-lg text-slate-700">You hire only if satisfied.</p>
           </div>
           
-          <p className="mt-6 text-2xl font-semibold text-emerald-600">
+          <p className="mt-6 text-2xl font-semibold text-tryhire-coral">
             Prove first. Hire later.
           </p>
           
@@ -71,20 +71,20 @@ const TryHireHome = () => {
           
           {/* TryHire */}
           <TryHireCard variant="highlight">
-            <h3 className="text-lg font-semibold text-emerald-700 mb-6">
+            <h3 className="text-lg font-semibold text-tryhire-coral mb-6">
               TryHire
             </h3>
             <ul className="space-y-4">
               <li className="flex items-start gap-3">
-                <Check className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
+                <Check className="h-5 w-5 text-tryhire-coral mt-0.5 shrink-0" />
                 <span className="text-slate-700">Work + training first</span>
               </li>
               <li className="flex items-start gap-3">
-                <Check className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
+                <Check className="h-5 w-5 text-tryhire-coral mt-0.5 shrink-0" />
                 <span className="text-slate-700">Hire on performance</span>
               </li>
               <li className="flex items-start gap-3">
-                <Check className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
+                <Check className="h-5 w-5 text-tryhire-coral mt-0.5 shrink-0" />
                 <span className="text-slate-700">Less regret</span>
               </li>
             </ul>
@@ -100,18 +100,18 @@ const TryHireHome = () => {
       <TryHireSection>
         <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           <div>
-            <h3 className="text-xl font-bold text-emerald-700 mb-4">What TryHire IS</h3>
+            <h3 className="text-xl font-bold text-tryhire-coral mb-4">What TryHire IS</h3>
             <ul className="space-y-3">
               <li className="flex items-start gap-3">
-                <Check className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
+                <Check className="h-5 w-5 text-tryhire-coral mt-0.5 shrink-0" />
                 <span className="text-slate-700">Training-linked placement</span>
               </li>
               <li className="flex items-start gap-3">
-                <Check className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
+                <Check className="h-5 w-5 text-tryhire-coral mt-0.5 shrink-0" />
                 <span className="text-slate-700">Time-bound</span>
               </li>
               <li className="flex items-start gap-3">
-                <Check className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
+                <Check className="h-5 w-5 text-tryhire-coral mt-0.5 shrink-0" />
                 <span className="text-slate-700">Performance-based</span>
               </li>
             </ul>

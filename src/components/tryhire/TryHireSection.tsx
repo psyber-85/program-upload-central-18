@@ -15,7 +15,7 @@ const TryHireSection = ({
   const backgrounds = {
     white: 'bg-white',
     gray: 'bg-slate-50',
-    accent: 'bg-emerald-50',
+    accent: 'bg-tryhire-peach',
   };
 
   return (

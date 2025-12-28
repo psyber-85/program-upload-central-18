@@ -20,7 +20,11 @@ interface PayrollItemWithProRating extends PayrollItem {
   daysWorked?: number;
   totalWorkDays?: number;
   originalBaseSalary?: number;
+  epfRate?: number;
+  socsoRate?: number;
 }
+
+const DEFAULT_WORK_DAYS = 22;
 
 const PayrollRunDetail = () => {
   const { runId } = useParams<{ runId: string }>();
@@ -30,7 +34,10 @@ const PayrollRunDetail = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [workDaysPerMonth, setWorkDaysPerMonth] = useState(22);
+  // Track individual work days per staff (userId -> daysWorked)
+  const [staffWorkDays, setStaffWorkDays] = useState<Record<string, number>>({});
+  // Staff rates for recalculation
+  const [staffRates, setStaffRates] = useState<Record<string, { epfRate: number; socsoRate: number; originalSalary: number }>>({});
 
   useEffect(() => {
     loadData();
@@ -56,8 +63,7 @@ const PayrollRunDetail = () => {
   const calculateProRatedSalary = (
     baseSalary: number,
     joinDate: string,
-    payrollMonth: string,
-    configuredWorkDays: number
+    payrollMonth: string
   ): { salary: number; daysWorked: number; totalDays: number; isProRated: boolean } => {
     const [year, month] = payrollMonth.split('-').map(Number);
     const monthStart = startOfMonth(new Date(year, month - 1, 1));
@@ -66,12 +72,12 @@ const PayrollRunDetail = () => {
     
     // If joined before this month, full salary
     if (isBefore(staffJoinDate, monthStart)) {
-      return { salary: baseSalary, daysWorked: configuredWorkDays, totalDays: configuredWorkDays, isProRated: false };
+      return { salary: baseSalary, daysWorked: DEFAULT_WORK_DAYS, totalDays: DEFAULT_WORK_DAYS, isProRated: false };
     }
     
     // If joined after this month ends, 0 salary
     if (isAfter(staffJoinDate, monthEnd)) {
-      return { salary: 0, daysWorked: 0, totalDays: configuredWorkDays, isProRated: true };
+      return { salary: 0, daysWorked: 0, totalDays: DEFAULT_WORK_DAYS, isProRated: true };
     }
     
     // Pro-rate: calculate based on calendar days ratio
@@ -79,10 +85,52 @@ const PayrollRunDetail = () => {
     const remainingCalendarDays = differenceInCalendarDays(monthEnd, staffJoinDate) + 1;
     const ratio = remainingCalendarDays / totalCalendarDays;
     
-    const daysWorked = Math.round(configuredWorkDays * ratio);
-    const salary = Math.round(baseSalary * (daysWorked / configuredWorkDays));
+    const daysWorked = Math.round(DEFAULT_WORK_DAYS * ratio);
+    const salary = Math.round(baseSalary * (daysWorked / DEFAULT_WORK_DAYS));
     
-    return { salary, daysWorked, totalDays: configuredWorkDays, isProRated: true };
+    return { salary, daysWorked, totalDays: DEFAULT_WORK_DAYS, isProRated: true };
+  };
+
+  // Recalculate a single staff's payroll when their work days change
+  const recalculatePayrollItem = (
+    userId: string,
+    newDaysWorked: number
+  ) => {
+    const rates = staffRates[userId];
+    if (!rates) return;
+
+    const ratio = newDaysWorked / DEFAULT_WORK_DAYS;
+    const effectiveSalary = Math.round(rates.originalSalary * ratio);
+    const epf = Math.round(effectiveSalary * (rates.epfRate / 100));
+    const socso = Math.round(effectiveSalary * (rates.socsoRate / 100));
+    const employerEpf = Math.round(effectiveSalary * (13 / 100));
+    const employerSocso = socso;
+
+    setItems(prev => prev.map(item => {
+      if (item.userId !== userId) return item;
+      
+      const netPay = effectiveSalary - epf - socso + (item.claimsTotal || 0) + (item.trainingClaimsTotal || 0);
+      const totalCompanyCost = effectiveSalary + employerEpf + employerSocso + (item.claimsTotal || 0) + (item.trainingClaimsTotal || 0);
+      
+      return {
+        ...item,
+        baseSalary: effectiveSalary,
+        epf,
+        socso,
+        employerEpf,
+        employerSocso,
+        netPay,
+        totalCompanyCost,
+        daysWorked: newDaysWorked,
+        isProRated: newDaysWorked < DEFAULT_WORK_DAYS,
+      };
+    }));
+  };
+
+  const handleUpdateWorkDays = (userId: string, daysWorked: number) => {
+    const clampedDays = Math.max(0, Math.min(DEFAULT_WORK_DAYS, daysWorked || 0));
+    setStaffWorkDays(prev => ({ ...prev, [userId]: clampedDays }));
+    recalculatePayrollItem(userId, clampedDays);
   };
 
   const handleGenerateItems = async () => {
@@ -119,28 +167,27 @@ const PayrollRunDetail = () => {
         trainingByUser[training.userId].push(training);
       }
       
+      // Track rates and work days for each staff
+      const newStaffRates: Record<string, { epfRate: number; socsoRate: number; originalSalary: number }> = {};
+      const newStaffWorkDays: Record<string, number> = {};
+      
       // Generate payroll items for each staff
       for (const staff of activeStaff) {
-        // Calculate pro-rated salary
+        // Calculate pro-rated salary based on join date
         const proRating = calculateProRatedSalary(
           staff.salaryBase,
           staff.joinDate,
-          run.month,
-          workDaysPerMonth
+          run.month
         );
         
-        const effectiveSalary = proRating.salary;
-        
         // Skip if salary is 0 (joined after month end)
-        if (effectiveSalary === 0) continue;
+        if (proRating.salary === 0) continue;
         
+        const effectiveSalary = proRating.salary;
         const epf = Math.round(effectiveSalary * (staff.epfRate / 100));
         const socso = Math.round(effectiveSalary * (staff.socsoRate / 100));
-        
-        // Employer contributions (default: EPF 13%, SOCSO same as employee rate)
-        const employerEpfRate = 13; // Standard employer EPF rate
-        const employerEpf = Math.round(effectiveSalary * (employerEpfRate / 100));
-        const employerSocso = socso; // Employer pays same as employee for SOCSO
+        const employerEpf = Math.round(effectiveSalary * (13 / 100));
+        const employerSocso = socso;
         
         // Calculate claims for this staff member
         const staffClaims = claimsByUser[staff.id] || [];
@@ -153,10 +200,18 @@ const PayrollRunDetail = () => {
         const netPay = effectiveSalary - epf - socso + claimsTotal + trainingClaimsTotal;
         const totalCompanyCost = effectiveSalary + employerEpf + employerSocso + claimsTotal + trainingClaimsTotal;
         
+        // Store staff rates for later recalculation
+        newStaffRates[staff.id] = {
+          epfRate: staff.epfRate,
+          socsoRate: staff.socsoRate,
+          originalSalary: staff.salaryBase,
+        };
+        newStaffWorkDays[staff.id] = proRating.daysWorked;
+        
         await payrollSupabaseRepo.addPayrollItem({
           runId: run.id,
           userId: staff.id,
-          userName: staff.name + (proRating.isProRated ? ` (${proRating.daysWorked}/${proRating.totalDays} days)` : ''),
+          userName: staff.name,
           baseSalary: effectiveSalary,
           epf,
           socso,
@@ -168,6 +223,9 @@ const PayrollRunDetail = () => {
           totalCompanyCost,
         });
       }
+      
+      setStaffRates(newStaffRates);
+      setStaffWorkDays(newStaffWorkDays);
       
       toast({ title: 'Payroll items generated with pro-rating!' });
       loadData();
@@ -334,45 +392,15 @@ const PayrollRunDetail = () => {
               </CardDescription>
             </div>
             {!isFinalized && (
-              <div className="flex flex-col gap-3 items-end">
-                {/* Work Days Configuration */}
-                <div className="flex items-center gap-2">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className="flex items-center gap-2">
-                          <Label htmlFor="workDays" className="text-sm text-muted-foreground whitespace-nowrap flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            Work Days
-                            <Info className="h-3 w-3" />
-                          </Label>
-                          <Input
-                            id="workDays"
-                            type="number"
-                            min={1}
-                            max={31}
-                            value={workDaysPerMonth}
-                            onChange={(e) => setWorkDaysPerMonth(Math.max(1, Math.min(31, parseInt(e.target.value) || 22)))}
-                            className="w-16 h-8"
-                          />
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Number of working days this month for pro-rating calculation</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={handleGenerateItems} disabled={isGenerating}>
-                    {isGenerating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    {items.length > 0 ? 'Regenerate' : 'Generate'} Items
-                  </Button>
-                  <Button onClick={handleFinalize} disabled={isFinalizing || items.length === 0}>
-                    {isFinalizing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    Finalize Payroll
-                  </Button>
-                </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleGenerateItems} disabled={isGenerating}>
+                  {isGenerating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  {items.length > 0 ? 'Regenerate' : 'Generate'} Items
+                </Button>
+                <Button onClick={handleFinalize} disabled={isFinalizing || items.length === 0}>
+                  {isFinalizing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Finalize Payroll
+                </Button>
               </div>
             )}
           </CardHeader>
@@ -382,7 +410,7 @@ const PayrollRunDetail = () => {
                 <AlertTriangle className="h-12 w-12 mx-auto text-amber-500 mb-4" />
                 <p className="text-muted-foreground mb-4">No payroll items generated yet</p>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Configure work days ({workDaysPerMonth}) for pro-rating calculation, then generate items.
+                  Generate items to calculate payroll. You can adjust individual work days after generation.
                 </p>
                 <Button onClick={handleGenerateItems} disabled={isGenerating}>
                   {isGenerating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -396,6 +424,7 @@ const PayrollRunDetail = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Staff</TableHead>
+                        <TableHead className="text-center">Days</TableHead>
                         <TableHead className="text-right">Base Salary</TableHead>
                         <TableHead className="text-right">EPF (E)</TableHead>
                         <TableHead className="text-right">SOCSO (E)</TableHead>
@@ -408,27 +437,42 @@ const PayrollRunDetail = () => {
                     </TableHeader>
                     <TableBody>
                       {items.map((item) => {
-                        const isProRated = item.userName.includes('/');
+                        const daysWorked = staffWorkDays[item.userId] ?? DEFAULT_WORK_DAYS;
+                        const isProRated = daysWorked < DEFAULT_WORK_DAYS;
                         return (
-                          <TableRow key={item.id}>
+                          <TableRow key={item.id} className={isProRated ? 'bg-amber-50/50' : ''}>
                             <TableCell className="font-medium">
                               <div className="flex items-center gap-2">
-                                {item.userName.split(' (')[0]}
+                                {item.userName}
                                 {isProRated && (
                                   <TooltipProvider>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
-                                        <Badge variant="secondary" className="text-xs">
+                                        <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700">
                                           <Calendar className="h-3 w-3 mr-1" />
-                                          {item.userName.match(/\(([^)]+)\)/)?.[1] || 'Pro-rated'}
+                                          Adjusted
                                         </Badge>
                                       </TooltipTrigger>
                                       <TooltipContent>
-                                        <p>Pro-rated salary based on join date</p>
+                                        <p>Work days adjusted (unpaid leave / new joiner)</p>
                                       </TooltipContent>
                                     </Tooltip>
                                   </TooltipProvider>
                                 )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={DEFAULT_WORK_DAYS}
+                                  value={daysWorked}
+                                  onChange={(e) => handleUpdateWorkDays(item.userId, parseInt(e.target.value))}
+                                  className="w-14 h-7 text-center"
+                                  disabled={isFinalized}
+                                />
+                                <span className="text-muted-foreground text-sm">/ {DEFAULT_WORK_DAYS}</span>
                               </div>
                             </TableCell>
                             <TableCell className="text-right">RM {item.baseSalary.toLocaleString()}</TableCell>

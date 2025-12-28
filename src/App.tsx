@@ -38,6 +38,12 @@ import BirthdayDashboard from "./pages/BirthdayDashboard";
 import RegisterTracker from "./pages/RegisterTracker";
 import CRMTracker from "./pages/CRMTracker";
 
+// TryHire Microsite
+import TryHireHome from "./pages/tryhire/TryHireHome";
+import TryHireInterest from "./pages/tryhire/TryHireInterest";
+import TryHireThanks from "./pages/tryhire/TryHireThanks";
+import TryHirePrivacy from "./pages/tryhire/TryHirePrivacy";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -52,6 +58,12 @@ const App = () => (
             <Route path="/" element={<PublicHome />} />
             <Route path="/login" element={<Login />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            
+            {/* TryHire Microsite (public) */}
+            <Route path="/tryhire" element={<TryHireHome />} />
+            <Route path="/tryhire/interest" element={<TryHireInterest />} />
+            <Route path="/tryhire/thanks" element={<TryHireThanks />} />
+            <Route path="/tryhire/privacy" element={<TryHirePrivacy />} />
             
             {/* Staff Portal routes (protected) */}
             <Route path="/staff" element={

@@ -8,6 +8,7 @@ import HowItWorks from '@/components/tryhire/HowItWorks';
 import TryHireFAQ from '@/components/tryhire/TryHireFAQ';
 import SocialProofStrip from '@/components/tryhire/SocialProofStrip';
 import OperatorCard from '@/components/tryhire/OperatorCard';
+import BrochureDownloadModal from '@/components/tryhire/BrochureDownloadModal';
 
 const TryHireHome = () => {
   return (
@@ -31,17 +32,18 @@ const TryHireHome = () => {
             Prove first. Hire later.
           </p>
           
-          <div className="mt-10">
+          <div className="mt-10 flex flex-col sm:flex-row gap-4">
             <Link to="/interest">
               <TryHireButton size="lg" className="group">
                 Submit Hiring Interest
                 <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
               </TryHireButton>
             </Link>
-            <p className="mt-3 text-sm text-slate-500">
-              No upfront cost to employers.
-            </p>
+            <BrochureDownloadModal />
           </div>
+          <p className="mt-3 text-sm text-slate-500">
+            No upfront cost to employers.
+          </p>
         </div>
       </TryHireSection>
 
@@ -211,12 +213,15 @@ const TryHireHome = () => {
           <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-6">
             Ready to hire smarter?
           </h2>
-          <Link to="/interest">
-            <TryHireButton size="lg" className="group shadow-lg shadow-tryhire-coral/25 hover:shadow-xl hover:shadow-tryhire-coral/30">
-              Submit Hiring Interest
-              <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-            </TryHireButton>
-          </Link>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link to="/interest">
+              <TryHireButton size="lg" className="group shadow-lg shadow-tryhire-coral/25 hover:shadow-xl hover:shadow-tryhire-coral/30">
+                Submit Hiring Interest
+                <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
+              </TryHireButton>
+            </Link>
+            <BrochureDownloadModal />
+          </div>
           <p className="mt-3 text-sm text-slate-500">
             No obligation. No upfront cost.
           </p>

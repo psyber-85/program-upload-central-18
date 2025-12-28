@@ -579,17 +579,834 @@ export type Database = {
         }
         Relationships: []
       }
+      sp_app_settings: {
+        Row: {
+          id: string
+          key: string
+          updated_at: string | null
+          value: Json
+        }
+        Insert: {
+          id?: string
+          key: string
+          updated_at?: string | null
+          value: Json
+        }
+        Update: {
+          id?: string
+          key?: string
+          updated_at?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
+      sp_bills: {
+        Row: {
+          amount: number
+          attachment_file_name: string | null
+          attachment_file_size: number | null
+          attachment_file_type: string | null
+          attachment_uploaded_at: string | null
+          category: string
+          created_at: string | null
+          created_by: string | null
+          due_date: string | null
+          id: string
+          notes: string | null
+          paid_date: string | null
+          status: Database["public"]["Enums"]["sp_bill_status"] | null
+          updated_at: string | null
+          vendor_name: string
+        }
+        Insert: {
+          amount: number
+          attachment_file_name?: string | null
+          attachment_file_size?: number | null
+          attachment_file_type?: string | null
+          attachment_uploaded_at?: string | null
+          category: string
+          created_at?: string | null
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          paid_date?: string | null
+          status?: Database["public"]["Enums"]["sp_bill_status"] | null
+          updated_at?: string | null
+          vendor_name: string
+        }
+        Update: {
+          amount?: number
+          attachment_file_name?: string | null
+          attachment_file_size?: number | null
+          attachment_file_type?: string | null
+          attachment_uploaded_at?: string | null
+          category?: string
+          created_at?: string | null
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          notes?: string | null
+          paid_date?: string | null
+          status?: Database["public"]["Enums"]["sp_bill_status"] | null
+          updated_at?: string | null
+          vendor_name?: string
+        }
+        Relationships: []
+      }
+      sp_claim_requests: {
+        Row: {
+          admin_comment: string | null
+          amount: number
+          attachment_url: string | null
+          auto_approved: boolean | null
+          category: string
+          created_at: string | null
+          description: string | null
+          id: string
+          included_in_payroll_month: string | null
+          linked_training_app_id: string | null
+          receipt_file_name: string | null
+          receipt_file_size: number | null
+          receipt_file_type: string | null
+          receipt_uploaded_at: string | null
+          status: Database["public"]["Enums"]["sp_request_status"] | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          admin_comment?: string | null
+          amount: number
+          attachment_url?: string | null
+          auto_approved?: boolean | null
+          category: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          included_in_payroll_month?: string | null
+          linked_training_app_id?: string | null
+          receipt_file_name?: string | null
+          receipt_file_size?: number | null
+          receipt_file_type?: string | null
+          receipt_uploaded_at?: string | null
+          status?: Database["public"]["Enums"]["sp_request_status"] | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          admin_comment?: string | null
+          amount?: number
+          attachment_url?: string | null
+          auto_approved?: boolean | null
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          included_in_payroll_month?: string | null
+          linked_training_app_id?: string | null
+          receipt_file_name?: string | null
+          receipt_file_size?: number | null
+          receipt_file_type?: string | null
+          receipt_uploaded_at?: string | null
+          status?: Database["public"]["Enums"]["sp_request_status"] | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sp_doc_links: {
+        Row: {
+          category: string
+          created_at: string | null
+          description: string | null
+          id: string
+          title: string
+          updated_at: string | null
+          url: string
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          title: string
+          updated_at?: string | null
+          url: string
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          title?: string
+          updated_at?: string | null
+          url?: string
+        }
+        Relationships: []
+      }
+      sp_invoices: {
+        Row: {
+          business_arm: Database["public"]["Enums"]["sp_business_arm"] | null
+          client_address: string | null
+          client_email: string | null
+          client_name: string | null
+          client_phone: string | null
+          created_at: string | null
+          created_by: string | null
+          due_date: string | null
+          id: string
+          invoice_number: string
+          issue_date: string
+          items: Json
+          notes: string | null
+          paid_date: string | null
+          payment_terms: string | null
+          quotation_id: string | null
+          reference: string | null
+          status: Database["public"]["Enums"]["sp_invoice_status"] | null
+          total: number
+          updated_at: string | null
+        }
+        Insert: {
+          business_arm?: Database["public"]["Enums"]["sp_business_arm"] | null
+          client_address?: string | null
+          client_email?: string | null
+          client_name?: string | null
+          client_phone?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_number: string
+          issue_date?: string
+          items?: Json
+          notes?: string | null
+          paid_date?: string | null
+          payment_terms?: string | null
+          quotation_id?: string | null
+          reference?: string | null
+          status?: Database["public"]["Enums"]["sp_invoice_status"] | null
+          total?: number
+          updated_at?: string | null
+        }
+        Update: {
+          business_arm?: Database["public"]["Enums"]["sp_business_arm"] | null
+          client_address?: string | null
+          client_email?: string | null
+          client_name?: string | null
+          client_phone?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_number?: string
+          issue_date?: string
+          items?: Json
+          notes?: string | null
+          paid_date?: string | null
+          payment_terms?: string | null
+          quotation_id?: string | null
+          reference?: string | null
+          status?: Database["public"]["Enums"]["sp_invoice_status"] | null
+          total?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      sp_leave_balances: {
+        Row: {
+          al_carry_forward: number | null
+          al_total: number | null
+          al_used: number | null
+          created_at: string | null
+          id: string
+          sl_total: number | null
+          sl_used: number | null
+          updated_at: string | null
+          user_id: string
+          year: number
+        }
+        Insert: {
+          al_carry_forward?: number | null
+          al_total?: number | null
+          al_used?: number | null
+          created_at?: string | null
+          id?: string
+          sl_total?: number | null
+          sl_used?: number | null
+          updated_at?: string | null
+          user_id: string
+          year: number
+        }
+        Update: {
+          al_carry_forward?: number | null
+          al_total?: number | null
+          al_used?: number | null
+          created_at?: string | null
+          id?: string
+          sl_total?: number | null
+          sl_used?: number | null
+          updated_at?: string | null
+          user_id?: string
+          year?: number
+        }
+        Relationships: []
+      }
+      sp_leave_requests: {
+        Row: {
+          admin_comment: string | null
+          attachment_url: string | null
+          created_at: string | null
+          custom_leave_type: string | null
+          end_date: string
+          half_day: boolean | null
+          id: string
+          leave_type: Database["public"]["Enums"]["sp_leave_type"]
+          reason: string | null
+          start_date: string
+          status: Database["public"]["Enums"]["sp_request_status"] | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          admin_comment?: string | null
+          attachment_url?: string | null
+          created_at?: string | null
+          custom_leave_type?: string | null
+          end_date: string
+          half_day?: boolean | null
+          id?: string
+          leave_type: Database["public"]["Enums"]["sp_leave_type"]
+          reason?: string | null
+          start_date: string
+          status?: Database["public"]["Enums"]["sp_request_status"] | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          admin_comment?: string | null
+          attachment_url?: string | null
+          created_at?: string | null
+          custom_leave_type?: string | null
+          end_date?: string
+          half_day?: boolean | null
+          id?: string
+          leave_type?: Database["public"]["Enums"]["sp_leave_type"]
+          reason?: string | null
+          start_date?: string
+          status?: Database["public"]["Enums"]["sp_request_status"] | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sp_payments: {
+        Row: {
+          amount: number
+          bill_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          notes: string | null
+          payment_date: string
+          payment_method: Database["public"]["Enums"]["sp_payment_method"]
+          payment_number: string
+          po_id: string | null
+          reference: string | null
+          vendor_name: string
+        }
+        Insert: {
+          amount: number
+          bill_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_method: Database["public"]["Enums"]["sp_payment_method"]
+          payment_number: string
+          po_id?: string | null
+          reference?: string | null
+          vendor_name: string
+        }
+        Update: {
+          amount?: number
+          bill_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_method?: Database["public"]["Enums"]["sp_payment_method"]
+          payment_number?: string
+          po_id?: string | null
+          reference?: string | null
+          vendor_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sp_payments_bill_id_fkey"
+            columns: ["bill_id"]
+            isOneToOne: false
+            referencedRelation: "sp_bills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sp_payments_po_id_fkey"
+            columns: ["po_id"]
+            isOneToOne: false
+            referencedRelation: "sp_purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sp_payroll_items: {
+        Row: {
+          base_salary: number
+          claims_total: number | null
+          created_at: string | null
+          employer_epf: number | null
+          employer_socso: number | null
+          epf: number | null
+          id: string
+          net_pay: number
+          run_id: string
+          socso: number | null
+          total_company_cost: number
+          training_claims_total: number | null
+          user_id: string
+          user_name: string
+        }
+        Insert: {
+          base_salary?: number
+          claims_total?: number | null
+          created_at?: string | null
+          employer_epf?: number | null
+          employer_socso?: number | null
+          epf?: number | null
+          id?: string
+          net_pay?: number
+          run_id: string
+          socso?: number | null
+          total_company_cost?: number
+          training_claims_total?: number | null
+          user_id: string
+          user_name: string
+        }
+        Update: {
+          base_salary?: number
+          claims_total?: number | null
+          created_at?: string | null
+          employer_epf?: number | null
+          employer_socso?: number | null
+          epf?: number | null
+          id?: string
+          net_pay?: number
+          run_id?: string
+          socso?: number | null
+          total_company_cost?: number
+          training_claims_total?: number | null
+          user_id?: string
+          user_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sp_payroll_items_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "sp_payroll_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sp_payroll_runs: {
+        Row: {
+          created_at: string | null
+          finalized_at: string | null
+          id: string
+          month: string
+          status: Database["public"]["Enums"]["sp_payroll_status"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          finalized_at?: string | null
+          id?: string
+          month: string
+          status?: Database["public"]["Enums"]["sp_payroll_status"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          finalized_at?: string | null
+          id?: string
+          month?: string
+          status?: Database["public"]["Enums"]["sp_payroll_status"] | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      sp_payslips: {
+        Row: {
+          base_salary: number
+          claims_total: number | null
+          created_at: string | null
+          employer_epf: number | null
+          employer_socso: number | null
+          epf: number | null
+          id: string
+          month: string
+          net_pay: number
+          run_id: string
+          socso: number | null
+          training_claims_total: number | null
+          user_id: string
+        }
+        Insert: {
+          base_salary: number
+          claims_total?: number | null
+          created_at?: string | null
+          employer_epf?: number | null
+          employer_socso?: number | null
+          epf?: number | null
+          id?: string
+          month: string
+          net_pay: number
+          run_id: string
+          socso?: number | null
+          training_claims_total?: number | null
+          user_id: string
+        }
+        Update: {
+          base_salary?: number
+          claims_total?: number | null
+          created_at?: string | null
+          employer_epf?: number | null
+          employer_socso?: number | null
+          epf?: number | null
+          id?: string
+          month?: string
+          net_pay?: number
+          run_id?: string
+          socso?: number | null
+          training_claims_total?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sp_payslips_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "sp_payroll_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sp_purchase_orders: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          expected_delivery: string | null
+          id: string
+          items: Json
+          notes: string | null
+          po_number: string
+          status: Database["public"]["Enums"]["sp_po_status"] | null
+          total: number
+          updated_at: string | null
+          vendor_address: string | null
+          vendor_email: string | null
+          vendor_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          expected_delivery?: string | null
+          id?: string
+          items?: Json
+          notes?: string | null
+          po_number: string
+          status?: Database["public"]["Enums"]["sp_po_status"] | null
+          total?: number
+          updated_at?: string | null
+          vendor_address?: string | null
+          vendor_email?: string | null
+          vendor_name: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          expected_delivery?: string | null
+          id?: string
+          items?: Json
+          notes?: string | null
+          po_number?: string
+          status?: Database["public"]["Enums"]["sp_po_status"] | null
+          total?: number
+          updated_at?: string | null
+          vendor_address?: string | null
+          vendor_email?: string | null
+          vendor_name?: string
+        }
+        Relationships: []
+      }
+      sp_quotations: {
+        Row: {
+          business_arm: Database["public"]["Enums"]["sp_business_arm"] | null
+          client_address: string | null
+          client_email: string | null
+          client_name: string | null
+          client_phone: string | null
+          converted_invoice_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          issue_date: string
+          items: Json
+          notes: string | null
+          quotation_number: string
+          reference: string | null
+          status: Database["public"]["Enums"]["sp_quotation_status"] | null
+          total: number
+          updated_at: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          business_arm?: Database["public"]["Enums"]["sp_business_arm"] | null
+          client_address?: string | null
+          client_email?: string | null
+          client_name?: string | null
+          client_phone?: string | null
+          converted_invoice_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          issue_date?: string
+          items?: Json
+          notes?: string | null
+          quotation_number: string
+          reference?: string | null
+          status?: Database["public"]["Enums"]["sp_quotation_status"] | null
+          total?: number
+          updated_at?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          business_arm?: Database["public"]["Enums"]["sp_business_arm"] | null
+          client_address?: string | null
+          client_email?: string | null
+          client_name?: string | null
+          client_phone?: string | null
+          converted_invoice_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          issue_date?: string
+          items?: Json
+          notes?: string | null
+          quotation_number?: string
+          reference?: string | null
+          status?: Database["public"]["Enums"]["sp_quotation_status"] | null
+          total?: number
+          updated_at?: string | null
+          valid_until?: string | null
+        }
+        Relationships: []
+      }
+      sp_staff_profiles: {
+        Row: {
+          avatar_url: string | null
+          business_arm: Database["public"]["Enums"]["sp_business_arm"] | null
+          created_at: string | null
+          email: string
+          epf_rate: number | null
+          id: string
+          is_active: boolean | null
+          join_date: string
+          name: string
+          salary_base: number | null
+          socso_rate: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          business_arm?: Database["public"]["Enums"]["sp_business_arm"] | null
+          created_at?: string | null
+          email: string
+          epf_rate?: number | null
+          id: string
+          is_active?: boolean | null
+          join_date?: string
+          name: string
+          salary_base?: number | null
+          socso_rate?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          business_arm?: Database["public"]["Enums"]["sp_business_arm"] | null
+          created_at?: string | null
+          email?: string
+          epf_rate?: number | null
+          id?: string
+          is_active?: boolean | null
+          join_date?: string
+          name?: string
+          salary_base?: number | null
+          socso_rate?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      sp_training_applications: {
+        Row: {
+          approved_at: string | null
+          attachment_url: string | null
+          claimed_at: string | null
+          completed_at: string | null
+          cost: number
+          course_name: string
+          created_at: string | null
+          id: string
+          included_in_payroll_month: string | null
+          justification: string | null
+          link: string | null
+          provider: string
+          status: Database["public"]["Enums"]["sp_training_status"] | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          attachment_url?: string | null
+          claimed_at?: string | null
+          completed_at?: string | null
+          cost: number
+          course_name: string
+          created_at?: string | null
+          id?: string
+          included_in_payroll_month?: string | null
+          justification?: string | null
+          link?: string | null
+          provider: string
+          status?: Database["public"]["Enums"]["sp_training_status"] | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          attachment_url?: string | null
+          claimed_at?: string | null
+          completed_at?: string | null
+          cost?: number
+          course_name?: string
+          created_at?: string | null
+          id?: string
+          included_in_payroll_month?: string | null
+          justification?: string | null
+          link?: string | null
+          provider?: string
+          status?: Database["public"]["Enums"]["sp_training_status"] | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sp_training_entitlements: {
+        Row: {
+          annual_amount: number | null
+          created_at: string | null
+          eligible_from: string
+          id: string
+          override_balance: number | null
+          override_eligible: boolean | null
+          updated_at: string | null
+          used_amount: number | null
+          user_id: string
+        }
+        Insert: {
+          annual_amount?: number | null
+          created_at?: string | null
+          eligible_from?: string
+          id?: string
+          override_balance?: number | null
+          override_eligible?: boolean | null
+          updated_at?: string | null
+          used_amount?: number | null
+          user_id: string
+        }
+        Update: {
+          annual_amount?: number | null
+          created_at?: string | null
+          eligible_from?: string
+          id?: string
+          override_balance?: number | null
+          override_eligible?: boolean | null
+          updated_at?: string | null
+          used_amount?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sp_user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["sp_app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["sp_app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["sp_app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_sp_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["sp_app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       crm_activity_type: "Contacted" | "Call" | "Email"
       crm_lead_score: "A" | "B" | "C" | "D" | "E"
       crm_lead_status: "Success" | "Lost" | "Future"
+      sp_app_role: "admin" | "staff"
+      sp_bill_status: "Draft" | "Paid"
+      sp_business_arm: "Training" | "Solutions"
+      sp_invoice_status: "Draft" | "Sent" | "Paid"
+      sp_leave_type: "AL" | "SL" | "Custom"
+      sp_payment_method: "Bank Transfer" | "Cash" | "Cheque" | "Card"
+      sp_payroll_status: "Draft" | "Finalized"
+      sp_po_status: "Draft" | "Sent" | "Received" | "Closed"
+      sp_quotation_status:
+        | "Draft"
+        | "Sent"
+        | "Accepted"
+        | "Rejected"
+        | "Converted"
+      sp_request_status: "Pending" | "Approved" | "Rejected"
+      sp_training_status:
+        | "Submitted"
+        | "Approved"
+        | "Rejected"
+        | "Completed"
+        | "Claimed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -720,6 +1537,29 @@ export const Constants = {
       crm_activity_type: ["Contacted", "Call", "Email"],
       crm_lead_score: ["A", "B", "C", "D", "E"],
       crm_lead_status: ["Success", "Lost", "Future"],
+      sp_app_role: ["admin", "staff"],
+      sp_bill_status: ["Draft", "Paid"],
+      sp_business_arm: ["Training", "Solutions"],
+      sp_invoice_status: ["Draft", "Sent", "Paid"],
+      sp_leave_type: ["AL", "SL", "Custom"],
+      sp_payment_method: ["Bank Transfer", "Cash", "Cheque", "Card"],
+      sp_payroll_status: ["Draft", "Finalized"],
+      sp_po_status: ["Draft", "Sent", "Received", "Closed"],
+      sp_quotation_status: [
+        "Draft",
+        "Sent",
+        "Accepted",
+        "Rejected",
+        "Converted",
+      ],
+      sp_request_status: ["Pending", "Approved", "Rejected"],
+      sp_training_status: [
+        "Submitted",
+        "Approved",
+        "Rejected",
+        "Completed",
+        "Claimed",
+      ],
     },
   },
 } as const

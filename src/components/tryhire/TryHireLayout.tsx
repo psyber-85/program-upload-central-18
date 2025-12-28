@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import TryHireFooter from './TryHireFooter';
+import tryhireLogo from '@/assets/tryhire-logo.png';
 
 interface TryHireLayoutProps {
   children: ReactNode;
@@ -11,16 +12,20 @@ const TryHireLayout = ({ children }: TryHireLayoutProps) => {
     <div className="min-h-screen flex flex-col bg-white">
       {/* Simple Header */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-slate-100">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <Link 
             to="/" 
-            className="text-xl font-bold text-slate-900 tracking-tight hover:text-emerald-600 transition-colors"
+            className="hover:opacity-80 transition-opacity"
           >
-            TryHire
+            <img 
+              src={tryhireLogo} 
+              alt="TryHire" 
+              className="h-10 sm:h-12 w-auto"
+            />
           </Link>
           <Link
             to="/interest"
-            className="text-sm font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
+            className="text-sm font-medium text-tryhire-coral hover:text-tryhire-coral-dark transition-colors"
           >
             Submit Interest →
           </Link>

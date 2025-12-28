@@ -13,8 +13,8 @@ const TryHireThanks = () => {
       <TryHireSection className="py-20 sm:py-32">
         <div className="max-w-lg mx-auto text-center">
           <div className="flex justify-center mb-6">
-            <div className="p-4 bg-emerald-100 rounded-full">
-              <CheckCircle className="h-12 w-12 text-emerald-600" />
+            <div className="p-4 bg-tryhire-peach rounded-full">
+              <CheckCircle className="h-12 w-12 text-tryhire-coral" />
             </div>
           </div>
           

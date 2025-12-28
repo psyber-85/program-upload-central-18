@@ -11,9 +11,9 @@ const TryHireButton = forwardRef<HTMLButtonElement, TryHireButtonProps>(
     const baseStyles = 'inline-flex items-center justify-center font-semibold rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
     
     const variants = {
-      primary: 'bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500 shadow-sm hover:shadow-md',
-      secondary: 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 focus:ring-slate-500',
-      ghost: 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 focus:ring-slate-500',
+      primary: 'bg-gradient-to-r from-tryhire-coral to-tryhire-orange text-white hover:from-tryhire-coral-dark hover:to-tryhire-coral focus:ring-tryhire-coral shadow-sm hover:shadow-md',
+      secondary: 'bg-white text-slate-700 border border-slate-300 hover:bg-tryhire-peach hover:border-tryhire-coral/30 focus:ring-tryhire-coral',
+      ghost: 'text-slate-600 hover:text-tryhire-coral hover:bg-tryhire-peach focus:ring-tryhire-coral',
     };
     
     const sizes = {

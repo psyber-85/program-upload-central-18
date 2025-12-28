@@ -15,7 +15,7 @@ const TryHireCard = ({
   const variants = {
     default: 'bg-white shadow-sm border border-slate-100',
     outlined: 'bg-white border-2 border-slate-200',
-    highlight: 'bg-emerald-50 border border-emerald-200',
+    highlight: 'bg-tryhire-peach border border-tryhire-coral/20',
   };
 
   return (

@@ -1381,6 +1381,30 @@ export type Database = {
         }
         Relationships: []
       }
+      tryhire_brochure_downloads: {
+        Row: {
+          company: string
+          created_at: string
+          email: string
+          id: string
+          name: string
+        }
+        Insert: {
+          company: string
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+        }
+        Update: {
+          company?: string
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

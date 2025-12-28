@@ -1,60 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { payrollSupabaseRepo, staffSupabaseRepo, requestsSupabaseRepo } from '@/lib/dal';
-import { PayrollRun, PayrollItem, ClaimRequest, TrainingApplication, UserProfile } from '@/lib/dal/types';
+import { PayrollRun, PayrollItem, ClaimRequest, TrainingApplication } from '@/lib/dal/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft, CheckCircle, Loader2, AlertTriangle, Mail, Calendar, Info } from 'lucide-react';
-import { format, getDaysInMonth, parseISO, isAfter, isBefore, startOfMonth, endOfMonth, differenceInCalendarDays, eachDayOfInterval, isWeekend } from 'date-fns';
+import { ArrowLeft, CheckCircle, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
+import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
-
-interface PayrollItemWithProRating extends PayrollItem {
-  isProRated?: boolean;
-  daysWorked?: number;
-  totalWorkDays?: number;
-  originalBaseSalary?: number;
-  epfRate?: number;
-  socsoRate?: number;
-}
-
-// Calculate weekdays (Mon-Fri) in a given month
-const getWeekdaysInMonth = (monthStr: string): number => {
-  const [year, month] = monthStr.split('-').map(Number);
-  const start = startOfMonth(new Date(year, month - 1, 1));
-  const end = endOfMonth(new Date(year, month - 1, 1));
-  const days = eachDayOfInterval({ start, end });
-  return days.filter(day => !isWeekend(day)).length;
-};
 
 const PayrollRunDetail = () => {
   const { runId } = useParams<{ runId: string }>();
   const navigate = useNavigate();
   const [run, setRun] = useState<PayrollRun | null>(null);
-  const [items, setItems] = useState<PayrollItemWithProRating[]>([]);
+  const [items, setItems] = useState<PayrollItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  // Configurable total work days for this month (admin can adjust for holidays)
-  const [totalWorkDays, setTotalWorkDays] = useState<number>(22);
-  // Track individual work days per staff (userId -> daysWorked)
-  const [staffWorkDays, setStaffWorkDays] = useState<Record<string, number>>({});
-  // Staff rates for recalculation
-  const [staffRates, setStaffRates] = useState<Record<string, { epfRate: number; socsoRate: number; originalSalary: number }>>({});
-
-  // Initialize totalWorkDays when run is loaded
-  useEffect(() => {
-    if (run?.month) {
-      const weekdays = getWeekdaysInMonth(run.month);
-      setTotalWorkDays(weekdays);
-    }
-  }, [run?.month]);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -77,80 +45,52 @@ const PayrollRunDetail = () => {
     }
   };
 
-  const calculateProRatedSalary = (
-    baseSalary: number,
-    joinDate: string,
-    payrollMonth: string,
-    workDaysInMonth: number
-  ): { salary: number; daysWorked: number; totalDays: number; isProRated: boolean } => {
-    const [year, month] = payrollMonth.split('-').map(Number);
-    const monthStart = startOfMonth(new Date(year, month - 1, 1));
-    const monthEnd = endOfMonth(new Date(year, month - 1, 1));
-    const staffJoinDate = parseISO(joinDate);
-    
-    // If joined before this month, full salary
-    if (isBefore(staffJoinDate, monthStart)) {
-      return { salary: baseSalary, daysWorked: workDaysInMonth, totalDays: workDaysInMonth, isProRated: false };
-    }
-    
-    // If joined after this month ends, 0 salary
-    if (isAfter(staffJoinDate, monthEnd)) {
-      return { salary: 0, daysWorked: 0, totalDays: workDaysInMonth, isProRated: true };
-    }
-    
-    // Pro-rate: calculate based on calendar days ratio
-    const totalCalendarDays = getDaysInMonth(monthStart);
-    const remainingCalendarDays = differenceInCalendarDays(monthEnd, staffJoinDate) + 1;
-    const ratio = remainingCalendarDays / totalCalendarDays;
-    
-    const daysWorked = Math.round(workDaysInMonth * ratio);
-    const salary = Math.round(baseSalary * (daysWorked / workDaysInMonth));
-    
-    return { salary, daysWorked, totalDays: workDaysInMonth, isProRated: true };
+  // Calculate net pay and company cost from editable fields
+  const calculateTotals = (item: PayrollItem) => {
+    const netPay = item.baseSalary - item.epf - item.socso + item.claimsTotal + item.trainingClaimsTotal;
+    const totalCompanyCost = item.baseSalary + item.employerEpf + item.employerSocso + item.claimsTotal + item.trainingClaimsTotal;
+    return { netPay, totalCompanyCost };
   };
 
-  // Recalculate a single staff's payroll when their work days change
-  const recalculatePayrollItem = (
-    userId: string,
-    newDaysWorked: number
-  ) => {
-    const rates = staffRates[userId];
-    if (!rates) return;
-
-    const ratio = newDaysWorked / totalWorkDays;
-    const effectiveSalary = Math.round(rates.originalSalary * ratio);
-    const epf = Math.round(effectiveSalary * (rates.epfRate / 100));
-    const socso = Math.round(effectiveSalary * (rates.socsoRate / 100));
-    const employerEpf = Math.round(effectiveSalary * (13 / 100));
-    const employerSocso = socso;
-
+  // Update a field and save to database
+  const handleFieldChange = async (itemId: string, field: keyof PayrollItem, value: number) => {
+    // Update local state immediately
     setItems(prev => prev.map(item => {
-      if (item.userId !== userId) return item;
-      
-      const netPay = effectiveSalary - epf - socso + (item.claimsTotal || 0) + (item.trainingClaimsTotal || 0);
-      const totalCompanyCost = effectiveSalary + employerEpf + employerSocso + (item.claimsTotal || 0) + (item.trainingClaimsTotal || 0);
-      
-      return {
-        ...item,
-        baseSalary: effectiveSalary,
-        epf,
-        socso,
-        employerEpf,
-        employerSocso,
-        netPay,
-        totalCompanyCost,
-        daysWorked: newDaysWorked,
-        isProRated: newDaysWorked < totalWorkDays,
-      };
+      if (item.id !== itemId) return item;
+      const updated = { ...item, [field]: value };
+      const totals = calculateTotals(updated);
+      return { ...updated, ...totals };
     }));
   };
 
-  const handleUpdateWorkDays = (userId: string, daysWorked: number) => {
-    const clampedDays = Math.max(0, Math.min(totalWorkDays, daysWorked || 0));
-    setStaffWorkDays(prev => ({ ...prev, [userId]: clampedDays }));
-    recalculatePayrollItem(userId, clampedDays);
+  // Save item to database on blur
+  const handleFieldBlur = async (itemId: string) => {
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+    
+    setIsSaving(itemId);
+    try {
+      const totals = calculateTotals(item);
+      await payrollSupabaseRepo.updatePayrollItem(itemId, {
+        baseSalary: item.baseSalary,
+        epf: item.epf,
+        socso: item.socso,
+        employerEpf: item.employerEpf,
+        employerSocso: item.employerSocso,
+        claimsTotal: item.claimsTotal,
+        trainingClaimsTotal: item.trainingClaimsTotal,
+        netPay: totals.netPay,
+        totalCompanyCost: totals.totalCompanyCost,
+      });
+    } catch (error) {
+      console.error('Failed to save item:', error);
+      toast({ title: 'Failed to save changes', variant: 'destructive' });
+    } finally {
+      setIsSaving(null);
+    }
   };
 
+  // Generate payroll items from staff salary rates (first run)
   const handleGenerateItems = async () => {
     if (!run) return;
     setIsGenerating(true);
@@ -185,27 +125,12 @@ const PayrollRunDetail = () => {
         trainingByUser[training.userId].push(training);
       }
       
-      // Track rates and work days for each staff
-      const newStaffRates: Record<string, { epfRate: number; socsoRate: number; originalSalary: number }> = {};
-      const newStaffWorkDays: Record<string, number> = {};
-      
-      // Generate payroll items for each staff
+      // Generate payroll items for each staff - use FULL salary, no pro-rating
       for (const staff of activeStaff) {
-        // Calculate pro-rated salary based on join date
-        const proRating = calculateProRatedSalary(
-          staff.salaryBase,
-          staff.joinDate,
-          run.month,
-          totalWorkDays
-        );
-        
-        // Skip if salary is 0 (joined after month end)
-        if (proRating.salary === 0) continue;
-        
-        const effectiveSalary = proRating.salary;
-        const epf = Math.round(effectiveSalary * (staff.epfRate / 100));
-        const socso = Math.round(effectiveSalary * (staff.socsoRate / 100));
-        const employerEpf = Math.round(effectiveSalary * (13 / 100));
+        const baseSalary = staff.salaryBase;
+        const epf = Math.round(baseSalary * (staff.epfRate / 100));
+        const socso = Math.round(baseSalary * (staff.socsoRate / 100));
+        const employerEpf = Math.round(baseSalary * (13 / 100));
         const employerSocso = socso;
         
         // Calculate claims for this staff member
@@ -216,22 +141,14 @@ const PayrollRunDetail = () => {
         const staffTraining = trainingByUser[staff.id] || [];
         const trainingClaimsTotal = staffTraining.reduce((sum, training) => sum + training.cost, 0);
         
-        const netPay = effectiveSalary - epf - socso + claimsTotal + trainingClaimsTotal;
-        const totalCompanyCost = effectiveSalary + employerEpf + employerSocso + claimsTotal + trainingClaimsTotal;
-        
-        // Store staff rates for later recalculation
-        newStaffRates[staff.id] = {
-          epfRate: staff.epfRate,
-          socsoRate: staff.socsoRate,
-          originalSalary: staff.salaryBase,
-        };
-        newStaffWorkDays[staff.id] = proRating.daysWorked;
+        const netPay = baseSalary - epf - socso + claimsTotal + trainingClaimsTotal;
+        const totalCompanyCost = baseSalary + employerEpf + employerSocso + claimsTotal + trainingClaimsTotal;
         
         await payrollSupabaseRepo.addPayrollItem({
           runId: run.id,
           userId: staff.id,
           userName: staff.name,
-          baseSalary: effectiveSalary,
+          baseSalary,
           epf,
           socso,
           employerEpf,
@@ -243,15 +160,35 @@ const PayrollRunDetail = () => {
         });
       }
       
-      setStaffRates(newStaffRates);
-      setStaffWorkDays(newStaffWorkDays);
-      
-      toast({ title: 'Payroll items generated with pro-rating!' });
+      toast({ title: 'Payroll items generated!' });
       loadData();
     } catch (error) {
       toast({ title: 'Failed to generate items', variant: 'destructive' });
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // Regenerate payroll - recalculate totals from current values (preserves edits)
+  const handleRegeneratePayroll = async () => {
+    if (!run || items.length === 0) return;
+    setIsRegenerating(true);
+    try {
+      // Recalculate net pay and company cost for all items
+      for (const item of items) {
+        const totals = calculateTotals(item);
+        await payrollSupabaseRepo.updatePayrollItem(item.id, {
+          netPay: totals.netPay,
+          totalCompanyCost: totals.totalCompanyCost,
+        });
+      }
+      
+      toast({ title: 'Payroll recalculated!' });
+      loadData();
+    } catch (error) {
+      toast({ title: 'Failed to regenerate payroll', variant: 'destructive' });
+    } finally {
+      setIsRegenerating(false);
     }
   };
 
@@ -310,7 +247,7 @@ const PayrollRunDetail = () => {
             const { error } = await supabase.functions.invoke('send-payslip-notification', {
               body: {
                 recipientEmail: staff.email,
-                recipientName: item.userName.split(' (')[0], // Remove pro-rating suffix from name
+                recipientName: item.userName,
                 month: formatMonth(run.month),
                 baseSalary: item.baseSalary,
                 epf: item.epf,
@@ -352,11 +289,12 @@ const PayrollRunDetail = () => {
   };
 
   const totalNetPay = items.reduce((sum, item) => sum + item.netPay, 0);
+  const totalCompanyCost = items.reduce((sum, item) => sum + item.totalCompanyCost, 0);
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-muted/30 p-4 md:p-8">
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <Skeleton className="h-8 w-32 mb-4" />
           <Card>
             <CardContent className="p-6">
@@ -372,7 +310,7 @@ const PayrollRunDetail = () => {
   if (!run) {
     return (
       <div className="min-h-screen bg-muted/30 p-4 md:p-8">
-        <div className="max-w-5xl mx-auto text-center">
+        <div className="max-w-6xl mx-auto text-center">
           <h1 className="text-2xl font-bold mb-4">Payroll run not found</h1>
           <Button onClick={() => navigate('/staff/payroll')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -385,9 +323,39 @@ const PayrollRunDetail = () => {
 
   const isFinalized = run.status === 'Finalized';
 
+  // Editable input component
+  const EditableCell = ({ 
+    value, 
+    itemId, 
+    field, 
+    disabled = false,
+    prefix = 'RM ',
+    className = ''
+  }: { 
+    value: number; 
+    itemId: string; 
+    field: keyof PayrollItem;
+    disabled?: boolean;
+    prefix?: string;
+    className?: string;
+  }) => (
+    <div className="flex items-center justify-end gap-1">
+      {prefix && <span className="text-muted-foreground text-sm">{prefix}</span>}
+      <Input
+        type="number"
+        value={value}
+        onChange={(e) => handleFieldChange(itemId, field, parseFloat(e.target.value) || 0)}
+        onBlur={() => handleFieldBlur(itemId)}
+        className={`w-20 h-7 text-right ${className}`}
+        disabled={disabled || isFinalized}
+      />
+      {isSaving === itemId && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-muted/30 p-4 md:p-8">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <Button variant="ghost" className="mb-4" onClick={() => navigate('/staff/payroll')}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Payroll
@@ -411,40 +379,24 @@ const PayrollRunDetail = () => {
               </CardDescription>
             </div>
             {!isFinalized && (
-              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="totalWorkDays" className="whitespace-nowrap text-sm">Work Days:</Label>
-                  <Input
-                    id="totalWorkDays"
-                    type="number"
-                    min={1}
-                    max={31}
-                    value={totalWorkDays}
-                    onChange={(e) => setTotalWorkDays(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-16 h-8"
-                    disabled={items.length > 0}
-                  />
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Auto-calculated from weekdays (Mon-Fri).<br/>Adjust for public holidays before generating.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={handleGenerateItems} disabled={isGenerating}>
+              <div className="flex flex-wrap gap-2">
+                {items.length === 0 ? (
+                  <Button onClick={handleGenerateItems} disabled={isGenerating}>
                     {isGenerating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    {items.length > 0 ? 'Regenerate' : 'Generate'} Items
+                    Generate Payroll
                   </Button>
-                  <Button onClick={handleFinalize} disabled={isFinalizing || items.length === 0}>
-                    {isFinalizing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    Finalize Payroll
-                  </Button>
-                </div>
+                ) : (
+                  <>
+                    <Button variant="outline" onClick={handleRegeneratePayroll} disabled={isRegenerating}>
+                      {isRegenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                      Regenerate Totals
+                    </Button>
+                    <Button onClick={handleFinalize} disabled={isFinalizing}>
+                      {isFinalizing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Finalize Payroll
+                    </Button>
+                  </>
+                )}
               </div>
             )}
           </CardHeader>
@@ -454,7 +406,7 @@ const PayrollRunDetail = () => {
                 <AlertTriangle className="h-12 w-12 mx-auto text-amber-500 mb-4" />
                 <p className="text-muted-foreground mb-4">No payroll items generated yet</p>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Generate items to calculate payroll. You can adjust individual work days after generation.
+                  Generate items to create payroll based on each staff's salary rate.
                 </p>
                 <Button onClick={handleGenerateItems} disabled={isGenerating}>
                   {isGenerating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -463,75 +415,58 @@ const PayrollRunDetail = () => {
               </div>
             ) : (
               <>
+                <p className="text-sm text-muted-foreground mb-4">
+                  All fields are editable. Changes are saved automatically. Click "Regenerate Totals" to recalculate Net Pay and Company Cost.
+                </p>
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Staff</TableHead>
-                        <TableHead className="text-center">Days</TableHead>
                         <TableHead className="text-right">Base Salary</TableHead>
                         <TableHead className="text-right">EPF (E)</TableHead>
                         <TableHead className="text-right">SOCSO (E)</TableHead>
                         <TableHead className="text-right">EPF (ER)</TableHead>
                         <TableHead className="text-right">SOCSO (ER)</TableHead>
                         <TableHead className="text-right">Claims</TableHead>
+                        <TableHead className="text-right">Training</TableHead>
                         <TableHead className="text-right">Net Pay</TableHead>
                         <TableHead className="text-right">Company Cost</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {items.map((item) => {
-                        const daysWorked = staffWorkDays[item.userId] ?? totalWorkDays;
-                        const isProRated = daysWorked < totalWorkDays;
-                        return (
-                          <TableRow key={item.id} className={isProRated ? 'bg-amber-50/50' : ''}>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                {item.userName}
-                                {isProRated && (
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700">
-                                          <Calendar className="h-3 w-3 mr-1" />
-                                          Adjusted
-                                        </Badge>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>Work days adjusted (unpaid leave / new joiner)</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <div className="flex items-center justify-center gap-1">
-                                <Input
-                                  type="number"
-                                  min={0}
-                                  max={totalWorkDays}
-                                  value={daysWorked}
-                                  onChange={(e) => handleUpdateWorkDays(item.userId, parseInt(e.target.value))}
-                                  className="w-14 h-7 text-center"
-                                  disabled={isFinalized}
-                                />
-                                <span className="text-muted-foreground text-sm">/ {totalWorkDays}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right">RM {item.baseSalary.toLocaleString()}</TableCell>
-                            <TableCell className="text-right text-red-600">-RM {item.epf.toLocaleString()}</TableCell>
-                            <TableCell className="text-right text-red-600">-RM {item.socso.toLocaleString()}</TableCell>
-                            <TableCell className="text-right text-muted-foreground">RM {item.employerEpf.toLocaleString()}</TableCell>
-                            <TableCell className="text-right text-muted-foreground">RM {item.employerSocso.toLocaleString()}</TableCell>
-                            <TableCell className="text-right text-green-600">
-                              {(item.claimsTotal + item.trainingClaimsTotal) > 0 ? `+RM ${(item.claimsTotal + item.trainingClaimsTotal).toLocaleString()}` : '-'}
-                            </TableCell>
-                            <TableCell className="text-right font-bold">RM {item.netPay.toLocaleString()}</TableCell>
-                            <TableCell className="text-right font-semibold text-primary">RM {item.totalCompanyCost.toLocaleString()}</TableCell>
-                          </TableRow>
-                        );
-                      })}
+                      {items.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-medium">{item.userName}</TableCell>
+                          <TableCell>
+                            <EditableCell value={item.baseSalary} itemId={item.id} field="baseSalary" />
+                          </TableCell>
+                          <TableCell>
+                            <EditableCell value={item.epf} itemId={item.id} field="epf" className="text-red-600" />
+                          </TableCell>
+                          <TableCell>
+                            <EditableCell value={item.socso} itemId={item.id} field="socso" className="text-red-600" />
+                          </TableCell>
+                          <TableCell>
+                            <EditableCell value={item.employerEpf} itemId={item.id} field="employerEpf" />
+                          </TableCell>
+                          <TableCell>
+                            <EditableCell value={item.employerSocso} itemId={item.id} field="employerSocso" />
+                          </TableCell>
+                          <TableCell>
+                            <EditableCell value={item.claimsTotal} itemId={item.id} field="claimsTotal" className="text-green-600" />
+                          </TableCell>
+                          <TableCell>
+                            <EditableCell value={item.trainingClaimsTotal} itemId={item.id} field="trainingClaimsTotal" className="text-green-600" />
+                          </TableCell>
+                          <TableCell className="text-right font-bold">
+                            RM {item.netPay.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold text-primary">
+                            RM {item.totalCompanyCost.toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                 </div>
@@ -543,7 +478,7 @@ const PayrollRunDetail = () => {
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="font-semibold">Total Company Cost (incl. employer contributions)</span>
-                    <span className="text-xl font-bold text-primary">RM {items.reduce((sum, item) => sum + item.totalCompanyCost, 0).toLocaleString()}</span>
+                    <span className="text-xl font-bold text-primary">RM {totalCompanyCost.toLocaleString()}</span>
                   </div>
                 </div>
               </>

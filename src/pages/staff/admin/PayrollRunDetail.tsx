@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from '@/hooks/use-toast';
 import { ArrowLeft, CheckCircle, Loader2, AlertTriangle, Mail, Calendar, Info } from 'lucide-react';
-import { format, getDaysInMonth, parseISO, isAfter, isBefore, startOfMonth, endOfMonth, differenceInCalendarDays } from 'date-fns';
+import { format, getDaysInMonth, parseISO, isAfter, isBefore, startOfMonth, endOfMonth, differenceInCalendarDays, eachDayOfInterval, isWeekend } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 
 interface PayrollItemWithProRating extends PayrollItem {
@@ -24,7 +24,14 @@ interface PayrollItemWithProRating extends PayrollItem {
   socsoRate?: number;
 }
 
-const DEFAULT_WORK_DAYS = 22;
+// Calculate weekdays (Mon-Fri) in a given month
+const getWeekdaysInMonth = (monthStr: string): number => {
+  const [year, month] = monthStr.split('-').map(Number);
+  const start = startOfMonth(new Date(year, month - 1, 1));
+  const end = endOfMonth(new Date(year, month - 1, 1));
+  const days = eachDayOfInterval({ start, end });
+  return days.filter(day => !isWeekend(day)).length;
+};
 
 const PayrollRunDetail = () => {
   const { runId } = useParams<{ runId: string }>();
@@ -34,10 +41,20 @@ const PayrollRunDetail = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  // Configurable total work days for this month (admin can adjust for holidays)
+  const [totalWorkDays, setTotalWorkDays] = useState<number>(22);
   // Track individual work days per staff (userId -> daysWorked)
   const [staffWorkDays, setStaffWorkDays] = useState<Record<string, number>>({});
   // Staff rates for recalculation
   const [staffRates, setStaffRates] = useState<Record<string, { epfRate: number; socsoRate: number; originalSalary: number }>>({});
+
+  // Initialize totalWorkDays when run is loaded
+  useEffect(() => {
+    if (run?.month) {
+      const weekdays = getWeekdaysInMonth(run.month);
+      setTotalWorkDays(weekdays);
+    }
+  }, [run?.month]);
 
   useEffect(() => {
     loadData();
@@ -63,7 +80,8 @@ const PayrollRunDetail = () => {
   const calculateProRatedSalary = (
     baseSalary: number,
     joinDate: string,
-    payrollMonth: string
+    payrollMonth: string,
+    workDaysInMonth: number
   ): { salary: number; daysWorked: number; totalDays: number; isProRated: boolean } => {
     const [year, month] = payrollMonth.split('-').map(Number);
     const monthStart = startOfMonth(new Date(year, month - 1, 1));
@@ -72,12 +90,12 @@ const PayrollRunDetail = () => {
     
     // If joined before this month, full salary
     if (isBefore(staffJoinDate, monthStart)) {
-      return { salary: baseSalary, daysWorked: DEFAULT_WORK_DAYS, totalDays: DEFAULT_WORK_DAYS, isProRated: false };
+      return { salary: baseSalary, daysWorked: workDaysInMonth, totalDays: workDaysInMonth, isProRated: false };
     }
     
     // If joined after this month ends, 0 salary
     if (isAfter(staffJoinDate, monthEnd)) {
-      return { salary: 0, daysWorked: 0, totalDays: DEFAULT_WORK_DAYS, isProRated: true };
+      return { salary: 0, daysWorked: 0, totalDays: workDaysInMonth, isProRated: true };
     }
     
     // Pro-rate: calculate based on calendar days ratio
@@ -85,10 +103,10 @@ const PayrollRunDetail = () => {
     const remainingCalendarDays = differenceInCalendarDays(monthEnd, staffJoinDate) + 1;
     const ratio = remainingCalendarDays / totalCalendarDays;
     
-    const daysWorked = Math.round(DEFAULT_WORK_DAYS * ratio);
-    const salary = Math.round(baseSalary * (daysWorked / DEFAULT_WORK_DAYS));
+    const daysWorked = Math.round(workDaysInMonth * ratio);
+    const salary = Math.round(baseSalary * (daysWorked / workDaysInMonth));
     
-    return { salary, daysWorked, totalDays: DEFAULT_WORK_DAYS, isProRated: true };
+    return { salary, daysWorked, totalDays: workDaysInMonth, isProRated: true };
   };
 
   // Recalculate a single staff's payroll when their work days change
@@ -99,7 +117,7 @@ const PayrollRunDetail = () => {
     const rates = staffRates[userId];
     if (!rates) return;
 
-    const ratio = newDaysWorked / DEFAULT_WORK_DAYS;
+    const ratio = newDaysWorked / totalWorkDays;
     const effectiveSalary = Math.round(rates.originalSalary * ratio);
     const epf = Math.round(effectiveSalary * (rates.epfRate / 100));
     const socso = Math.round(effectiveSalary * (rates.socsoRate / 100));
@@ -122,13 +140,13 @@ const PayrollRunDetail = () => {
         netPay,
         totalCompanyCost,
         daysWorked: newDaysWorked,
-        isProRated: newDaysWorked < DEFAULT_WORK_DAYS,
+        isProRated: newDaysWorked < totalWorkDays,
       };
     }));
   };
 
   const handleUpdateWorkDays = (userId: string, daysWorked: number) => {
-    const clampedDays = Math.max(0, Math.min(DEFAULT_WORK_DAYS, daysWorked || 0));
+    const clampedDays = Math.max(0, Math.min(totalWorkDays, daysWorked || 0));
     setStaffWorkDays(prev => ({ ...prev, [userId]: clampedDays }));
     recalculatePayrollItem(userId, clampedDays);
   };
@@ -177,7 +195,8 @@ const PayrollRunDetail = () => {
         const proRating = calculateProRatedSalary(
           staff.salaryBase,
           staff.joinDate,
-          run.month
+          run.month,
+          totalWorkDays
         );
         
         // Skip if salary is 0 (joined after month end)
@@ -392,15 +411,40 @@ const PayrollRunDetail = () => {
               </CardDescription>
             </div>
             {!isFinalized && (
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={handleGenerateItems} disabled={isGenerating}>
-                  {isGenerating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  {items.length > 0 ? 'Regenerate' : 'Generate'} Items
-                </Button>
-                <Button onClick={handleFinalize} disabled={isFinalizing || items.length === 0}>
-                  {isFinalizing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Finalize Payroll
-                </Button>
+              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="totalWorkDays" className="whitespace-nowrap text-sm">Work Days:</Label>
+                  <Input
+                    id="totalWorkDays"
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={totalWorkDays}
+                    onChange={(e) => setTotalWorkDays(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-16 h-8"
+                    disabled={items.length > 0}
+                  />
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Auto-calculated from weekdays (Mon-Fri).<br/>Adjust for public holidays before generating.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={handleGenerateItems} disabled={isGenerating}>
+                    {isGenerating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    {items.length > 0 ? 'Regenerate' : 'Generate'} Items
+                  </Button>
+                  <Button onClick={handleFinalize} disabled={isFinalizing || items.length === 0}>
+                    {isFinalizing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Finalize Payroll
+                  </Button>
+                </div>
               </div>
             )}
           </CardHeader>
@@ -437,8 +481,8 @@ const PayrollRunDetail = () => {
                     </TableHeader>
                     <TableBody>
                       {items.map((item) => {
-                        const daysWorked = staffWorkDays[item.userId] ?? DEFAULT_WORK_DAYS;
-                        const isProRated = daysWorked < DEFAULT_WORK_DAYS;
+                        const daysWorked = staffWorkDays[item.userId] ?? totalWorkDays;
+                        const isProRated = daysWorked < totalWorkDays;
                         return (
                           <TableRow key={item.id} className={isProRated ? 'bg-amber-50/50' : ''}>
                             <TableCell className="font-medium">
@@ -466,13 +510,13 @@ const PayrollRunDetail = () => {
                                 <Input
                                   type="number"
                                   min={0}
-                                  max={DEFAULT_WORK_DAYS}
+                                  max={totalWorkDays}
                                   value={daysWorked}
                                   onChange={(e) => handleUpdateWorkDays(item.userId, parseInt(e.target.value))}
                                   className="w-14 h-7 text-center"
                                   disabled={isFinalized}
                                 />
-                                <span className="text-muted-foreground text-sm">/ {DEFAULT_WORK_DAYS}</span>
+                                <span className="text-muted-foreground text-sm">/ {totalWorkDays}</span>
                               </div>
                             </TableCell>
                             <TableCell className="text-right">RM {item.baseSalary.toLocaleString()}</TableCell>

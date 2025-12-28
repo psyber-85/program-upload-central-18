@@ -1,25 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { payrollSupabaseRepo, staffSupabaseRepo, requestsSupabaseRepo } from '@/lib/dal';
-import { PayrollRun, PayrollItem, ClaimRequest, TrainingApplication } from '@/lib/dal/types';
+import { PayrollRun, PayrollItem, ClaimRequest, TrainingApplication, UserProfile } from '@/lib/dal/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft, CheckCircle, Loader2, AlertTriangle, Mail } from 'lucide-react';
-import { format } from 'date-fns';
+import { ArrowLeft, CheckCircle, Loader2, AlertTriangle, Mail, Calendar, Info } from 'lucide-react';
+import { format, getDaysInMonth, parseISO, isAfter, isBefore, startOfMonth, endOfMonth, differenceInCalendarDays } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+
+interface PayrollItemWithProRating extends PayrollItem {
+  isProRated?: boolean;
+  daysWorked?: number;
+  totalWorkDays?: number;
+  originalBaseSalary?: number;
+}
 
 const PayrollRunDetail = () => {
   const { runId } = useParams<{ runId: string }>();
   const navigate = useNavigate();
   const [run, setRun] = useState<PayrollRun | null>(null);
-  const [items, setItems] = useState<PayrollItem[]>([]);
+  const [items, setItems] = useState<PayrollItemWithProRating[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [workDaysPerMonth, setWorkDaysPerMonth] = useState(22);
 
   useEffect(() => {
     loadData();
@@ -40,6 +51,38 @@ const PayrollRunDetail = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const calculateProRatedSalary = (
+    baseSalary: number,
+    joinDate: string,
+    payrollMonth: string,
+    configuredWorkDays: number
+  ): { salary: number; daysWorked: number; totalDays: number; isProRated: boolean } => {
+    const [year, month] = payrollMonth.split('-').map(Number);
+    const monthStart = startOfMonth(new Date(year, month - 1, 1));
+    const monthEnd = endOfMonth(new Date(year, month - 1, 1));
+    const staffJoinDate = parseISO(joinDate);
+    
+    // If joined before this month, full salary
+    if (isBefore(staffJoinDate, monthStart)) {
+      return { salary: baseSalary, daysWorked: configuredWorkDays, totalDays: configuredWorkDays, isProRated: false };
+    }
+    
+    // If joined after this month ends, 0 salary
+    if (isAfter(staffJoinDate, monthEnd)) {
+      return { salary: 0, daysWorked: 0, totalDays: configuredWorkDays, isProRated: true };
+    }
+    
+    // Pro-rate: calculate based on calendar days ratio
+    const totalCalendarDays = getDaysInMonth(monthStart);
+    const remainingCalendarDays = differenceInCalendarDays(monthEnd, staffJoinDate) + 1;
+    const ratio = remainingCalendarDays / totalCalendarDays;
+    
+    const daysWorked = Math.round(configuredWorkDays * ratio);
+    const salary = Math.round(baseSalary * (daysWorked / configuredWorkDays));
+    
+    return { salary, daysWorked, totalDays: configuredWorkDays, isProRated: true };
   };
 
   const handleGenerateItems = async () => {
@@ -78,12 +121,25 @@ const PayrollRunDetail = () => {
       
       // Generate payroll items for each staff
       for (const staff of activeStaff) {
-        const epf = Math.round(staff.salaryBase * (staff.epfRate / 100));
-        const socso = Math.round(staff.salaryBase * (staff.socsoRate / 100));
+        // Calculate pro-rated salary
+        const proRating = calculateProRatedSalary(
+          staff.salaryBase,
+          staff.joinDate,
+          run.month,
+          workDaysPerMonth
+        );
+        
+        const effectiveSalary = proRating.salary;
+        
+        // Skip if salary is 0 (joined after month end)
+        if (effectiveSalary === 0) continue;
+        
+        const epf = Math.round(effectiveSalary * (staff.epfRate / 100));
+        const socso = Math.round(effectiveSalary * (staff.socsoRate / 100));
         
         // Employer contributions (default: EPF 13%, SOCSO same as employee rate)
         const employerEpfRate = 13; // Standard employer EPF rate
-        const employerEpf = Math.round(staff.salaryBase * (employerEpfRate / 100));
+        const employerEpf = Math.round(effectiveSalary * (employerEpfRate / 100));
         const employerSocso = socso; // Employer pays same as employee for SOCSO
         
         // Calculate claims for this staff member
@@ -94,14 +150,14 @@ const PayrollRunDetail = () => {
         const staffTraining = trainingByUser[staff.id] || [];
         const trainingClaimsTotal = staffTraining.reduce((sum, training) => sum + training.cost, 0);
         
-        const netPay = staff.salaryBase - epf - socso + claimsTotal + trainingClaimsTotal;
-        const totalCompanyCost = staff.salaryBase + employerEpf + employerSocso + claimsTotal + trainingClaimsTotal;
+        const netPay = effectiveSalary - epf - socso + claimsTotal + trainingClaimsTotal;
+        const totalCompanyCost = effectiveSalary + employerEpf + employerSocso + claimsTotal + trainingClaimsTotal;
         
         await payrollSupabaseRepo.addPayrollItem({
           runId: run.id,
           userId: staff.id,
-          userName: staff.name,
-          baseSalary: staff.salaryBase,
+          userName: staff.name + (proRating.isProRated ? ` (${proRating.daysWorked}/${proRating.totalDays} days)` : ''),
+          baseSalary: effectiveSalary,
           epf,
           socso,
           employerEpf,
@@ -113,7 +169,7 @@ const PayrollRunDetail = () => {
         });
       }
       
-      toast({ title: 'Payroll items generated with claims and training!' });
+      toast({ title: 'Payroll items generated with pro-rating!' });
       loadData();
     } catch (error) {
       toast({ title: 'Failed to generate items', variant: 'destructive' });
@@ -177,7 +233,7 @@ const PayrollRunDetail = () => {
             const { error } = await supabase.functions.invoke('send-payslip-notification', {
               body: {
                 recipientEmail: staff.email,
-                recipientName: item.userName,
+                recipientName: item.userName.split(' (')[0], // Remove pro-rating suffix from name
                 month: formatMonth(run.month),
                 baseSalary: item.baseSalary,
                 epf: item.epf,
@@ -261,7 +317,7 @@ const PayrollRunDetail = () => {
         </Button>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div>
               <CardTitle>{formatMonth(run.month)} Payroll</CardTitle>
               <CardDescription>
@@ -278,15 +334,45 @@ const PayrollRunDetail = () => {
               </CardDescription>
             </div>
             {!isFinalized && (
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={handleGenerateItems} disabled={isGenerating}>
-                  {isGenerating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  {items.length > 0 ? 'Regenerate' : 'Generate'} Items
-                </Button>
-                <Button onClick={handleFinalize} disabled={isFinalizing || items.length === 0}>
-                  {isFinalizing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Finalize Payroll
-                </Button>
+              <div className="flex flex-col gap-3 items-end">
+                {/* Work Days Configuration */}
+                <div className="flex items-center gap-2">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center gap-2">
+                          <Label htmlFor="workDays" className="text-sm text-muted-foreground whitespace-nowrap flex items-center gap-1">
+                            <Calendar className="h-4 w-4" />
+                            Work Days
+                            <Info className="h-3 w-3" />
+                          </Label>
+                          <Input
+                            id="workDays"
+                            type="number"
+                            min={1}
+                            max={31}
+                            value={workDaysPerMonth}
+                            onChange={(e) => setWorkDaysPerMonth(Math.max(1, Math.min(31, parseInt(e.target.value) || 22)))}
+                            className="w-16 h-8"
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Number of working days this month for pro-rating calculation</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={handleGenerateItems} disabled={isGenerating}>
+                    {isGenerating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    {items.length > 0 ? 'Regenerate' : 'Generate'} Items
+                  </Button>
+                  <Button onClick={handleFinalize} disabled={isFinalizing || items.length === 0}>
+                    {isFinalizing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Finalize Payroll
+                  </Button>
+                </div>
               </div>
             )}
           </CardHeader>
@@ -295,6 +381,9 @@ const PayrollRunDetail = () => {
               <div className="text-center py-12 bg-muted/50 rounded-lg">
                 <AlertTriangle className="h-12 w-12 mx-auto text-amber-500 mb-4" />
                 <p className="text-muted-foreground mb-4">No payroll items generated yet</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Configure work days ({workDaysPerMonth}) for pro-rating calculation, then generate items.
+                </p>
                 <Button onClick={handleGenerateItems} disabled={isGenerating}>
                   {isGenerating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   Generate Payroll Items
@@ -318,21 +407,43 @@ const PayrollRunDetail = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {items.map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell className="font-medium">{item.userName}</TableCell>
-                          <TableCell className="text-right">RM {item.baseSalary.toLocaleString()}</TableCell>
-                          <TableCell className="text-right text-red-600">-RM {item.epf.toLocaleString()}</TableCell>
-                          <TableCell className="text-right text-red-600">-RM {item.socso.toLocaleString()}</TableCell>
-                          <TableCell className="text-right text-muted-foreground">RM {item.employerEpf.toLocaleString()}</TableCell>
-                          <TableCell className="text-right text-muted-foreground">RM {item.employerSocso.toLocaleString()}</TableCell>
-                          <TableCell className="text-right text-green-600">
-                            {(item.claimsTotal + item.trainingClaimsTotal) > 0 ? `+RM ${(item.claimsTotal + item.trainingClaimsTotal).toLocaleString()}` : '-'}
-                          </TableCell>
-                          <TableCell className="text-right font-bold">RM {item.netPay.toLocaleString()}</TableCell>
-                          <TableCell className="text-right font-semibold text-primary">RM {item.totalCompanyCost.toLocaleString()}</TableCell>
-                        </TableRow>
-                      ))}
+                      {items.map((item) => {
+                        const isProRated = item.userName.includes('/');
+                        return (
+                          <TableRow key={item.id}>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                {item.userName.split(' (')[0]}
+                                {isProRated && (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Badge variant="secondary" className="text-xs">
+                                          <Calendar className="h-3 w-3 mr-1" />
+                                          {item.userName.match(/\(([^)]+)\)/)?.[1] || 'Pro-rated'}
+                                        </Badge>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Pro-rated salary based on join date</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">RM {item.baseSalary.toLocaleString()}</TableCell>
+                            <TableCell className="text-right text-red-600">-RM {item.epf.toLocaleString()}</TableCell>
+                            <TableCell className="text-right text-red-600">-RM {item.socso.toLocaleString()}</TableCell>
+                            <TableCell className="text-right text-muted-foreground">RM {item.employerEpf.toLocaleString()}</TableCell>
+                            <TableCell className="text-right text-muted-foreground">RM {item.employerSocso.toLocaleString()}</TableCell>
+                            <TableCell className="text-right text-green-600">
+                              {(item.claimsTotal + item.trainingClaimsTotal) > 0 ? `+RM ${(item.claimsTotal + item.trainingClaimsTotal).toLocaleString()}` : '-'}
+                            </TableCell>
+                            <TableCell className="text-right font-bold">RM {item.netPay.toLocaleString()}</TableCell>
+                            <TableCell className="text-right font-semibold text-primary">RM {item.totalCompanyCost.toLocaleString()}</TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>

@@ -214,7 +214,7 @@ const MyEntries = () => {
     <div className="min-h-screen bg-muted/30 p-4 md:p-8">
       <div className="max-w-5xl mx-auto">
         <header className="mb-6">
-          <h1 className="text-2xl font-bold text-foreground">My Entries</h1>
+          <h1 className="text-2xl font-bold text-foreground">My Billing</h1>
           <p className="text-muted-foreground">Create and manage your quotations and invoices</p>
         </header>
 

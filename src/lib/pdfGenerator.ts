@@ -12,19 +12,17 @@ const POSITIONS = {
   docNumber: { top: '178px', right: '48px' },
   docDate: { top: '200px', right: '48px' },
   
-  // Recipient section - between doc info and table
+  // Recipient section - between doc info and table (adjusted spacing)
   attnLabel: { top: '228px', left: '48px' },
-  recipientName: { top: '246px', left: '48px' },
-  recipientEmail: { top: '264px', left: '48px' },
-  recipientTitle: { top: '282px', left: '48px' },
+  recipientName: { top: '248px', left: '48px' },
+  recipientEmail: { top: '268px', left: '48px' },
+  recipientTitle: { top: '288px', left: '48px' },
   
-  // Table content area - inside the existing table structure (below header row)
-  // Table header is at ~320px, content starts at ~358px
-  tableContent: { top: '358px', left: '48px', right: '48px' },
+  // Table content area - aligned with template table body
+  tableContent: { top: '365px', left: '55px', right: '55px' },
   
-  // Total value - positioned to the right of the "Total :" label in footer
-  // The "Total :" label is part of the template, we just add the value
-  totalValue: { bottom: '215px', right: '65px' },
+  // Total value - aligned with the "Total :" row in footer
+  totalValue: { bottom: '198px', right: '75px' },
 };
 
 function generateTemplateStyles(): string {
@@ -135,12 +133,13 @@ function generateTemplateStyles(): string {
         top: ${POSITIONS.tableContent.top};
         left: ${POSITIONS.tableContent.left};
         right: ${POSITIONS.tableContent.right};
-        width: calc(100% - 96px);
+        width: calc(100% - 110px);
       }
       .table-row {
         display: flex;
         justify-content: space-between;
-        padding: 8px 12px;
+        align-items: flex-start;
+        padding: 6px 0;
         border-bottom: 1px solid #e8e8e8;
         font-size: 11px;
       }
@@ -149,10 +148,12 @@ function generateTemplateStyles(): string {
       }
       .table-row .desc {
         flex: 1;
+        max-width: 72%;
         color: #333;
+        padding-right: 10px;
       }
       .table-row .cost {
-        width: 120px;
+        width: 140px;
         text-align: right;
         color: #333;
         font-weight: 500;

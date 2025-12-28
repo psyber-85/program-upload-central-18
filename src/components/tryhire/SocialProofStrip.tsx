@@ -1,24 +1,30 @@
-// TODO: Replace placeholder logos with approved employer/partner logos
+import hrdcorpLogo from '@/assets/collaborators/hrdcorp.png';
+import mediaprimaLogo from '@/assets/collaborators/mediaprima.png';
+import pikomLogo from '@/assets/collaborators/pikom.png';
+import digitalpenangLogo from '@/assets/collaborators/digitalpenang.png';
+import mtdcLogo from '@/assets/collaborators/mtdc.png';
+import talentcorpLogo from '@/assets/collaborators/talentcorp.png';
+
 const logos = [
-  { name: 'Company 1', imageSrc: '/placeholder.svg' },
-  { name: 'Company 2', imageSrc: '/placeholder.svg' },
-  { name: 'Company 3', imageSrc: '/placeholder.svg' },
-  { name: 'Company 4', imageSrc: '/placeholder.svg' },
-  { name: 'Company 5', imageSrc: '/placeholder.svg' },
-  { name: 'Company 6', imageSrc: '/placeholder.svg' },
+  { name: 'HRD Corp', imageSrc: hrdcorpLogo },
+  { name: 'Media Prima', imageSrc: mediaprimaLogo },
+  { name: 'PIKOM', imageSrc: pikomLogo },
+  { name: 'Digital Penang', imageSrc: digitalpenangLogo },
+  { name: 'MTDC', imageSrc: mtdcLogo },
+  { name: 'TalentCorp', imageSrc: talentcorpLogo },
 ];
 
 const SocialProofStrip = () => {
   return (
     <div className="text-center">
       <p className="text-sm font-medium text-slate-500 mb-8">
-        Trusted by employers across Malaysia
+        AIHQ's past collaborators across industries
       </p>
       <div className="flex flex-wrap justify-center items-center gap-8 md:gap-12">
         {logos.map((logo) => (
           <div
             key={logo.name}
-            className="w-24 h-12 flex items-center justify-center grayscale opacity-50"
+            className="w-24 h-24 flex items-center justify-center grayscale opacity-60 hover:opacity-80 transition-opacity"
           >
             <img
               src={logo.imageSrc}

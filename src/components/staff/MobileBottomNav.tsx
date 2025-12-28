@@ -30,7 +30,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: 'Home', path: '/staff', icon: Home },
   { label: 'Requests', path: '/staff/requests', icon: ClipboardList },
-  { label: 'Billing', path: '/staff/my-entries', icon: FileText },
+  { label: 'Billing', path: '/staff/my-entries', icon: FileText, adminOnly: false },
   { label: 'Docs', path: '/staff/docs', icon: FileText },
   { label: 'Payslips', path: '/staff/payslips', icon: Receipt },
 ];
@@ -55,10 +55,13 @@ const MobileBottomNav = () => {
 
   const filteredMoreItems = moreItems.filter(item => !item.adminOnly || isAdmin);
 
+  // Filter out "My Billing" for admin users
+  const filteredNavItems = navItems.filter(item => !(item.adminOnly === false && isAdmin));
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t md:hidden">
       <div className="flex items-center justify-around h-16">
-        {navItems.map((item) => {
+        {filteredNavItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.path);
           

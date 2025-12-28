@@ -42,6 +42,7 @@ const Settings = () => {
   const [newRole, setNewRole] = useState<AppRole>('staff');
   const [newBusinessArm, setNewBusinessArm] = useState<'Training' | 'Solutions'>('Training');
   const [newSalary, setNewSalary] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [welcomeMessage, setWelcomeMessage] = useState(DEFAULT_WELCOME_MESSAGE);
   const [isAdding, setIsAdding] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
@@ -84,8 +85,13 @@ const Settings = () => {
   };
 
   const handleAddStaff = async (sendWelcomeEmail: boolean) => {
-    if (!newName || !newEmail || !newSalary) {
+    if (!newName || !newEmail || !newSalary || !newPassword) {
       toast({ title: 'Please fill all required fields', variant: 'destructive' });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast({ title: 'Password must be at least 6 characters', variant: 'destructive' });
       return;
     }
 
@@ -102,6 +108,7 @@ const Settings = () => {
       await staffSupabaseRepo.addStaff({
         name: newName,
         email: newEmail,
+        password: newPassword,
         role: newRole,
         businessArm: newBusinessArm,
         joinDate: format(new Date(), 'yyyy-MM-dd'),
@@ -177,6 +184,7 @@ const Settings = () => {
     setAddMode(null);
     setNewName('');
     setNewEmail('');
+    setNewPassword('');
     setNewRole('staff');
     setNewBusinessArm('Training');
     setNewSalary('');
@@ -330,6 +338,11 @@ const Settings = () => {
                     <div className="space-y-2">
                       <Label>Email</Label>
                       <Input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="john@theaihq.net" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Initial Password</Label>
+                      <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min 6 characters" />
+                      <p className="text-xs text-muted-foreground">Staff can change this after first login</p>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">

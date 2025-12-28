@@ -257,6 +257,7 @@ export interface PayrollRun {
   status: PayrollRunStatus;
   createdAt: string;
   finalizedAt?: string;
+  totalWorkDays?: number; // configurable work days for this month
 }
 
 export interface PayrollItem {
@@ -273,6 +274,9 @@ export interface PayrollItem {
   trainingClaimsTotal: number;
   netPay: number;
   totalCompanyCost: number; // salary + employer contributions
+  daysWorked?: number; // individual staff's actual days worked
+  totalDays?: number; // total work days for this payroll (reference)
+  originalSalary?: number; // staff's base salary before pro-rating
 }
 
 export interface Payslip {

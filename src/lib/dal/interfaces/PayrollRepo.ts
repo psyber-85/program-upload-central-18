@@ -15,7 +15,10 @@ export interface PayrollRepo {
   getPayrollRunByMonth(month: string): Promise<PayrollRun | null>;
   
   // Create payroll run
-  createPayrollRun(month: string): Promise<PayrollRun>;
+  createPayrollRun(month: string, totalWorkDays?: number): Promise<PayrollRun>;
+  
+  // Update payroll run (e.g., total work days)
+  updatePayrollRun(id: string, updates: Partial<Pick<PayrollRun, 'totalWorkDays'>>): Promise<PayrollRun | null>;
   
   // Finalize payroll run
   finalizePayrollRun(id: string): Promise<PayrollRun | null>;

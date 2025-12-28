@@ -5,8 +5,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 
-// Public pages
-import PublicHome from "./pages/PublicHome";
+// TryHire Microsite (main public site)
+import TryHireHome from "./pages/tryhire/TryHireHome";
+import TryHireInterest from "./pages/tryhire/TryHireInterest";
+import TryHireThanks from "./pages/tryhire/TryHireThanks";
+import TryHirePrivacy from "./pages/tryhire/TryHirePrivacy";
+
+// Auth pages
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -38,12 +43,6 @@ import BirthdayDashboard from "./pages/BirthdayDashboard";
 import RegisterTracker from "./pages/RegisterTracker";
 import CRMTracker from "./pages/CRMTracker";
 
-// TryHire Microsite
-import TryHireHome from "./pages/tryhire/TryHireHome";
-import TryHireInterest from "./pages/tryhire/TryHireInterest";
-import TryHireThanks from "./pages/tryhire/TryHireThanks";
-import TryHirePrivacy from "./pages/tryhire/TryHirePrivacy";
-
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -54,16 +53,15 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            {/* Public routes */}
-            <Route path="/" element={<PublicHome />} />
+            {/* TryHire - Main Public Site */}
+            <Route path="/" element={<TryHireHome />} />
+            <Route path="/interest" element={<TryHireInterest />} />
+            <Route path="/thanks" element={<TryHireThanks />} />
+            <Route path="/privacy" element={<TryHirePrivacy />} />
+            
+            {/* Auth routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            
-            {/* TryHire Microsite (public) */}
-            <Route path="/tryhire" element={<TryHireHome />} />
-            <Route path="/tryhire/interest" element={<TryHireInterest />} />
-            <Route path="/tryhire/thanks" element={<TryHireThanks />} />
-            <Route path="/tryhire/privacy" element={<TryHirePrivacy />} />
             
             {/* Staff Portal routes (protected) */}
             <Route path="/staff" element={

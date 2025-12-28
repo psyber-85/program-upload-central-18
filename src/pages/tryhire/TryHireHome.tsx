@@ -28,7 +28,7 @@ const TryHireHome = () => {
           </p>
           
           <div className="mt-10">
-            <Link to="/tryhire/interest">
+            <Link to="/interest">
               <TryHireButton size="lg">
                 Submit Hiring Interest
                 <ArrowRight className="ml-2 h-5 w-5" />
@@ -203,7 +203,7 @@ const TryHireHome = () => {
       {/* Final CTA */}
       <TryHireSection>
         <div className="text-center">
-          <Link to="/tryhire/interest">
+          <Link to="/interest">
             <TryHireButton size="lg">
               Submit Hiring Interest
               <ArrowRight className="ml-2 h-5 w-5" />

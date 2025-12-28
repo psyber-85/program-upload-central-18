@@ -63,7 +63,7 @@ const TryHireInterest = () => {
       });
 
       if (result.ok) {
-        navigate(`/tryhire/thanks${result.id ? `?ref=${result.id}` : ''}`);
+        navigate(`/thanks${result.id ? `?ref=${result.id}` : ''}`);
       } else {
         setSubmitError(result.error || 'Submission failed. Please try again.');
       }
@@ -168,7 +168,7 @@ const TryHireInterest = () => {
                 )}
               </TryHireButton>
               
-              <Link to="/tryhire" className="flex-1">
+              <Link to="/" className="flex-1">
                 <TryHireButton 
                   type="button" 
                   variant="secondary"

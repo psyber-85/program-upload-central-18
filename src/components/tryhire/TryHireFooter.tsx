@@ -10,7 +10,7 @@ const TryHireFooter = () => {
           </p>
           <div className="flex items-center gap-6">
             <Link 
-              to="/tryhire/privacy" 
+              to="/privacy" 
               className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
             >
               Privacy

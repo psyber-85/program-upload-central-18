@@ -10,8 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft, CheckCircle, Loader2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Loader2, AlertTriangle, Mail } from 'lucide-react';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 
 const PayrollRunDetail = () => {
   const { runId } = useParams<{ runId: string }>();
@@ -133,6 +134,10 @@ const PayrollRunDetail = () => {
       // Get claimed training to mark as included
       const claimedTraining = await requestsLocalRepo.getClaimedTrainingForPayroll();
       
+      // Get staff details for email sending
+      const allStaff = await staffLocalRepo.getAllStaff();
+      const staffMap = new Map(allStaff.map(s => [s.id, s]));
+      
       // Mark all included claims
       for (const claim of approvedClaims) {
         await requestsLocalRepo.markClaimIncludedInPayroll(claim.id, run.month);
@@ -163,9 +168,44 @@ const PayrollRunDetail = () => {
         });
       }
       
+      // Send email notifications to each staff member
+      let emailsSent = 0;
+      let emailsFailed = 0;
+      
+      for (const item of items) {
+        const staff = staffMap.get(item.userId);
+        if (staff?.email) {
+          try {
+            const { error } = await supabase.functions.invoke('send-payslip-notification', {
+              body: {
+                recipientEmail: staff.email,
+                recipientName: item.userName,
+                month: formatMonth(run.month),
+                baseSalary: item.baseSalary,
+                epf: item.epf,
+                socso: item.socso,
+                claimsTotal: item.claimsTotal,
+                trainingClaimsTotal: item.trainingClaimsTotal,
+                netPay: item.netPay,
+              },
+            });
+            
+            if (error) {
+              console.error('Failed to send payslip email to', staff.email, error);
+              emailsFailed++;
+            } else {
+              emailsSent++;
+            }
+          } catch (err) {
+            console.error('Error sending payslip email:', err);
+            emailsFailed++;
+          }
+        }
+      }
+      
       toast({ 
         title: 'Payroll finalized!',
-        description: `Payslips created, ${approvedClaims.length} claims and ${claimedTraining.length} training reimbursements marked as paid.`,
+        description: `Payslips created. ${emailsSent} email(s) sent${emailsFailed > 0 ? `, ${emailsFailed} failed` : ''}. ${approvedClaims.length} claims and ${claimedTraining.length} training reimbursements marked as paid.`,
       });
       navigate('/staff/payroll');
     } catch (error) {

@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.birthday-log]
 verify_jwt = false
+
+[functions.send-payslip-notification]
+verify_jwt = false
+
+[functions.send-welcome-email]
+verify_jwt = false

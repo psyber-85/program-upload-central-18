@@ -13,7 +13,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Plus, FileText, CheckCircle, Clock, Send, Loader2, ArrowRight, XCircle, FileCheck } from 'lucide-react';
+import { Plus, FileText, CheckCircle, Clock, Send, Loader2, ArrowRight, XCircle, FileCheck, Download } from 'lucide-react';
+import { generateInvoicePDF, generateQuotationPDF } from '@/lib/pdfGenerator';
 import { format } from 'date-fns';
 
 const MyEntries = () => {
@@ -347,6 +348,10 @@ const MyEntries = () => {
                           <TableCell>{getQuotationStatusBadge(quotation.status)}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex gap-1 justify-end flex-wrap">
+                              <Button size="sm" variant="ghost" onClick={() => generateQuotationPDF(quotation)}>
+                                <Download className="h-3 w-3 mr-1" />
+                                PDF
+                              </Button>
                               {quotation.status === 'Draft' && (
                                 <Button size="sm" variant="outline" onClick={() => handleMarkQuotationSent(quotation.id)}>
                                   <Send className="h-3 w-3 mr-1" />
@@ -408,6 +413,10 @@ const MyEntries = () => {
                           <TableCell>{getInvoiceStatusBadge(invoice.status)}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex gap-1 justify-end">
+                              <Button size="sm" variant="ghost" onClick={() => generateInvoicePDF(invoice)}>
+                                <Download className="h-3 w-3 mr-1" />
+                                PDF
+                              </Button>
                               {invoice.status === 'Draft' && (
                                 <Button size="sm" variant="outline" onClick={() => handleMarkInvoiceSent(invoice.id)}>
                                   <Send className="h-3 w-3 mr-1" />

@@ -82,6 +82,8 @@ Deno.serve(async (req) => {
 
     console.log(`Creating staff account for: ${email}`)
 
+    let newUserId: string
+
     // Step 1: Create auth user using Admin API
     const { data: authData, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -91,15 +93,57 @@ Deno.serve(async (req) => {
     })
 
     if (createUserError) {
-      console.error('Error creating auth user:', createUserError.message)
-      return new Response(
-        JSON.stringify({ error: `Failed to create user: ${createUserError.message}` }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      // Check if error is because user already exists
+      if (createUserError.message.includes('already been registered')) {
+        console.log('User already exists in auth, looking up existing user...')
+        
+        // Look up existing user by email
+        const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers()
+        
+        if (listError) {
+          console.error('Error listing users:', listError.message)
+          return new Response(
+            JSON.stringify({ error: `Failed to lookup existing user: ${listError.message}` }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+        
+        const existingUser = existingUsers.users.find(u => u.email === email)
+        
+        if (!existingUser) {
+          return new Response(
+            JSON.stringify({ error: 'User exists in auth but could not be found' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+        
+        // Check if staff profile already exists
+        const { data: existingProfile } = await supabaseAdmin
+          .from('sp_staff_profiles')
+          .select('id')
+          .eq('id', existingUser.id)
+          .single()
+        
+        if (existingProfile) {
+          return new Response(
+            JSON.stringify({ error: 'Staff profile already exists for this email' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+        
+        newUserId = existingUser.id
+        console.log(`Using existing auth user ID: ${newUserId}`)
+      } else {
+        console.error('Error creating auth user:', createUserError.message)
+        return new Response(
+          JSON.stringify({ error: `Failed to create user: ${createUserError.message}` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    } else {
+      newUserId = authData.user.id
+      console.log(`Auth user created with ID: ${newUserId}`)
     }
-
-    const newUserId = authData.user.id
-    console.log(`Auth user created with ID: ${newUserId}`)
 
     // Step 2: Create staff profile
     const { error: profileError } = await supabaseAdmin

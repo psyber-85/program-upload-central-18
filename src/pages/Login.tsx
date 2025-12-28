@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, LogIn, Info } from 'lucide-react';
+import { Loader2, LogIn, ArrowLeft, Mail } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -15,9 +16,10 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mode, setMode] = useState<'login' | 'forgot'>('login');
 
-  // Redirect if already authenticated
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
       navigate('/staff', { replace: true });
@@ -46,18 +48,26 @@ const Login = () => {
     setIsSubmitting(false);
   };
 
-  const handleDemoLogin = async (demoEmail: string) => {
-    setEmail(demoEmail);
-    setPassword('demo');
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError('');
+    setSuccess('');
+    
+    if (!email.trim()) {
+      setError('Please enter your email');
+      return;
+    }
+    
     setIsSubmitting(true);
     
-    const result = await login(demoEmail, 'demo');
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
     
-    if (result.success) {
-      navigate('/staff', { replace: true });
+    if (error) {
+      setError(error.message);
     } else {
-      setError(result.error || 'Login failed');
+      setSuccess('Password reset email sent! Check your inbox.');
     }
     
     setIsSubmitting(false);
@@ -76,96 +86,131 @@ const Login = () => {
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-foreground">AIHQ Staff Portal</h1>
-          <p className="text-muted-foreground mt-2">Sign in to access the portal</p>
+          <p className="text-muted-foreground mt-2">
+            {mode === 'login' ? 'Sign in to access the portal' : 'Reset your password'}
+          </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Welcome back</CardTitle>
-            <CardDescription>Enter your credentials to continue</CardDescription>
+            <CardTitle>{mode === 'login' ? 'Welcome back' : 'Forgot Password'}</CardTitle>
+            <CardDescription>
+              {mode === 'login' 
+                ? 'Enter your credentials to continue' 
+                : 'Enter your email to receive a reset link'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-              
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@theaihq.net"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={isSubmitting}
-                  autoComplete="email"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter any password (demo)"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={isSubmitting}
-                  autoComplete="current-password"
-                />
-              </div>
-              
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing in...
-                  </>
-                ) : (
-                  <>
-                    <LogIn className="mr-2 h-4 w-4" />
-                    Sign In
-                  </>
+            {mode === 'login' ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
                 )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="you@theaihq.net"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isSubmitting}
+                    autoComplete="email"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isSubmitting}
+                    autoComplete="current-password"
+                  />
+                </div>
 
-        {/* Demo accounts */}
-        <Card className="border-dashed">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Info className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-sm font-medium">Demo Accounts</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Button 
-              variant="outline" 
-              className="w-full justify-start text-left"
-              onClick={() => handleDemoLogin('ahmad@theaihq.net')}
-              disabled={isSubmitting}
-            >
-              <div className="flex flex-col items-start">
-                <span className="font-medium">Ahmad Rizal</span>
-                <span className="text-xs text-muted-foreground">ahmad@theaihq.net · Admin</span>
-              </div>
-            </Button>
-            <Button 
-              variant="outline" 
-              className="w-full justify-start text-left"
-              onClick={() => handleDemoLogin('siti@theaihq.net')}
-              disabled={isSubmitting}
-            >
-              <div className="flex flex-col items-start">
-                <span className="font-medium">Siti Nurhaliza</span>
-                <span className="text-xs text-muted-foreground">siti@theaihq.net · Staff</span>
-              </div>
-            </Button>
+                <div className="text-right">
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="px-0 text-sm text-muted-foreground"
+                    onClick={() => { setMode('forgot'); setError(''); setSuccess(''); }}
+                  >
+                    Forgot Password?
+                  </Button>
+                </div>
+                
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Signing in...
+                    </>
+                  ) : (
+                    <>
+                      <LogIn className="mr-2 h-4 w-4" />
+                      Sign In
+                    </>
+                  )}
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                {success && (
+                  <Alert>
+                    <AlertDescription>{success}</AlertDescription>
+                  </Alert>
+                )}
+                
+                <div className="space-y-2">
+                  <Label htmlFor="reset-email">Email</Label>
+                  <Input
+                    id="reset-email"
+                    type="email"
+                    placeholder="you@theaihq.net"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={isSubmitting}
+                    autoComplete="email"
+                  />
+                </div>
+                
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="mr-2 h-4 w-4" />
+                      Send Reset Link
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => { setMode('login'); setError(''); setSuccess(''); }}
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Login
+                </Button>
+              </form>
+            )}
           </CardContent>
         </Card>
       </div>

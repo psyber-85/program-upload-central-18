@@ -29,7 +29,7 @@ interface NavItem {
 const mainNavItems: NavItem[] = [
   { label: 'Home', path: '/staff', icon: Home },
   { label: 'Requests', path: '/staff/requests', icon: ClipboardList },
-  { label: 'My Billing', path: '/staff/my-entries', icon: FileText },
+  { label: 'My Billing', path: '/staff/my-entries', icon: FileText, adminOnly: false },
   { label: 'Documents', path: '/staff/docs', icon: FileText },
   { label: 'My Payslips', path: '/staff/payslips', icon: Receipt },
 ];
@@ -117,9 +117,11 @@ const StaffSidebar = () => {
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1">
-        {mainNavItems.map((item) => (
-          <NavLink key={item.path} item={item} />
-        ))}
+        {mainNavItems
+          .filter(item => !(item.adminOnly === false && isAdmin)) // Hide "My Billing" for admin
+          .map((item) => (
+            <NavLink key={item.path} item={item} />
+          ))}
         
         {isAdmin && (
           <>

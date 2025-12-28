@@ -129,8 +129,9 @@ export type AnyRequest = LeaveRequest | ClaimRequest;
 export type InvoiceStatus = 'Draft' | 'Sent' | 'Paid';
 export type BillStatus = 'Draft' | 'Paid';
 export type QuotationStatus = 'Draft' | 'Sent' | 'Accepted' | 'Rejected' | 'Converted';
-export type POStatus = 'Draft' | 'Sent' | 'Received' | 'Closed';
+export type POStatus = 'Draft' | 'Pending Approval' | 'Sent' | 'Received' | 'Closed';
 export type PaymentMethod = 'Bank Transfer' | 'Cash' | 'Cheque' | 'Card';
+export type PaymentStatus = 'Pending' | 'Completed';
 export type BusinessArm = 'Training' | 'Solutions';
 
 export interface InvoiceItem {
@@ -240,6 +241,7 @@ export interface Payment {
   notes?: string;
   createdBy: string;
   creatorName?: string;
+  status?: PaymentStatus; // 'Pending' | 'Completed' - staff creates as Pending, admin marks Completed
   createdAt: string;
 }
 

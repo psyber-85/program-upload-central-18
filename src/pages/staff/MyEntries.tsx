@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Plus, FileText, CheckCircle, Clock, Send, Loader2, ArrowRight, XCircle, FileCheck, Download, Package, Receipt, CreditCard } from 'lucide-react';
+import { Plus, FileText, CheckCircle, Clock, Send, Loader2, ArrowRight, XCircle, FileCheck, Download, Package, Receipt, CreditCard, AlertCircle } from 'lucide-react';
 import { generateInvoicePDF, generateQuotationPDF } from '@/lib/pdfGenerator';
 import { format } from 'date-fns';
 
@@ -58,6 +58,7 @@ const MyEntries = () => {
   const [poDescription, setPODescription] = useState('');
   const [poExpectedDelivery, setPOExpectedDelivery] = useState('');
   const [isCreatingPO, setIsCreatingPO] = useState(false);
+  const [isSubmittingPO, setIsSubmittingPO] = useState<string | null>(null);
 
   // Payment dialog state
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
@@ -224,7 +225,7 @@ const MyEntries = () => {
         status: 'Draft',
         expectedDelivery: poExpectedDelivery || undefined,
       });
-      toast({ title: 'Purchase Order created!' });
+      toast({ title: 'Purchase Order saved as draft!' });
       setShowPODialog(false);
       resetPOForm();
       loadData();
@@ -232,6 +233,20 @@ const MyEntries = () => {
       toast({ title: 'Failed to create PO', variant: 'destructive' });
     } finally {
       setIsCreatingPO(false);
+    }
+  };
+
+  const handleSubmitPOForApproval = async (id: string) => {
+    setIsSubmittingPO(id);
+    try {
+      // Update PO status to 'Pending Approval'
+      await entriesSupabaseRepo.updatePurchaseOrderStatus(id, 'Pending Approval' as any);
+      toast({ title: 'PO submitted for admin approval!' });
+      loadData();
+    } catch (error) {
+      toast({ title: 'Failed to submit PO', variant: 'destructive' });
+    } finally {
+      setIsSubmittingPO(null);
     }
   };
 
@@ -257,13 +272,14 @@ const MyEntries = () => {
         paymentDate: format(new Date(), 'yyyy-MM-dd'),
         paymentMethod,
         reference: paymentReference || undefined,
+        status: 'Pending', // Staff creates payment requests as Pending
       });
-      toast({ title: 'Payment recorded!' });
+      toast({ title: 'Payment request submitted! Awaiting admin approval.' });
       setShowPaymentDialog(false);
       resetPaymentForm();
       loadData();
     } catch (error) {
-      toast({ title: 'Failed to record payment', variant: 'destructive' });
+      toast({ title: 'Failed to request payment', variant: 'destructive' });
     } finally {
       setIsCreatingPayment(false);
     }
@@ -301,16 +317,6 @@ const MyEntries = () => {
       loadData();
     } catch (error) {
       toast({ title: 'Failed to update invoice', variant: 'destructive' });
-    }
-  };
-
-  const handleMarkPOSent = async (id: string) => {
-    try {
-      await entriesSupabaseRepo.updatePurchaseOrderStatus(id, 'Sent');
-      toast({ title: 'PO marked as sent!' });
-      loadData();
-    } catch (error) {
-      toast({ title: 'Failed to update PO', variant: 'destructive' });
     }
   };
 
@@ -386,6 +392,8 @@ const MyEntries = () => {
 
   const getPOStatusBadge = (status: string) => {
     switch (status) {
+      case 'Pending Approval':
+        return <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50"><AlertCircle className="h-3 w-3 mr-1" />Pending Approval</Badge>;
       case 'Sent':
         return <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-50"><Send className="h-3 w-3 mr-1" />Sent</Badge>;
       case 'Received':
@@ -394,6 +402,18 @@ const MyEntries = () => {
         return <Badge variant="outline" className="text-gray-600 border-gray-300 bg-gray-50"><FileCheck className="h-3 w-3 mr-1" />Closed</Badge>;
       default:
         return <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50"><Clock className="h-3 w-3 mr-1" />Draft</Badge>;
+    }
+  };
+
+  const getPaymentStatusBadge = (status?: string) => {
+    switch (status) {
+      case 'Completed':
+        return <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50"><CheckCircle className="h-3 w-3 mr-1" />Completed</Badge>;
+      case 'Pending':
+        return <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+      default:
+        // Legacy payments without status - show as completed
+        return <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50"><CheckCircle className="h-3 w-3 mr-1" />Completed</Badge>;
     }
   };
 
@@ -538,7 +558,7 @@ const MyEntries = () => {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create Purchase Order</DialogTitle>
-                <DialogDescription>Create a new purchase order for a vendor</DialogDescription>
+                <DialogDescription>Create a new PO (requires admin approval to send)</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 mt-4">
                 <div className="space-y-2">
@@ -559,7 +579,7 @@ const MyEntries = () => {
                 </div>
                 <Button onClick={handleCreatePO} className="w-full" disabled={isCreatingPO}>
                   {isCreatingPO && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Create PO
+                  Save as Draft
                 </Button>
               </div>
             </DialogContent>
@@ -569,12 +589,12 @@ const MyEntries = () => {
         return (
           <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
             <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" />Record Payment</Button>
+              <Button><Plus className="h-4 w-4 mr-2" />Request Payment</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Record Payment</DialogTitle>
-                <DialogDescription>Record a payment made to a vendor</DialogDescription>
+                <DialogTitle>Request Payment</DialogTitle>
+                <DialogDescription>Submit a payment request (admin will mark as paid)</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 mt-4">
                 <div className="space-y-2">
@@ -603,7 +623,7 @@ const MyEntries = () => {
                 </div>
                 <Button onClick={handleCreatePayment} className="w-full" disabled={isCreatingPayment}>
                   {isCreatingPayment && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Record Payment
+                  Submit Payment Request
                 </Button>
               </div>
             </DialogContent>
@@ -862,10 +882,19 @@ const MyEntries = () => {
                           <TableCell>{getPOStatusBadge(po.status)}</TableCell>
                           <TableCell className="text-right">
                             {po.status === 'Draft' && (
-                              <Button size="sm" variant="outline" onClick={() => handleMarkPOSent(po.id)}>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                onClick={() => handleSubmitPOForApproval(po.id)}
+                                disabled={isSubmittingPO === po.id}
+                              >
+                                {isSubmittingPO === po.id && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
                                 <Send className="h-3 w-3 mr-1" />
-                                Send
+                                Submit for Approval
                               </Button>
+                            )}
+                            {po.status === 'Pending Approval' && (
+                              <span className="text-sm text-muted-foreground">Awaiting admin</span>
                             )}
                           </TableCell>
                         </TableRow>
@@ -885,10 +914,10 @@ const MyEntries = () => {
               <Card className="text-center py-12">
                 <CardContent>
                   <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground mb-4">You haven't recorded any payments yet</p>
+                  <p className="text-muted-foreground mb-4">You haven't requested any payments yet</p>
                   <Button onClick={() => setShowPaymentDialog(true)}>
                     <Plus className="h-4 w-4 mr-2" />
-                    Record Your First Payment
+                    Request Your First Payment
                   </Button>
                 </CardContent>
               </Card>
@@ -903,6 +932,7 @@ const MyEntries = () => {
                         <TableHead className="text-right">Amount</TableHead>
                         <TableHead>Method</TableHead>
                         <TableHead>Date</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead>Reference</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -914,6 +944,7 @@ const MyEntries = () => {
                           <TableCell className="text-right">RM {payment.amount.toLocaleString()}</TableCell>
                           <TableCell><Badge variant="secondary">{payment.paymentMethod}</Badge></TableCell>
                           <TableCell>{format(new Date(payment.paymentDate), 'dd MMM yyyy')}</TableCell>
+                          <TableCell>{getPaymentStatusBadge(payment.status)}</TableCell>
                           <TableCell>{payment.reference || '-'}</TableCell>
                         </TableRow>
                       ))}

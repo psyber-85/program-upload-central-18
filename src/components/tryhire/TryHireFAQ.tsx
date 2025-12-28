@@ -26,6 +26,10 @@ const faqs = [
     question: 'Is this an internship or contract role?',
     answer: 'No. This is a training-linked placement phase before employment.',
   },
+  {
+    question: 'Is there a minimum hiring/employment period?',
+    answer: 'Yes. For confirmed hires after the AIHQ process, a minimum employment period of 3 months applies.',
+  },
 ];
 
 const TryHireFAQ = () => {

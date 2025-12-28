@@ -9,10 +9,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Download, Receipt } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { generatePayslipPDF } from '@/lib/pdfGenerator';
+import { useAuth } from '@/contexts/AuthContext';
 
 const PayslipDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [payslip, setPayslip] = useState<Payslip | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -34,7 +37,10 @@ const PayslipDetail = () => {
   };
 
   const handleDownload = () => {
-    toast({ title: 'PDF download will be available soon' });
+    if (payslip && user) {
+      generatePayslipPDF(payslip, user.name);
+      toast({ title: 'PDF generated', description: 'Your payslip will open in a new window for printing.' });
+    }
   };
 
   const formatMonth = (month: string) => {

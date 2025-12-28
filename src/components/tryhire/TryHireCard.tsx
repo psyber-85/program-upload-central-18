@@ -13,13 +13,19 @@ const TryHireCard = ({
   variant = 'default' 
 }: TryHireCardProps) => {
   const variants = {
-    default: 'bg-white shadow-sm border border-slate-100',
-    outlined: 'bg-white border-2 border-slate-200',
-    highlight: 'bg-tryhire-peach border border-tryhire-coral/20',
+    default: 'bg-white shadow-md border border-slate-100 hover:shadow-lg',
+    outlined: 'bg-white border-2 border-slate-200 hover:border-slate-300 hover:shadow-md',
+    highlight: 'bg-gradient-to-br from-tryhire-peach to-white border border-tryhire-coral/20 hover:shadow-lg hover:border-tryhire-coral/40',
   };
 
   return (
-    <div className={cn('rounded-xl p-6', variants[variant], className)}>
+    <div 
+      className={cn(
+        'rounded-xl p-6 transition-all duration-300',
+        variants[variant], 
+        className
+      )}
+    >
       {children}
     </div>
   );

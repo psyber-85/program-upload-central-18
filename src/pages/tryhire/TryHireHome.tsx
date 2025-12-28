@@ -4,13 +4,15 @@ import TryHireLayout from '@/components/tryhire/TryHireLayout';
 import TryHireSection from '@/components/tryhire/TryHireSection';
 import TryHireButton from '@/components/tryhire/TryHireButton';
 import TryHireCard from '@/components/tryhire/TryHireCard';
+import HowItWorks from '@/components/tryhire/HowItWorks';
+import TryHireFAQ from '@/components/tryhire/TryHireFAQ';
 
 const TryHireHome = () => {
   return (
     <TryHireLayout>
       {/* Hero Section */}
-      <TryHireSection className="pt-20 sm:pt-28 pb-16">
-        <div className="max-w-3xl">
+      <TryHireSection background="hero" className="pt-20 sm:pt-28 pb-16">
+        <div className="max-w-3xl animate-fade-in">
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 tracking-tight leading-tight">
             Hire First-Time Right.
           </h1>
@@ -23,15 +25,15 @@ const TryHireHome = () => {
             <p className="text-lg text-slate-700">You hire only if satisfied.</p>
           </div>
           
-          <p className="mt-6 text-2xl font-semibold text-tryhire-coral">
+          <p className="mt-6 text-2xl font-semibold bg-gradient-to-r from-tryhire-coral to-tryhire-orange bg-clip-text text-transparent">
             Prove first. Hire later.
           </p>
           
           <div className="mt-10">
             <Link to="/interest">
-              <TryHireButton size="lg">
+              <TryHireButton size="lg" className="group">
                 Submit Hiring Interest
-                <ArrowRight className="ml-2 h-5 w-5" />
+                <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
               </TryHireButton>
             </Link>
             <p className="mt-3 text-sm text-slate-500">
@@ -39,6 +41,17 @@ const TryHireHome = () => {
             </p>
           </div>
         </div>
+      </TryHireSection>
+
+      {/* How It Works Section */}
+      <TryHireSection>
+        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 text-center mb-12">
+          How It Works
+        </h2>
+        <HowItWorks />
+        <p className="text-center mt-10 text-lg text-slate-600">
+          Simple. Transparent. No hidden fees.
+        </p>
       </TryHireSection>
 
       {/* Comparison Section */}
@@ -99,7 +112,7 @@ const TryHireHome = () => {
       {/* What TryHire Is / Is Not */}
       <TryHireSection>
         <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-          <div>
+          <TryHireCard variant="highlight" className="border-l-4 border-l-tryhire-coral">
             <h3 className="text-xl font-bold text-tryhire-coral mb-4">What TryHire IS</h3>
             <ul className="space-y-3">
               <li className="flex items-start gap-3">
@@ -115,9 +128,9 @@ const TryHireHome = () => {
                 <span className="text-slate-700">Performance-based</span>
               </li>
             </ul>
-          </div>
+          </TryHireCard>
           
-          <div>
+          <TryHireCard variant="outlined" className="border-l-4 border-l-slate-300">
             <h3 className="text-xl font-bold text-slate-500 mb-4">What TryHire IS NOT</h3>
             <ul className="space-y-3">
               <li className="flex items-start gap-3">
@@ -133,7 +146,7 @@ const TryHireHome = () => {
                 <span className="text-slate-600">A long-term contract</span>
               </li>
             </ul>
-          </div>
+          </TryHireCard>
         </div>
       </TryHireSection>
 
@@ -149,7 +162,7 @@ const TryHireHome = () => {
           <p className="text-lg text-slate-700 mb-6">
             Employers only decide whether to hire after the placement phase.
           </p>
-          <p className="text-sm font-medium text-slate-600">
+          <p className="text-sm font-semibold text-tryhire-coral-dark inline-block px-4 py-2 bg-white/60 rounded-full">
             Hiring is optional.
           </p>
         </div>
@@ -164,7 +177,7 @@ const TryHireHome = () => {
           <p className="text-lg text-slate-600 mb-4">
             We require a simple Hiring Intent Confirmation to confirm there is a real opening.
           </p>
-          <p className="text-sm font-semibold text-slate-700">
+          <p className="text-sm font-semibold text-slate-700 inline-block px-4 py-2 bg-slate-100 rounded-full">
             This is not a hiring commitment.
           </p>
         </div>
@@ -175,38 +188,21 @@ const TryHireHome = () => {
         <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 text-center mb-12">
           Frequently Asked Questions
         </h2>
-        
-        <div className="max-w-3xl mx-auto space-y-6">
-          <FAQItem 
-            question="Do we have to pay to use TryHire?"
-            answer="No. There is no upfront cost to employers to participate."
-          />
-          <FAQItem 
-            question="So how does this work without fees?"
-            answer="TryHire is supported through training and placement programmes. Employers are not charged."
-          />
-          <FAQItem 
-            question="Are we required to hire anyone?"
-            answer="No. Hiring is fully at your discretion."
-          />
-          <FAQItem 
-            question="What roles does this work best for?"
-            answer="Bulk or repeated hiring for junior or entry-level roles."
-          />
-          <FAQItem 
-            question="Is this an internship or contract role?"
-            answer="No. This is a training-linked placement phase before employment."
-          />
+        <div className="max-w-3xl mx-auto">
+          <TryHireFAQ />
         </div>
       </TryHireSection>
 
       {/* Final CTA */}
-      <TryHireSection>
+      <TryHireSection className="bg-gradient-to-t from-tryhire-peach/50 to-white">
         <div className="text-center">
+          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-6">
+            Ready to hire smarter?
+          </h2>
           <Link to="/interest">
-            <TryHireButton size="lg">
+            <TryHireButton size="lg" className="group shadow-lg shadow-tryhire-coral/25 hover:shadow-xl hover:shadow-tryhire-coral/30">
               Submit Hiring Interest
-              <ArrowRight className="ml-2 h-5 w-5" />
+              <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
             </TryHireButton>
           </Link>
           <p className="mt-3 text-sm text-slate-500">
@@ -215,25 +211,6 @@ const TryHireHome = () => {
         </div>
       </TryHireSection>
     </TryHireLayout>
-  );
-};
-
-// FAQ Item Component
-interface FAQItemProps {
-  question: string;
-  answer: string;
-}
-
-const FAQItem = ({ question, answer }: FAQItemProps) => {
-  return (
-    <TryHireCard>
-      <h3 className="text-lg font-semibold text-slate-900 mb-2">
-        {question}
-      </h3>
-      <p className="text-slate-600">
-        {answer}
-      </p>
-    </TryHireCard>
   );
 };
 

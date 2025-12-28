@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { payrollLocalRepo } from '@/lib/dal/localStorage/PayrollLocalRepo';
+import { payrollSupabaseRepo } from '@/lib/dal';
 import { PayrollRun } from '@/lib/dal/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,7 @@ const Payroll = () => {
   const loadPayrollRuns = async () => {
     setIsLoading(true);
     try {
-      const runs = await payrollLocalRepo.getAllPayrollRuns();
+      const runs = await payrollSupabaseRepo.getAllPayrollRuns();
       setPayrollRuns(runs);
     } catch (error) {
       console.error('Failed to load payroll runs:', error);
@@ -43,7 +43,7 @@ const Payroll = () => {
     
     setIsCreating(true);
     try {
-      await payrollLocalRepo.createPayrollRun(currentMonth);
+      await payrollSupabaseRepo.createPayrollRun(currentMonth);
       toast({ title: 'Payroll run created!' });
       loadPayrollRuns();
     } catch (error) {

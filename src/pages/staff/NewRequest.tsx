@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { requestsLocalRepo } from '@/lib/dal/localStorage/RequestsLocalRepo';
-import { staffLocalRepo } from '@/lib/dal/localStorage/StaffLocalRepo';
+import { requestsSupabaseRepo, staffSupabaseRepo } from '@/lib/dal';
 import { LeaveRequest, ClaimRequest, TrainingEntitlement, LeaveBalance } from '@/lib/dal/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -64,8 +63,8 @@ const NewRequest = () => {
     try {
       const currentYear = new Date().getFullYear();
       const [balance, entitlement] = await Promise.all([
-        staffLocalRepo.getLeaveBalance(user.id, currentYear),
-        staffLocalRepo.getTrainingEntitlement(user.id),
+        staffSupabaseRepo.getLeaveBalance(user.id, currentYear),
+        staffSupabaseRepo.getTrainingEntitlement(user.id),
       ]);
       setLeaveBalance(balance);
       setTrainingEntitlement(entitlement);
@@ -125,7 +124,7 @@ const NewRequest = () => {
         attachmentUrl: leaveAttachmentUrl || undefined,
       };
 
-      await requestsLocalRepo.createLeaveRequest(leaveRequest);
+      await requestsSupabaseRepo.createLeaveRequest(leaveRequest);
       toast({ title: 'Leave request submitted successfully!' });
       navigate('/staff/requests');
     } catch (error) {
@@ -161,7 +160,7 @@ const NewRequest = () => {
         attachmentUrl: claimAttachmentUrl || undefined,
       };
 
-      await requestsLocalRepo.createClaimRequest(claimRequest);
+      await requestsSupabaseRepo.createClaimRequest(claimRequest);
       toast({ 
         title: autoApproved 
           ? 'Claim auto-approved (≤RM30)!' 
@@ -208,7 +207,7 @@ const NewRequest = () => {
 
     setIsSubmitting(true);
     try {
-      await requestsLocalRepo.createTrainingApplication({
+      await requestsSupabaseRepo.createTrainingApplication({
         userId: user.id,
         courseName,
         provider,

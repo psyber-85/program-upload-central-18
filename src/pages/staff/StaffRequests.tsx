@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { requestsLocalRepo } from '@/lib/dal/localStorage/RequestsLocalRepo';
-import { staffLocalRepo } from '@/lib/dal/localStorage/StaffLocalRepo';
+import { requestsSupabaseRepo, staffSupabaseRepo } from '@/lib/dal';
 import { AnyRequest, TrainingApplication, UserProfile } from '@/lib/dal/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,15 +30,15 @@ const StaffRequests = () => {
     setIsLoading(true);
     try {
       // Load staff data for name mapping
-      const allStaff = await staffLocalRepo.getAllStaff();
+      const allStaff = await staffSupabaseRepo.getAllStaff();
       const nameMap = new Map<string, string>();
       allStaff.forEach(s => nameMap.set(s.id, s.name));
       setStaffMap(nameMap);
 
       const [leaveRequests, claimRequests, trainingApps] = await Promise.all([
-        requestsLocalRepo.getAllLeaveRequests(),
-        requestsLocalRepo.getAllClaimRequests(),
-        requestsLocalRepo.getAllTrainingApplications(),
+        requestsSupabaseRepo.getAllLeaveRequests(),
+        requestsSupabaseRepo.getAllClaimRequests(),
+        requestsSupabaseRepo.getAllTrainingApplications(),
       ]);
 
       const allRequests: DisplayRequest[] = [

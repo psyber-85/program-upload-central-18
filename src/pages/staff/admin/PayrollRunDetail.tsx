@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { payrollLocalRepo } from '@/lib/dal/localStorage/PayrollLocalRepo';
-import { staffLocalRepo } from '@/lib/dal/localStorage/StaffLocalRepo';
-import { requestsLocalRepo } from '@/lib/dal/localStorage/RequestsLocalRepo';
+import { payrollSupabaseRepo, staffSupabaseRepo, requestsSupabaseRepo } from '@/lib/dal';
 import { PayrollRun, PayrollItem, ClaimRequest, TrainingApplication } from '@/lib/dal/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,8 +30,8 @@ const PayrollRunDetail = () => {
     setIsLoading(true);
     try {
       const [payrollRun, payrollItems] = await Promise.all([
-        payrollLocalRepo.getPayrollRunById(runId),
-        payrollLocalRepo.getPayrollItems(runId),
+        payrollSupabaseRepo.getPayrollRunById(runId),
+        payrollSupabaseRepo.getPayrollItems(runId),
       ]);
       setRun(payrollRun);
       setItems(payrollItems);
@@ -49,16 +47,16 @@ const PayrollRunDetail = () => {
     setIsGenerating(true);
     try {
       // Clear existing items
-      await payrollLocalRepo.clearPayrollItems(run.id);
+      await payrollSupabaseRepo.clearPayrollItems(run.id);
       
       // Get all active staff
-      const activeStaff = await staffLocalRepo.getActiveStaff();
+      const activeStaff = await staffSupabaseRepo.getActiveStaff();
       
       // Get approved claims for payroll (not yet included in any payroll)
-      const approvedClaims = await requestsLocalRepo.getApprovedClaimsForPayroll(run.month);
+      const approvedClaims = await requestsSupabaseRepo.getApprovedClaimsForPayroll(run.month);
       
       // Get claimed training for payroll
-      const claimedTraining = await requestsLocalRepo.getClaimedTrainingForPayroll();
+      const claimedTraining = await requestsSupabaseRepo.getClaimedTrainingForPayroll();
       
       // Group claims by userId
       const claimsByUser: Record<string, ClaimRequest[]> = {};
@@ -99,7 +97,7 @@ const PayrollRunDetail = () => {
         const netPay = staff.salaryBase - epf - socso + claimsTotal + trainingClaimsTotal;
         const totalCompanyCost = staff.salaryBase + employerEpf + employerSocso + claimsTotal + trainingClaimsTotal;
         
-        await payrollLocalRepo.addPayrollItem({
+        await payrollSupabaseRepo.addPayrollItem({
           runId: run.id,
           userId: staff.id,
           userName: staff.name,
@@ -129,31 +127,31 @@ const PayrollRunDetail = () => {
     setIsFinalizing(true);
     try {
       // Get approved claims to mark as included
-      const approvedClaims = await requestsLocalRepo.getApprovedClaimsForPayroll(run.month);
+      const approvedClaims = await requestsSupabaseRepo.getApprovedClaimsForPayroll(run.month);
       
       // Get claimed training to mark as included
-      const claimedTraining = await requestsLocalRepo.getClaimedTrainingForPayroll();
+      const claimedTraining = await requestsSupabaseRepo.getClaimedTrainingForPayroll();
       
       // Get staff details for email sending
-      const allStaff = await staffLocalRepo.getAllStaff();
+      const allStaff = await staffSupabaseRepo.getAllStaff();
       const staffMap = new Map(allStaff.map(s => [s.id, s]));
       
       // Mark all included claims
       for (const claim of approvedClaims) {
-        await requestsLocalRepo.markClaimIncludedInPayroll(claim.id, run.month);
+        await requestsSupabaseRepo.markClaimIncludedInPayroll(claim.id, run.month);
       }
       
       // Mark all included training
       for (const training of claimedTraining) {
-        await requestsLocalRepo.markTrainingIncludedInPayroll(training.id, run.month);
+        await requestsSupabaseRepo.markTrainingIncludedInPayroll(training.id, run.month);
       }
       
       // Finalize the run
-      await payrollLocalRepo.finalizePayrollRun(run.id);
+      await payrollSupabaseRepo.finalizePayrollRun(run.id);
       
       // Create payslips for each item
       for (const item of items) {
-        await payrollLocalRepo.createPayslip({
+        await payrollSupabaseRepo.createPayslip({
           runId: run.id,
           userId: item.userId,
           month: run.month,

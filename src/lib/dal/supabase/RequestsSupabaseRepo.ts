@@ -302,6 +302,30 @@ class RequestsSupabaseRepo implements RequestsRepo {
     return this.getTrainingApplicationById(id);
   }
 
+  async getClaimedTrainingForPayroll(): Promise<TrainingApplication[]> {
+    const { data, error } = await supabase
+      .from('sp_training_applications')
+      .select('*')
+      .eq('status', 'Claimed')
+      .is('included_in_payroll_month', null)
+      .order('created_at');
+
+    if (error || !data) return [];
+
+    return data.map(this.mapTrainingApplication);
+  }
+
+  async markTrainingIncludedInPayroll(id: string, month: string): Promise<TrainingApplication | null> {
+    const { error } = await supabase
+      .from('sp_training_applications')
+      .update({ included_in_payroll_month: month })
+      .eq('id', id);
+
+    if (error) return null;
+
+    return this.getTrainingApplicationById(id);
+  }
+
   // ============================================
   // COMBINED QUERIES
   // ============================================

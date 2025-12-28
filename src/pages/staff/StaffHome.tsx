@@ -1,11 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { statsLocalRepo } from '@/lib/dal/localStorage/StatsLocalRepo';
-import { requestsLocalRepo } from '@/lib/dal/localStorage/RequestsLocalRepo';
-import { entriesLocalRepo } from '@/lib/dal/localStorage/EntriesLocalRepo';
-import { payrollLocalRepo } from '@/lib/dal/localStorage/PayrollLocalRepo';
-import { staffLocalRepo } from '@/lib/dal/localStorage/StaffLocalRepo';
+import { statsSupabaseRepo, requestsSupabaseRepo, entriesSupabaseRepo, payrollSupabaseRepo, staffSupabaseRepo } from '@/lib/dal';
 import { MonthlyStats, AnyRequest, Payslip, LeaveBalance, TrainingEntitlement } from '@/lib/dal/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -55,31 +51,31 @@ const StaffHome = () => {
       const currentYear = new Date().getFullYear();
       
       // Load stats
-      const monthlyStats = await statsLocalRepo.getMonthlyStats(currentMonth);
+      const monthlyStats = await statsSupabaseRepo.getMonthlyStats(currentMonth);
       setStats(monthlyStats);
       
       // Load recent requests for current user
-      const requests = await requestsLocalRepo.getRecentRequestsByUser(user.id, 3);
+      const requests = await requestsSupabaseRepo.getRecentRequestsByUser(user.id, 3);
       setRecentRequests(requests);
       
       // Load payslips
-      const payslips = await payrollLocalRepo.getPayslipsByUser(user.id);
+      const payslips = await payrollSupabaseRepo.getPayslipsByUser(user.id);
       setRecentPayslips(payslips.slice(0, 2));
 
       // Load leave balance
-      const balance = await staffLocalRepo.getLeaveBalance(user.id, currentYear);
+      const balance = await staffSupabaseRepo.getLeaveBalance(user.id, currentYear);
       setLeaveBalance(balance);
 
       // Load training entitlement
-      const entitlement = await staffLocalRepo.getTrainingEntitlement(user.id);
+      const entitlement = await staffSupabaseRepo.getTrainingEntitlement(user.id);
       setTrainingEntitlement(entitlement);
       
       // Admin-only data
       if (isAdmin) {
-        const pending = await requestsLocalRepo.getPendingApprovals();
+        const pending = await requestsSupabaseRepo.getPendingApprovals();
         setPendingCount(pending.leave.length + pending.claims.length + pending.training.length);
         
-        const unpaidCount = await entriesLocalRepo.getUnpaidInvoicesCount();
+        const unpaidCount = await entriesSupabaseRepo.getUnpaidInvoicesCount();
         setUnpaidInvoicesCount(unpaidCount);
       }
     } catch (error) {

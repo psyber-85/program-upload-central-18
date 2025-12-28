@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { requestsLocalRepo } from '@/lib/dal/localStorage/RequestsLocalRepo';
-import { staffLocalRepo } from '@/lib/dal/localStorage/StaffLocalRepo';
+import { requestsSupabaseRepo, staffSupabaseRepo } from '@/lib/dal';
 import { AnyRequest, TrainingApplication, LeaveRequest } from '@/lib/dal/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,7 +34,7 @@ const RequestDetail = () => {
     setIsLoading(true);
     try {
       // Try leave requests first
-      const leaveRequest = await requestsLocalRepo.getLeaveRequestById(id);
+      const leaveRequest = await requestsSupabaseRepo.getLeaveRequestById(id);
       if (leaveRequest) {
         setRequest(leaveRequest);
         setRequestCategory('leave');
@@ -44,7 +43,7 @@ const RequestDetail = () => {
       }
       
       // Then claims
-      const claimRequest = await requestsLocalRepo.getClaimRequestById(id);
+      const claimRequest = await requestsSupabaseRepo.getClaimRequestById(id);
       if (claimRequest) {
         setRequest(claimRequest);
         setRequestCategory('claim');
@@ -53,7 +52,7 @@ const RequestDetail = () => {
       }
 
       // Finally training
-      const trainingApp = await requestsLocalRepo.getTrainingApplicationById(id);
+      const trainingApp = await requestsSupabaseRepo.getTrainingApplicationById(id);
       if (trainingApp) {
         setRequest(trainingApp);
         setRequestCategory('training');
@@ -77,7 +76,7 @@ const RequestDetail = () => {
         const leaveReq = request as LeaveRequest;
         
         // Approve the request
-        await requestsLocalRepo.updateLeaveRequestStatus(
+        await requestsSupabaseRepo.updateLeaveRequestStatus(
           request.id, 
           'Approved', 
           adminComment || undefined
@@ -89,27 +88,27 @@ const RequestDetail = () => {
           : differenceInDays(new Date(leaveReq.endDate), new Date(leaveReq.startDate)) + 1;
         
         const currentYear = new Date().getFullYear();
-        const currentBalance = await staffLocalRepo.getLeaveBalance(leaveReq.userId, currentYear);
+        const currentBalance = await staffSupabaseRepo.getLeaveBalance(leaveReq.userId, currentYear);
         
         if (currentBalance) {
           if (leaveReq.leaveType === 'AL') {
-            await staffLocalRepo.updateLeaveBalance(leaveReq.userId, currentYear, {
+            await staffSupabaseRepo.updateLeaveBalance(leaveReq.userId, currentYear, {
               alUsed: currentBalance.alUsed + daysRequested,
             });
           } else if (leaveReq.leaveType === 'SL') {
-            await staffLocalRepo.updateLeaveBalance(leaveReq.userId, currentYear, {
+            await staffSupabaseRepo.updateLeaveBalance(leaveReq.userId, currentYear, {
               slUsed: currentBalance.slUsed + daysRequested,
             });
           }
         }
       } else if (requestCategory === 'claim') {
-        await requestsLocalRepo.updateClaimRequestStatus(
+        await requestsSupabaseRepo.updateClaimRequestStatus(
           request.id, 
           'Approved', 
           adminComment || undefined
         );
       } else if (requestCategory === 'training') {
-        await requestsLocalRepo.approveTrainingApplication(request.id);
+        await requestsSupabaseRepo.approveTrainingApplication(request.id);
       }
       toast({ title: 'Request approved!' });
       navigate('/staff/requests');
@@ -129,19 +128,19 @@ const RequestDetail = () => {
     setIsProcessing(true);
     try {
       if (requestCategory === 'leave') {
-        await requestsLocalRepo.updateLeaveRequestStatus(
+        await requestsSupabaseRepo.updateLeaveRequestStatus(
           request.id, 
           'Rejected', 
           adminComment
         );
       } else if (requestCategory === 'claim') {
-        await requestsLocalRepo.updateClaimRequestStatus(
+        await requestsSupabaseRepo.updateClaimRequestStatus(
           request.id, 
           'Rejected', 
           adminComment
         );
       } else if (requestCategory === 'training') {
-        await requestsLocalRepo.rejectTrainingApplication(request.id);
+        await requestsSupabaseRepo.rejectTrainingApplication(request.id);
       }
       toast({ title: 'Request rejected' });
       navigate('/staff/requests');
@@ -156,7 +155,7 @@ const RequestDetail = () => {
     if (!request || requestCategory !== 'training') return;
     setIsProcessing(true);
     try {
-      await requestsLocalRepo.markTrainingCompleted(request.id);
+      await requestsSupabaseRepo.markTrainingCompleted(request.id);
       toast({ title: 'Training marked as completed!' });
       loadRequest();
     } catch (error) {
@@ -170,7 +169,7 @@ const RequestDetail = () => {
     if (!request || requestCategory !== 'training') return;
     setIsProcessing(true);
     try {
-      await requestsLocalRepo.markTrainingClaimed(request.id);
+      await requestsSupabaseRepo.markTrainingClaimed(request.id);
       toast({ title: 'Training marked as claimed!' });
       loadRequest();
     } catch (error) {

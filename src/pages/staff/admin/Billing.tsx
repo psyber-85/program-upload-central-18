@@ -187,7 +187,7 @@ const Billing = () => {
                       <TableCell>{getStatusBadge(inv.status)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-1 justify-end flex-wrap">
-                          <Button size="sm" variant="ghost" onClick={() => generateInvoicePDF(inv)}><Download className="h-3 w-3" /></Button>
+                          <Button size="sm" variant="ghost" onClick={async () => await generateInvoicePDF(inv)}><Download className="h-3 w-3" /></Button>
                           {inv.status === 'Draft' && <Button size="sm" variant="outline" onClick={() => handleMarkInvoiceSent(inv.id)}><Send className="h-3 w-3 mr-1" />Send</Button>}
                           {inv.status !== 'Paid' && <Button size="sm" variant="outline" onClick={() => handleMarkInvoicePaid(inv.id)}>Mark Paid</Button>}
                         </div>
@@ -218,7 +218,7 @@ const Billing = () => {
                       <TableCell className="text-right">RM {q.total.toLocaleString()}</TableCell>
                       <TableCell>{getStatusBadge(q.status)}</TableCell>
                       <TableCell className="text-right">
-                        <Button size="sm" variant="ghost" onClick={() => generateQuotationPDF(q)}><Download className="h-3 w-3" /></Button>
+                        <Button size="sm" variant="ghost" onClick={async () => await generateQuotationPDF(q)}><Download className="h-3 w-3" /></Button>
                       </TableCell>
                     </TableRow>
                   ))}

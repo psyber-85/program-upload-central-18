@@ -36,9 +36,9 @@ const PayslipDetail = () => {
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (payslip && user) {
-      generatePayslipPDF(payslip, user.name);
+      await generatePayslipPDF(payslip, user.name);
       toast({ title: 'PDF generated', description: 'Your payslip will open in a new window for printing.' });
     }
   };

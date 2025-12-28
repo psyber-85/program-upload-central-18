@@ -26,7 +26,8 @@ import MyEntries from "./pages/staff/MyEntries";
 // Admin pages
 import Payroll from "./pages/staff/admin/Payroll";
 import PayrollRunDetail from "./pages/staff/admin/PayrollRunDetail";
-import Entries from "./pages/staff/admin/Entries";
+import Billing from "./pages/staff/admin/Billing";
+import Payments from "./pages/staff/admin/Payments";
 import Settings from "./pages/staff/admin/Settings";
 
 // Marketing Portal
@@ -77,9 +78,14 @@ const App = () => (
                   <PayrollRunDetail />
                 </ProtectedRoute>
               } />
-              <Route path="entries" element={
+              <Route path="billing" element={
                 <ProtectedRoute requireAdmin>
-                  <Entries />
+                  <Billing />
+                </ProtectedRoute>
+              } />
+              <Route path="payments" element={
+                <ProtectedRoute requireAdmin>
+                  <Payments />
                 </ProtectedRoute>
               } />
               <Route path="settings" element={

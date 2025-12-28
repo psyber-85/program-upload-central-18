@@ -29,14 +29,15 @@ interface NavItem {
 const mainNavItems: NavItem[] = [
   { label: 'Home', path: '/staff', icon: Home },
   { label: 'Requests', path: '/staff/requests', icon: ClipboardList },
-  { label: 'My Invoices', path: '/staff/my-entries', icon: FileText },
+  { label: 'My Billing', path: '/staff/my-entries', icon: FileText },
   { label: 'Documents', path: '/staff/docs', icon: FileText },
   { label: 'My Payslips', path: '/staff/payslips', icon: Receipt },
 ];
 
 const adminNavItems: NavItem[] = [
   { label: 'Payroll', path: '/staff/payroll', icon: DollarSign, adminOnly: true },
-  { label: 'Entries', path: '/staff/entries', icon: Users, adminOnly: true },
+  { label: 'Billing', path: '/staff/billing', icon: FileText, adminOnly: true },
+  { label: 'Payments', path: '/staff/payments', icon: Receipt, adminOnly: true },
   { label: 'Settings', path: '/staff/settings', icon: Settings, adminOnly: true },
 ];
 

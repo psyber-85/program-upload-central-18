@@ -5,26 +5,27 @@ import { format } from 'date-fns';
 // This is the document-template.png converted to base64
 const TEMPLATE_BASE64 = 'URL_PLACEHOLDER';
 
-// Accurate position coordinates based on template layout (A4: 794px × 1123px at 96dpi)
+// Accurate position coordinates based on template layout (A4: 210mm × 297mm)
+// Positions calibrated from user screenshot with color markers
 const POSITIONS = {
-  // Document type and info - positioned below header, above table
+  // Document type and info - below company header
   docTitle: { top: '178px', left: '48px' },
   docNumber: { top: '178px', right: '48px' },
   docDate: { top: '200px', right: '48px' },
   
-  // Recipient section - between doc info and table
-  attnLabel: { top: '228px', left: '48px' },
-  recipientName: { top: '246px', left: '48px' },
-  recipientEmail: { top: '264px', left: '48px' },
-  recipientTitle: { top: '282px', left: '48px' },
+  // Recipient section - BLUE marker area (under ATTN TO: label)
+  attnLabel: { top: '240px', left: '48px' },
+  recipientName: { top: '260px', left: '48px' },
+  recipientEmail: { top: '300px', left: '48px' },  // BLUE line 1
+  recipientTitle: { top: '320px', left: '48px' },  // BLUE line 2
   
-  // Table content area - inside the existing table structure (below header row)
-  // Table header is at ~320px, content starts at ~358px
-  tableContent: { top: '358px', left: '48px', right: '48px' },
+  // Table content area - GREEN marker (inside the table, below DESCRIPTION/COST header)
+  // Table header row is at ~480px, content starts at ~510px
+  tableContent: { top: '510px', left: '60px', right: '48px' },
   
-  // Total value - positioned to the right of the "Total :" label in footer
-  // The "Total :" label is part of the template, we just add the value
-  totalValue: { bottom: '215px', right: '65px' },
+  // Total value - RED marker (aligned with "Total :" label at bottom of table)
+  // Position to the LEFT of the existing "Total :" label in the red footer bar
+  totalValue: { top: '1015px', right: '100px' },
 };
 
 function generateTemplateStyles(): string {
@@ -167,7 +168,7 @@ function generateTemplateStyles(): string {
       }
       .total-value {
         position: absolute;
-        bottom: ${POSITIONS.totalValue.bottom};
+        top: ${POSITIONS.totalValue.top};
         right: ${POSITIONS.totalValue.right};
         font-size: 16px;
         font-weight: bold;

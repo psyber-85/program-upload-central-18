@@ -12,17 +12,17 @@ const POSITIONS = {
   docNumber: { top: '178px', right: '48px' },
   docDate: { top: '200px', right: '48px' },
   
-  // BLUE: Recipient section - client details area (between ATTN TO and table header)
-  attnLabel: { top: '225px', left: '48px' },
-  recipientName: { top: '250px', left: '48px' },
-  recipientEmail: { top: '275px', left: '48px' },
-  recipientTitle: { top: '300px', left: '48px' },
+  // BLUE: Recipient section - exact positions from screenshot
+  attnLabel: { top: '220px', left: '48px' },
+  recipientName: { top: '240px', left: '48px' },
+  recipientEmail: { top: '260px', left: '48px' },
+  recipientTitle: { top: '280px', left: '48px' },
   
-  // GREEN: Table content area - inside table body below black DESCRIPTION/COST header
-  tableContent: { top: '490px', left: '48px', costRight: '48px' },
+  // GREEN: Table content area - starts at 460px, desc at 50px, cost at 605px
+  tableContent: { top: '460px', descLeft: '50px', costLeft: '605px' },
   
-  // RED: Total amount value - aligned with "Total :" row at the bottom right
-  totalValue: { bottom: '160px', right: '55px' },
+  // RED: Total amount value - bottom 138px, right 48px
+  totalValue: { bottom: '138px', right: '48px' },
 };
 
 function generateTemplateStyles(): string {
@@ -131,29 +131,31 @@ function generateTemplateStyles(): string {
       .table-content {
         position: absolute;
         top: ${POSITIONS.tableContent.top};
-        left: ${POSITIONS.tableContent.left};
-        right: ${POSITIONS.tableContent.costRight};
-        width: calc(100% - 98px);
+        left: 0;
+        right: 0;
+        width: 100%;
       }
       .table-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        padding: 8px 0;
-        border-bottom: 1px solid #e8e8e8;
+        position: relative;
+        height: 24px;
         font-size: 11px;
+        border-bottom: 1px solid #e8e8e8;
       }
       .table-row:last-child {
         border-bottom: none;
       }
       .table-row .desc {
-        flex: 1;
-        max-width: 75%;
+        position: absolute;
+        left: ${POSITIONS.tableContent.descLeft};
+        top: 4px;
+        width: 520px;
         color: #333;
-        padding-right: 20px;
       }
       .table-row .cost {
-        width: 160px;
+        position: absolute;
+        left: ${POSITIONS.tableContent.costLeft};
+        top: 4px;
+        width: 140px;
         text-align: right;
         color: #333;
         font-weight: 500;

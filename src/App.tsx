@@ -8,6 +8,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 // Public pages
 import PublicHome from "./pages/PublicHome";
 import Login from "./pages/Login";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
 // Staff Portal
@@ -49,6 +50,7 @@ const App = () => (
             {/* Public routes */}
             <Route path="/" element={<PublicHome />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             
             {/* Staff Portal routes (protected) */}
             <Route path="/staff" element={

@@ -6,6 +6,8 @@ import TryHireButton from '@/components/tryhire/TryHireButton';
 import TryHireCard from '@/components/tryhire/TryHireCard';
 import HowItWorks from '@/components/tryhire/HowItWorks';
 import TryHireFAQ from '@/components/tryhire/TryHireFAQ';
+import SocialProofStrip from '@/components/tryhire/SocialProofStrip';
+import OperatorCard from '@/components/tryhire/OperatorCard';
 
 const TryHireHome = () => {
   return (
@@ -191,6 +193,16 @@ const TryHireHome = () => {
         <div className="max-w-3xl mx-auto">
           <TryHireFAQ />
         </div>
+      </TryHireSection>
+
+      {/* Social Proof Section */}
+      <TryHireSection>
+        <SocialProofStrip />
+      </TryHireSection>
+
+      {/* Operator Credibility Section */}
+      <TryHireSection background="gray">
+        <OperatorCard />
       </TryHireSection>
 
       {/* Final CTA */}

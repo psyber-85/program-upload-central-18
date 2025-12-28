@@ -6,7 +6,7 @@ const TryHireFooter = () => {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-slate-500">
-            TryHire is powered by AIHQ training & assessment.
+            TryHire is powered by AIHQ Sdn Bhd (1651383-T)
           </p>
           <div className="flex items-center gap-6">
             <Link 
@@ -16,7 +16,7 @@ const TryHireFooter = () => {
               Privacy
             </Link>
             <a 
-              href="mailto:hello@theaihq.net" 
+              href="mailto:info@theaihq.net" 
               className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
             >
               Contact

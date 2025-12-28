@@ -66,7 +66,7 @@ const TryHirePrivacy = () => {
 
           <div className="mt-12 pt-8 border-t border-slate-200">
             <Link 
-              to="/tryhire"
+              to="/"
               className="text-emerald-600 hover:text-emerald-700 font-medium"
             >
               ← Back to Home

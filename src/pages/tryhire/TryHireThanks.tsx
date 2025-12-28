@@ -32,7 +32,7 @@ const TryHireThanks = () => {
             </p>
           )}
           
-          <Link to="/tryhire">
+          <Link to="/">
             <TryHireButton>
               Back to Home
             </TryHireButton>

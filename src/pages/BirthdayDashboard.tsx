@@ -51,9 +51,6 @@ const BirthdayDashboard = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Use the provided TEST_TOKEN automatically
-    setTestToken('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');
-    
     fetchStats();
   }, []);
 

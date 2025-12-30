@@ -13,13 +13,13 @@ import {
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 
-// System user ID for anonymous access (using existing data owner)
-const SYSTEM_USER_ID = '0aa3de6e-ad3b-46aa-bb0d-cb0f5adb6e8f';
-
-// Get current user ID - returns system user ID for anonymous access
+// Get current user ID - requires authentication
 const getCurrentUserId = async (): Promise<string> => {
   const { data: { user } } = await supabase.auth.getUser();
-  return user?.id || SYSTEM_USER_ID;
+  if (!user?.id) {
+    throw new Error('Authentication required. Please log in to access CRM features.');
+  }
+  return user.id;
 };
 
 export const fetchCrmCampaigns = async (): Promise<CrmCampaign[]> => {

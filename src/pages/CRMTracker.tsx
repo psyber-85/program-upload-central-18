@@ -3,7 +3,6 @@ import { CrmProvider } from '@/lib/crm/CRMContext';
 import CRMCampaignTabs from '@/components/crm/CRMCampaignTabs';
 import CRMCampaignSummary from '@/components/crm/CRMCampaignSummary';
 import CRMLeadsTable from '@/components/crm/CRMLeadsTable';
-import CRMLeadSheetUploader from '@/components/crm/CRMLeadSheetUploader';
 
 const CRMTracker = () => {
   return (
@@ -21,14 +20,7 @@ const CRMTracker = () => {
           
           <CRMCampaignSummary />
           
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            <div className="lg:col-span-3">
-              <CRMLeadsTable />
-            </div>
-            <div className="lg:col-span-1">
-              <CRMLeadSheetUploader />
-            </div>
-          </div>
+          <CRMLeadsTable />
         </div>
       </div>
     </CrmProvider>

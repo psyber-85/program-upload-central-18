@@ -1,25 +1,124 @@
-
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  horizontalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, Plus, ArrowUpDown, Phone } from 'lucide-react';
+import { Search, Plus, Upload, RotateCcw } from 'lucide-react';
 import { useCrm } from '@/lib/crm/CRMContext';
 import { CrmLead } from '@/lib/crm/types';
 import { MALAYSIAN_STATES, LEAD_SCORES, LEAD_STATUSES } from '@/lib/crm/types';
 import CRMAddLeadModal from './CRMAddLeadModal';
+import CRMImportLeadsModal from './CRMImportLeadsModal';
 import CRMContactButton from './CRMContactButton';
 import CRMActivityHistory from './CRMActivityHistory';
 import CRMMobileLeadCard from './CRMMobileLeadCard';
+import DraggableTableHead from './DraggableTableHead';
 import { updateCrmLeadField } from '@/lib/crm/placeholderFunctions';
+
+// Column configuration
+interface ColumnConfig {
+  id: string;
+  label: string;
+  field: keyof CrmLead;
+  type: 'text' | 'number' | 'select';
+  options?: readonly string[];
+}
+
+const COLUMNS: ColumnConfig[] = [
+  { id: 'name', label: 'Name', field: 'crm_name', type: 'text' },
+  { id: 'email', label: 'Email', field: 'crm_email', type: 'text' },
+  { id: 'number', label: 'Phone', field: 'crm_number', type: 'text' },
+  { id: 'jobRole', label: 'Role', field: 'crm_jobRole', type: 'text' },
+  { id: 'org', label: 'Organization', field: 'crm_org', type: 'text' },
+  { id: 'state', label: 'State', field: 'crm_state', type: 'select', options: MALAYSIAN_STATES },
+  { id: 'leadScore', label: 'Score', field: 'crm_leadScore', type: 'select', options: LEAD_SCORES },
+  { id: 'status', label: 'Status', field: 'crm_status', type: 'select', options: LEAD_STATUSES },
+  { id: 'potentialDealSize', label: 'Potential', field: 'crm_potentialDealSize', type: 'number' },
+  { id: 'confirmedDealSize', label: 'Confirmed', field: 'crm_confirmedDealSize', type: 'number' },
+];
+
+const DEFAULT_COLUMN_ORDER = COLUMNS.map(col => col.id);
+const STORAGE_KEY = 'crm-leads-column-order';
 
 const CRMLeadsTable = () => {
   const { state, dispatch } = useCrm();
   const { leads, searchTerm, sortField, sortDirection, activeCampaignId } = state;
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [editingCell, setEditingCell] = useState<{ leadId: string; field: keyof CrmLead } | null>(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [columnOrder, setColumnOrder] = useState<string[]>(DEFAULT_COLUMN_ORDER);
+
+  // Load column order from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Validate saved order contains all columns
+        if (Array.isArray(parsed) && parsed.length === DEFAULT_COLUMN_ORDER.length) {
+          setColumnOrder(parsed);
+        }
+      } catch {
+        // Use default order if parsing fails
+      }
+    }
+  }, []);
+
+  // Save column order to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(columnOrder));
+  }, [columnOrder]);
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Get ordered columns
+  const orderedColumns = useMemo(() => {
+    return columnOrder.map(id => COLUMNS.find(col => col.id === id)!).filter(Boolean);
+  }, [columnOrder]);
+
+  // Handle drag end
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setColumnOrder((items) => {
+        const oldIndex = items.indexOf(active.id as string);
+        const newIndex = items.indexOf(over.id as string);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
+
+  // Reset column order
+  const resetColumnOrder = () => {
+    setColumnOrder(DEFAULT_COLUMN_ORDER);
+  };
 
   // Filter and sort leads
   const filteredAndSortedLeads = useMemo(() => {
@@ -39,7 +138,6 @@ const CRMLeadsTable = () => {
         let aValue = a[sortField];
         let bValue = b[sortField];
 
-        // Handle different data types
         if (typeof aValue === 'string' && typeof bValue === 'string') {
           aValue = aValue.toLowerCase();
           bValue = bValue.toLowerCase();
@@ -80,7 +178,7 @@ const CRMLeadsTable = () => {
     lead: CrmLead;
     field: keyof CrmLead;
     type?: 'text' | 'number' | 'date' | 'select' | 'textarea';
-    options?: string[];
+    options?: readonly string[];
   }> = ({ lead, field, type = 'text', options }) => {
     const [value, setValue] = useState(lead[field]?.toString() || '');
     const isEditing = editingCell?.leadId === lead.crm_id && editingCell?.field === field;
@@ -174,12 +272,21 @@ const CRMLeadsTable = () => {
     <>
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <CardTitle>Campaign Leads</CardTitle>
-            <Button onClick={() => setShowAddModal(true)} size="sm">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Lead
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={resetColumnOrder} title="Reset column order">
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setShowImportModal(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                Import
+              </Button>
+              <Button onClick={() => setShowAddModal(true)} size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Lead
+              </Button>
+            </div>
           </div>
           <div className="flex items-center space-x-2">
             <div className="relative flex-1 max-w-sm">
@@ -196,95 +303,72 @@ const CRMLeadsTable = () => {
         <CardContent>
           {/* Desktop Table */}
           <div className="hidden lg:block">
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {[
-                      { key: 'crm_name', label: 'Name' },
-                      { key: 'crm_email', label: 'Email' },
-                      { key: 'crm_number', label: 'Phone' },
-                      { key: 'crm_jobRole', label: 'Role' },
-                      { key: 'crm_org', label: 'Organization' },
-                      { key: 'crm_state', label: 'State' },
-                      { key: 'crm_leadScore', label: 'Score' },
-                      { key: 'crm_status', label: 'Status' },
-                      { key: 'crm_potentialDealSize', label: 'Potential' },
-                      { key: 'crm_confirmedDealSize', label: 'Confirmed' },
-                    ].map((col) => (
-                      <TableHead key={col.key}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleSort(col.key as keyof CrmLead)}
-                          className="h-8 p-0 font-medium"
-                        >
-                          {col.label}
-                          <ArrowUpDown className="ml-1 h-3 w-3" />
-                        </Button>
-                      </TableHead>
-                    ))}
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredAndSortedLeads.map((lead) => (
-                    <React.Fragment key={lead.crm_id}>
-                      <TableRow className="hover:bg-muted/50">
-                        <TableCell>
-                          <EditableCell lead={lead} field="crm_name" />
-                        </TableCell>
-                        <TableCell>
-                          <EditableCell lead={lead} field="crm_email" />
-                        </TableCell>
-                        <TableCell>
-                          <EditableCell lead={lead} field="crm_number" />
-                        </TableCell>
-                        <TableCell>
-                          <EditableCell lead={lead} field="crm_jobRole" />
-                        </TableCell>
-                        <TableCell>
-                          <EditableCell lead={lead} field="crm_org" />
-                        </TableCell>
-                        <TableCell>
-                          <EditableCell lead={lead} field="crm_state" type="select" options={MALAYSIAN_STATES} />
-                        </TableCell>
-                        <TableCell>
-                          <EditableCell lead={lead} field="crm_leadScore" type="select" options={[...LEAD_SCORES]} />
-                        </TableCell>
-                        <TableCell>
-                          <EditableCell lead={lead} field="crm_status" type="select" options={[...LEAD_STATUSES]} />
-                        </TableCell>
-                        <TableCell>
-                          <EditableCell lead={lead} field="crm_potentialDealSize" type="number" />
-                        </TableCell>
-                        <TableCell>
-                          <EditableCell lead={lead} field="crm_confirmedDealSize" type="number" />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            <CRMContactButton leadId={lead.crm_id} />
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setExpandedRow(expandedRow === lead.crm_id ? null : lead.crm_id)}
-                            >
-                              History
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                      {expandedRow === lead.crm_id && (
-                        <TableRow>
-                          <TableCell colSpan={11}>
-                            <CRMActivityHistory leadId={lead.crm_id} />
+            <div className="rounded-md border overflow-x-auto">
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+                modifiers={[restrictToHorizontalAxis]}
+              >
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <SortableContext
+                        items={columnOrder}
+                        strategy={horizontalListSortingStrategy}
+                      >
+                        {orderedColumns.map((col) => (
+                          <DraggableTableHead
+                            key={col.id}
+                            id={col.id}
+                            label={col.label}
+                            field={col.field}
+                            onSort={handleSort}
+                          />
+                        ))}
+                      </SortableContext>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredAndSortedLeads.map((lead) => (
+                      <React.Fragment key={lead.crm_id}>
+                        <TableRow className="hover:bg-muted/50">
+                          {orderedColumns.map((col) => (
+                            <TableCell key={col.id}>
+                              <EditableCell
+                                lead={lead}
+                                field={col.field}
+                                type={col.type}
+                                options={col.options}
+                              />
+                            </TableCell>
+                          ))}
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              <CRMContactButton leadId={lead.crm_id} />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setExpandedRow(expandedRow === lead.crm_id ? null : lead.crm_id)}
+                              >
+                                History
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </TableBody>
-              </Table>
+                        {expandedRow === lead.crm_id && (
+                          <TableRow>
+                            <TableCell colSpan={orderedColumns.length + 1}>
+                              <CRMActivityHistory leadId={lead.crm_id} />
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </TableBody>
+                </Table>
+              </DndContext>
             </div>
           </div>
 
@@ -307,6 +391,11 @@ const CRMLeadsTable = () => {
         open={showAddModal}
         onOpenChange={setShowAddModal}
         campaignId={activeCampaignId}
+      />
+
+      <CRMImportLeadsModal
+        open={showImportModal}
+        onOpenChange={setShowImportModal}
       />
     </>
   );

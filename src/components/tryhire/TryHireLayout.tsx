@@ -27,7 +27,7 @@ const TryHireLayout = ({ children }: TryHireLayoutProps) => {
             to="/interest"
             className="text-sm font-medium text-tryhire-coral hover:text-tryhire-coral-dark transition-colors"
           >
-            Submit Interest →
+            Join FREE →
           </Link>
         </div>
       </header>

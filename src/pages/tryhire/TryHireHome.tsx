@@ -10,6 +10,8 @@ import SocialProofStrip from '@/components/tryhire/SocialProofStrip';
 import OperatorCard from '@/components/tryhire/OperatorCard';
 import BrochureDownloadModal from '@/components/tryhire/BrochureDownloadModal';
 import WhosThisFor from '@/components/tryhire/WhosThisFor';
+import CompaniesWorkedWith from '@/components/tryhire/CompaniesWorkedWith';
+import InDemandSkills from '@/components/tryhire/InDemandSkills';
 
 const TryHireHome = () => {
   return (
@@ -51,7 +53,7 @@ const TryHireHome = () => {
       {/* Who's This For Section */}
       <TryHireSection background="gray">
         <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 text-center mb-10">
-          Who's This For
+          HR or employers who want
         </h2>
         <WhosThisFor />
       </TryHireSection>
@@ -65,6 +67,16 @@ const TryHireHome = () => {
         <p className="text-center mt-10 text-lg text-slate-600">
           Simple. Transparent. No hidden fees.
         </p>
+      </TryHireSection>
+
+      {/* Companies We Worked With Section */}
+      <TryHireSection background="gray">
+        <CompaniesWorkedWith />
+      </TryHireSection>
+
+      {/* In Demand Skills Section */}
+      <TryHireSection>
+        <InDemandSkills />
       </TryHireSection>
 
       {/* Comparison Section */}

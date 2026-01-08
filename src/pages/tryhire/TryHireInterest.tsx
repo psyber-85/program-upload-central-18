@@ -9,7 +9,7 @@ const TryHireInterest = () => {
       <TryHireSection className="py-12 sm:py-16">
         <div className="max-w-2xl mx-auto">
           <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-3 text-center">
-            Submit Hiring Interest
+            Join FREE
           </h1>
           <p className="text-lg text-slate-600 mb-8 text-center">
             Tell us what you're hiring for. We'll follow up if there's a fit.

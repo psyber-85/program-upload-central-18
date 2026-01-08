@@ -9,6 +9,7 @@ import TryHireFAQ from '@/components/tryhire/TryHireFAQ';
 import SocialProofStrip from '@/components/tryhire/SocialProofStrip';
 import OperatorCard from '@/components/tryhire/OperatorCard';
 import BrochureDownloadModal from '@/components/tryhire/BrochureDownloadModal';
+import WhosThisFor from '@/components/tryhire/WhosThisFor';
 
 const TryHireHome = () => {
   return (
@@ -35,7 +36,7 @@ const TryHireHome = () => {
           <div className="mt-10 flex flex-col sm:flex-row gap-4">
             <Link to="/interest">
               <TryHireButton size="lg" className="group">
-                Submit Hiring Interest
+                Join FREE
                 <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
               </TryHireButton>
             </Link>
@@ -45,6 +46,14 @@ const TryHireHome = () => {
             No upfront cost to employers.
           </p>
         </div>
+      </TryHireSection>
+
+      {/* Who's This For Section */}
+      <TryHireSection background="gray">
+        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 text-center mb-10">
+          Who's This For
+        </h2>
+        <WhosThisFor />
       </TryHireSection>
 
       {/* How It Works Section */}
@@ -216,7 +225,7 @@ const TryHireHome = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/interest">
               <TryHireButton size="lg" className="group shadow-lg shadow-tryhire-coral/25 hover:shadow-xl hover:shadow-tryhire-coral/30">
-                Submit Hiring Interest
+                Join FREE
                 <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
               </TryHireButton>
             </Link>

@@ -2,11 +2,11 @@ import { ShieldCheck, Link2Off, GraduationCap, Eye, CircleDollarSign } from 'luc
 import { cn } from '@/lib/utils';
 
 const benefits = [
-  { icon: ShieldCheck, label: 'Reduced hiring risk' },
-  { icon: Link2Off, label: 'Fewer probation failures' },
-  { icon: GraduationCap, label: 'Better-prepared junior hires' },
-  { icon: Eye, label: 'Observe attitude before hiring' },
-  { icon: CircleDollarSign, label: 'No upfront cost' },
+  { icon: ShieldCheck, label: 'Reduced hiring risk', description: 'Make informed decisions based on real performance, not just interviews' },
+  { icon: Link2Off, label: 'Fewer probation failures', description: 'Candidates prove themselves before you commit to hiring' },
+  { icon: GraduationCap, label: 'Better-prepared junior hires', description: 'Talent comes pre-trained with job-ready skills' },
+  { icon: Eye, label: 'Observe attitude before hiring', description: 'See work ethic and team fit during the placement phase' },
+  { icon: CircleDollarSign, label: 'No upfront cost', description: 'Zero financial risk - pay only if you decide to hire' },
 ];
 
 const WhosThisFor = () => {
@@ -32,8 +32,11 @@ const WhosThisFor = () => {
           </div>
           
           {/* Text content */}
-          <span className="text-sm font-semibold text-slate-700 leading-snug max-w-[140px]">
+          <span className="text-sm font-semibold text-slate-700 leading-snug">
             {benefit.label}
+          </span>
+          <span className="text-xs text-slate-500 leading-snug mt-1">
+            {benefit.description}
           </span>
         </div>
       ))}

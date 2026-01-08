@@ -12,49 +12,65 @@ import BrochureDownloadModal from '@/components/tryhire/BrochureDownloadModal';
 import WhosThisFor from '@/components/tryhire/WhosThisFor';
 import CompaniesWorkedWith from '@/components/tryhire/CompaniesWorkedWith';
 import InDemandSkills from '@/components/tryhire/InDemandSkills';
+import trainplaceHero from '@/assets/tryhire/trainplace-hero.webp';
 
 const TryHireHome = () => {
   return (
     <TryHireLayout>
       {/* Hero Section */}
       <TryHireSection background="hero" className="pt-20 sm:pt-28 pb-16">
-        <div className="max-w-3xl animate-fade-in">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 tracking-tight leading-tight">
-            Hire First-Time Right.
-          </h1>
-          <p className="mt-4 text-xl text-slate-600">
-            We help employers hiring in bulk.
-          </p>
-          
-          <div className="mt-8 space-y-2">
-            <p className="text-lg text-slate-700">Candidates train and work first.</p>
-            <p className="text-lg text-slate-700">You hire only if satisfied.</p>
+        <div className="grid lg:grid-cols-2 gap-12 items-center">
+          {/* Left: Text Content */}
+          <div className="max-w-xl animate-fade-in">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 tracking-tight leading-tight">
+              Hire First-Time Right.
+            </h1>
+            <p className="mt-4 text-xl text-slate-600">
+              We help employers hiring in bulk.
+            </p>
+            
+            <div className="mt-8 space-y-2">
+              <p className="text-lg text-slate-700">Candidates train and work first.</p>
+              <p className="text-lg text-slate-700">You hire only if satisfied.</p>
+            </div>
+            
+            <p className="mt-6 text-2xl font-semibold bg-gradient-to-r from-tryhire-coral to-tryhire-orange bg-clip-text text-transparent">
+              Prove first. Hire later.
+            </p>
+            
+            <div className="mt-10 flex flex-col sm:flex-row gap-4">
+              <Link to="/interest">
+                <TryHireButton size="lg" className="group">
+                  Join FREE
+                  <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
+                </TryHireButton>
+              </Link>
+              <BrochureDownloadModal />
+            </div>
+            <p className="mt-3 text-sm text-slate-500">
+              No upfront cost to employers.
+            </p>
           </div>
           
-          <p className="mt-6 text-2xl font-semibold bg-gradient-to-r from-tryhire-coral to-tryhire-orange bg-clip-text text-transparent">
-            Prove first. Hire later.
-          </p>
-          
-          <div className="mt-10 flex flex-col sm:flex-row gap-4">
-            <Link to="/interest">
-              <TryHireButton size="lg" className="group">
-                Join FREE
-                <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-              </TryHireButton>
-            </Link>
-            <BrochureDownloadModal />
+          {/* Right: Hero Image */}
+          <div className="hidden lg:block animate-fade-in">
+            <img 
+              src={trainplaceHero} 
+              alt="From training to workplace success" 
+              className="w-full h-auto rounded-2xl shadow-xl"
+            />
           </div>
-          <p className="mt-3 text-sm text-slate-500">
-            No upfront cost to employers.
-          </p>
         </div>
       </TryHireSection>
 
       {/* Who's This For Section */}
       <TryHireSection background="gray">
-        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 text-center mb-10">
-          HR or employers who want
+        <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 text-center mb-2">
+          Who is this for
         </h2>
+        <p className="text-lg text-slate-600 text-center mb-10">
+          HR or employers who want
+        </p>
         <WhosThisFor />
       </TryHireSection>
 

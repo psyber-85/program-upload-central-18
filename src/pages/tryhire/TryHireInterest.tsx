@@ -89,9 +89,28 @@ const TryHireInterest = () => {
           <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-3 text-center">
             Join FREE
           </h1>
-          <p className="text-lg text-slate-600 mb-8 text-center">
+          <p className="text-lg text-slate-600 mb-6 text-center">
             Tell us what you're hiring for. We'll send you a Hiring LOI if there's a fit.
           </p>
+
+          {/* Process explanation */}
+          <div className="bg-orange-50 border border-orange-100 rounded-xl p-5 mb-8">
+            <h3 className="font-semibold text-slate-900 mb-3">What happens next?</h3>
+            <ol className="space-y-2 text-sm text-slate-600">
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-orange-500 text-white text-xs flex items-center justify-center font-medium">1</span>
+                <span>We'll email you a <strong className="text-slate-900">Hiring Letter of Intent (LOI)</strong></span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-orange-500 text-white text-xs flex items-center justify-center font-medium">2</span>
+                <span>Review and sign the LOI</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-orange-500 text-white text-xs flex items-center justify-center font-medium">3</span>
+                <span>Candidates will be automatically sent to you from <strong className="text-orange-600">info@theaihq.net</strong></span>
+              </li>
+            </ol>
+          </div>
 
           <div className="bg-white rounded-2xl shadow-lg border border-slate-100 p-6 sm:p-8">
             <Form {...form}>

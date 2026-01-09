@@ -107,7 +107,7 @@ const TryHireInterest = () => {
               </li>
               <li className="flex gap-3">
                 <span className="flex-shrink-0 w-6 h-6 rounded-full bg-orange-500 text-white text-xs flex items-center justify-center font-medium">3</span>
-                <span>Candidates will be automatically sent to you from <strong className="text-orange-600">info@theaihq.net</strong></span>
+                <span>You will receive a list of candidates for review</span>
               </li>
             </ol>
           </div>

@@ -320,7 +320,10 @@ const BirthdayBulkUploadCard: React.FC<Props> = ({ onUploaded }) => {
         <div className="rounded-md border border-border bg-muted/40 p-3 text-xs space-y-1">
           <p className="font-medium">Required columns:</p>
           <p className="text-muted-foreground">
-            name, email, nric_number, phone, <strong>birth_date</strong> (YYYY-MM-DD), program_name, key_skills
+            name, email, <strong>nric_number</strong>, phone, birth_date (optional), program_name, key_skills
+          </p>
+          <p className="text-muted-foreground">
+            <strong>birth_date</strong> can be left blank — it will be auto-derived from the first 6 digits of the Malaysian NRIC (YYMMDD). If both are present, the explicit birth_date wins.
           </p>
           <p className="text-muted-foreground">
             Duplicate check uses email + birthday. New programs are auto-created.
@@ -331,11 +334,14 @@ const BirthdayBulkUploadCard: React.FC<Props> = ({ onUploaded }) => {
           <div className="text-sm">
             <p><strong>{file.name}</strong></p>
             <p className="text-muted-foreground">
-              {rows.length} valid · {errors.length} errors
+              {rows.length} valid · {rows.filter(r => r.derived_from_nric).length} from NRIC · {errors.length} errors
             </p>
             {rows.slice(0, 3).map((r, i) => (
               <p key={i} className="text-xs text-muted-foreground truncate">
-                • {r.name} — {r.email} — {r.birth_date} — {r.program_name}
+                • {r.name} — {r.email} — {r.birth_date}
+                {r.derived_from_nric && <span className="text-primary"> (from NRIC)</span>}
+                {r.mismatch_warning && <span className="text-destructive"> ⚠ mismatch</span>}
+                {' — '}{r.program_name}
               </p>
             ))}
             {errors.length > 0 && (

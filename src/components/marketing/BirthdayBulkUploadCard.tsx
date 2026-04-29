@@ -105,7 +105,8 @@ const BirthdayBulkUploadCard: React.FC<Props> = ({ onUploaded }) => {
   const downloadTemplate = () => {
     const sample = [
       TEMPLATE_HEADERS,
-      ['Jane Doe', 'jane@example.com', '900101015555', '0123456789', '1990-01-01', 'Sample Program', 'Marketing'],
+      ['Jane Doe', 'jane@example.com', '900101-01-5555', '0123456789', '1990-01-01', 'Sample Program', 'Marketing'],
+      ['Ali Bin Ahmad', 'ali@example.com', '880315085123', '0198887777', '', 'Sample Program', 'Operations'],
     ];
     const csv = sample.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });

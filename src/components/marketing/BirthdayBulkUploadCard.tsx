@@ -21,6 +21,8 @@ interface ParsedRow {
   birth_mmdd: string; // MM-DD
   program_name: string;
   key_skills: string | null;
+  derived_from_nric?: boolean;
+  mismatch_warning?: string;
 }
 
 interface RowError {
@@ -29,10 +31,42 @@ interface RowError {
   data: any;
 }
 
-const REQUIRED = ['name', 'email', 'nric_number', 'birth_date', 'program_name'];
+const REQUIRED = ['name', 'email', 'nric_number', 'program_name'];
 const TEMPLATE_HEADERS = ['name', 'email', 'nric_number', 'phone', 'birth_date', 'program_name', 'key_skills'];
 
 const pad = (n: number) => n.toString().padStart(2, '0');
+
+function deriveBirthFromNRIC(nric: string): string | null {
+  const digits = (nric || '').replace(/\D/g, '');
+  if (digits.length < 6) return null;
+  const yy = parseInt(digits.slice(0, 2), 10);
+  const mm = parseInt(digits.slice(2, 4), 10);
+  const dd = parseInt(digits.slice(4, 6), 10);
+  if (isNaN(yy) || isNaN(mm) || isNaN(dd)) return null;
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const candidates = [1900 + yy, 2000 + yy];
+  const valid: number[] = [];
+  for (const yyyy of candidates) {
+    const d = new Date(yyyy, mm - 1, dd);
+    if (
+      d.getFullYear() === yyyy &&
+      d.getMonth() === mm - 1 &&
+      d.getDate() === dd
+    ) {
+      const age = currentYear - yyyy;
+      if (age >= 0 && age <= 100 && d.getTime() <= today.getTime()) {
+        valid.push(yyyy);
+      }
+    }
+  }
+  if (!valid.length) return null;
+  // Prefer 19YY when both valid (typical working age)
+  const chosen = valid.includes(1900 + yy) ? 1900 + yy : valid[0];
+  return `${chosen}-${pad(mm)}-${pad(dd)}`;
+}
 
 function normalizeDate(input: any): string | null {
   if (input == null || input === '') return null;
@@ -71,7 +105,8 @@ const BirthdayBulkUploadCard: React.FC<Props> = ({ onUploaded }) => {
   const downloadTemplate = () => {
     const sample = [
       TEMPLATE_HEADERS,
-      ['Jane Doe', 'jane@example.com', '900101015555', '0123456789', '1990-01-01', 'Sample Program', 'Marketing'],
+      ['Jane Doe', 'jane@example.com', '900101-01-5555', '0123456789', '1990-01-01', 'Sample Program', 'Marketing'],
+      ['Ali Bin Ahmad', 'ali@example.com', '880315085123', '0198887777', '', 'Sample Program', 'Operations'],
     ];
     const csv = sample.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -113,13 +148,20 @@ const BirthdayBulkUploadCard: React.FC<Props> = ({ onUploaded }) => {
         const email = String(r.email ?? '').trim();
         const nric = String(r.nric_number ?? '').trim();
         const programName = String(r.program_name ?? '').trim();
-        const dateStr = normalizeDate(r.birth_date);
+        const explicitDate = normalizeDate(r.birth_date);
+        const nricDate = nric ? deriveBirthFromNRIC(nric) : null;
+        const dateStr = explicitDate || nricDate;
+        const derivedFromNric = !explicitDate && !!nricDate;
+        const mismatch =
+          explicitDate && nricDate && explicitDate !== nricDate
+            ? `birth_date (${explicitDate}) differs from NRIC-derived (${nricDate})`
+            : undefined;
 
         if (!name) return errs.push({ row: rowNum, reason: 'Missing name', data: raw });
         if (!email || !email.includes('@')) return errs.push({ row: rowNum, reason: 'Invalid email', data: raw });
         if (!nric) return errs.push({ row: rowNum, reason: 'Missing nric_number', data: raw });
         if (!programName) return errs.push({ row: rowNum, reason: 'Missing program_name', data: raw });
-        if (!dateStr) return errs.push({ row: rowNum, reason: 'Invalid birth_date (use YYYY-MM-DD)', data: raw });
+        if (!dateStr) return errs.push({ row: rowNum, reason: 'birth_date missing and could not derive from NRIC', data: raw });
 
         const [, mm, dd] = dateStr.split('-');
         valid.push({
@@ -131,12 +173,18 @@ const BirthdayBulkUploadCard: React.FC<Props> = ({ onUploaded }) => {
           birth_mmdd: `${mm}-${dd}`,
           program_name: programName,
           key_skills: r.key_skills ? String(r.key_skills).trim() : null,
+          derived_from_nric: derivedFromNric,
+          mismatch_warning: mismatch,
         });
       });
 
       setRows(valid);
       setErrors(errs);
-      toast({ title: 'File parsed', description: `${valid.length} valid rows, ${errs.length} errors` });
+      const derivedCount = valid.filter(v => v.derived_from_nric).length;
+      toast({
+        title: 'File parsed',
+        description: `${valid.length} valid${derivedCount ? ` (${derivedCount} auto-derived from NRIC)` : ''}, ${errs.length} errors`,
+      });
     } catch (err: any) {
       toast({ title: 'Parse failed', description: err.message, variant: 'destructive' });
       setFile(null);
@@ -272,7 +320,10 @@ const BirthdayBulkUploadCard: React.FC<Props> = ({ onUploaded }) => {
         <div className="rounded-md border border-border bg-muted/40 p-3 text-xs space-y-1">
           <p className="font-medium">Required columns:</p>
           <p className="text-muted-foreground">
-            name, email, nric_number, phone, <strong>birth_date</strong> (YYYY-MM-DD), program_name, key_skills
+            name, email, <strong>nric_number</strong>, phone, birth_date (optional), program_name, key_skills
+          </p>
+          <p className="text-muted-foreground">
+            <strong>birth_date</strong> can be left blank — it will be auto-derived from the first 6 digits of the Malaysian NRIC (YYMMDD). If both are present, the explicit birth_date wins.
           </p>
           <p className="text-muted-foreground">
             Duplicate check uses email + birthday. New programs are auto-created.
@@ -283,11 +334,14 @@ const BirthdayBulkUploadCard: React.FC<Props> = ({ onUploaded }) => {
           <div className="text-sm">
             <p><strong>{file.name}</strong></p>
             <p className="text-muted-foreground">
-              {rows.length} valid · {errors.length} errors
+              {rows.length} valid · {rows.filter(r => r.derived_from_nric).length} from NRIC · {errors.length} errors
             </p>
             {rows.slice(0, 3).map((r, i) => (
               <p key={i} className="text-xs text-muted-foreground truncate">
-                • {r.name} — {r.email} — {r.birth_date} — {r.program_name}
+                • {r.name} — {r.email} — {r.birth_date}
+                {r.derived_from_nric && <span className="text-primary"> (from NRIC)</span>}
+                {r.mismatch_warning && <span className="text-destructive"> ⚠ mismatch</span>}
+                {' — '}{r.program_name}
               </p>
             ))}
             {errors.length > 0 && (

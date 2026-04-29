@@ -1,67 +1,55 @@
 ## Goal
 
-Add a bulk-upload tool to the Birthday Dashboard (`/staff/marketing/birthdays`) so users can upload a CSV/XLSX file of personnel with their birthdays. Records will be inserted into the same table the birthday system already reads from (`participants_bday_duplicate`), guaranteeing they show up in stats, today's list, and "Send Remaining".
+Make `birth_date` optional in the Birthday bulk upload by auto-deriving it from the Malaysian NRIC (first 6 digits = YYMMDD) when not provided. If both are present, prefer the explicit `birth_date` and warn on mismatch.
 
-## Backend Alignment (no schema changes)
+## How NRIC → Date Works
 
-The existing birthday edge functions (`birthday`, `birthday-log`, `send-remaining`) all read/write `participants_bday_duplicate`. We will write to the same table to stay 100% consistent.
+Malaysian NRIC format: `YYMMDD-PB-####` (12 digits, dashes optional).
+- First 2 digits = year (YY)
+- Next 2 = month (MM, 01–12)
+- Next 2 = day (DD, 01–31)
 
-Columns used by the system:
-- `name` (text, required)
-- `email` (text, required)
-- `nric_number` (text, required by schema)
-- `phone` (text, optional)
-- `birth_date` (date, e.g. 1991-09-23) — used to compute `birth_mmdd`
-- `birth_mmdd` (text MM-DD) — what `birthday` function matches against today
-- `program_name` (text, required)
-- `program_id` (uuid, required) — defaulted to a fixed "Bulk Upload" program if not resolvable
-- `key_skills` (text, optional)
-- `email_sent` (bool, default false)
-- `last_birthday_sent_year` (text, leave null)
-- `registered_at` (timestamptz, default now())
+Year disambiguation (no century in NRIC):
+- Build candidate `19YY` and `20YY`.
+- Pick the one that yields an age between 0 and 100 vs today.
+- If both valid (rare), prefer `19YY` (older — typical for working professionals).
+- If neither valid → row error.
 
-No DB migration needed. RLS already permits inserts in this project context (used by edge functions and admin UI). If insert is blocked from the client, we'll route through a tiny edge function (`bulk-upload-birthdays`) using the service-role key.
+Validation:
+- Strip non-digits, require ≥ 6 digits.
+- Validate MM 1–12 and DD valid for that month/year (handles Feb 29 leap years).
 
-## Upload File Format
+## Changes
 
-Accept `.csv`, `.xlsx`, `.xls`. Required headers (first row):
+### `src/components/marketing/BirthdayBulkUploadCard.tsx`
 
-```text
-name, email, nric_number, phone, birth_date, program_name, key_skills
-```
+1. Add helper `deriveBirthFromNRIC(nric: string): string | null` returning `YYYY-MM-DD` or null.
+2. In row parsing:
+   - Try `normalizeDate(r.birth_date)` first.
+   - If null, fall back to `deriveBirthFromNRIC(nric)`.
+   - If explicit date AND NRIC-derived date both exist and differ → still accept the explicit date but record a soft warning (shown in preview, not blocking).
+   - Only error if BOTH are missing/invalid: `"birth_date missing and could not derive from NRIC"`.
+3. Mark `birth_date` as optional in:
+   - `REQUIRED` array (remove `birth_date`)
+   - Help text under the file input ("birth_date optional if NRIC is a valid Malaysian IC")
+   - Template CSV: keep the column but add a second sample row showing NRIC-only (empty birth_date).
+4. Preview section: show a small badge/note when a row's date was auto-derived (`• Jane Doe — ... — 1990-01-01 (from NRIC)`).
+5. Track counts in the post-parse toast: `"X valid (Y auto-derived from NRIC), Z errors"`.
 
-Rules:
-- `birth_date` accepts `YYYY-MM-DD`, `DD/MM/YYYY`, or Excel date serials. We compute `birth_mmdd` automatically as `MM-DD`.
-- `phone` and `key_skills` are optional.
-- `program_name` required (free text — e.g. "6021 NTW List"). We try to resolve `program_id` from the existing `programs` table by matching `title`; if not found, we fall back to a generated UUID stored in a single "Bulk Upload" program row (created on first use) so the NOT NULL `program_id` constraint is satisfied.
-- Duplicate guard: skip rows where `(email, birth_mmdd)` already exists in the table.
+### No backend / DB changes
 
-## UI Changes
+- `participants_bday_duplicate` schema unchanged.
+- `birth_date` and `birth_mmdd` are still written for every inserted row (derived value used when NRIC-resolved).
+- Edge functions (`birthday`, `send-remaining`) keep working unchanged since they read `birth_mmdd`.
 
-File: `src/pages/BirthdayDashboard.tsx`
+## Edge Cases Handled
 
-Add a new card "Upload Birthday List" alongside the existing cards with:
-- File input (`.csv,.xlsx,.xls`)
-- "Download template" button (generates a sample CSV client-side)
-- Preview: shows row count + first 3 rows after parsing
-- "Upload" button → parses with `xlsx` (already used in `BulkUploadForm.tsx`), validates, inserts in batches of 200
-- Result toast: `Inserted X, Skipped Y duplicates, Z errors`
-- After success, calls `fetchStats()` to refresh dashboard
-
-New helper file: `src/components/marketing/BirthdayBulkUploadCard.tsx` (keeps `BirthdayDashboard.tsx` clean).
-
-## Validation & Errors
-
-Per-row validation surfaces a downloadable error report (CSV) listing row number + reason for any rejected rows (missing email, bad date, missing program_name, etc.). Valid rows still get inserted.
+- NRIC with dashes / spaces (`900101-01-5555`) — stripped before parsing.
+- Invalid month/day (e.g. `991332...`) → row error if no explicit `birth_date`.
+- Non-Malaysian / passport IDs (letters, < 6 digits) → row error if no explicit `birth_date`.
+- Future-dated NRIC → rejected via age range check.
 
 ## Out of Scope
 
-- No edits to existing edge functions.
-- No changes to `participants_bday` (legacy table) — only `participants_bday_duplicate`.
-- No new auth/role rules.
-
-## Files to Add / Edit
-
-- Add: `src/components/marketing/BirthdayBulkUploadCard.tsx`
-- Edit: `src/pages/BirthdayDashboard.tsx` (mount the new card)
-- Optional (only if client insert is RLS-blocked at runtime): add `supabase/functions/bulk-upload-birthdays/index.ts` and register it in `supabase/config.toml`.
+- Gender / state extraction from NRIC (not needed by the birthday system).
+- Backfilling birthdays for existing rows already in the DB (separate task if needed).

@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Calendar, Mail, Users } from 'lucide-react';
+import BirthdayBulkUploadCard from '@/components/marketing/BirthdayBulkUploadCard';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -296,6 +297,8 @@ const BirthdayDashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      <BirthdayBulkUploadCard onUploaded={fetchStats} />
 
       {/* Yearly Overview Chart */}
       <Card>

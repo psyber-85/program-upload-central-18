@@ -110,7 +110,7 @@ class EntriesSupabaseRepo implements EntriesRepo {
 
     const { error } = await supabase
       .from('sp_invoices')
-      .update(updateData)
+      .update(updateData as never)
       .eq('id', id);
 
     if (error) return null;
@@ -124,7 +124,7 @@ class EntriesSupabaseRepo implements EntriesRepo {
 
     const { error } = await supabase
       .from('sp_invoices')
-      .update(updateData)
+      .update(updateData as never)
       .eq('id', id);
 
     if (error) return null;
@@ -276,7 +276,7 @@ class EntriesSupabaseRepo implements EntriesRepo {
 
     const { error } = await supabase
       .from('sp_quotations')
-      .update(updateData)
+      .update(updateData as never)
       .eq('id', id);
 
     if (error) return null;
@@ -421,7 +421,7 @@ class EntriesSupabaseRepo implements EntriesRepo {
 
     const { error } = await supabase
       .from('sp_bills')
-      .update(updateData)
+      .update(updateData as never)
       .eq('id', id);
 
     if (error) return null;
@@ -435,7 +435,7 @@ class EntriesSupabaseRepo implements EntriesRepo {
 
     const { error } = await supabase
       .from('sp_bills')
-      .update(updateData)
+      .update(updateData as never)
       .eq('id', id);
 
     if (error) return null;
@@ -548,7 +548,7 @@ class EntriesSupabaseRepo implements EntriesRepo {
 
     const { error } = await supabase
       .from('sp_purchase_orders')
-      .update(updateData)
+      .update(updateData as never)
       .eq('id', id);
 
     if (error) return null;

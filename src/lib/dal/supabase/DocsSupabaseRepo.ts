@@ -79,7 +79,7 @@ class DocsSupabaseRepo implements DocsRepo {
 
     const { error } = await supabase
       .from('sp_doc_links')
-      .update(updateData)
+      .update(updateData as never)
       .eq('id', id);
 
     if (error) return null;

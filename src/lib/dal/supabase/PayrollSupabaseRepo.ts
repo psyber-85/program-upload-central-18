@@ -61,7 +61,7 @@ class PayrollSupabaseRepo implements PayrollRepo {
 
     const { data, error } = await supabase
       .from('sp_payroll_runs')
-      .update(updateData)
+      .update(updateData as never)
       .eq('id', id)
       .select()
       .single();
@@ -157,7 +157,7 @@ class PayrollSupabaseRepo implements PayrollRepo {
 
     const { data, error } = await supabase
       .from('sp_payroll_items')
-      .update(updateData)
+      .update(updateData as never)
       .eq('id', id)
       .select()
       .single();

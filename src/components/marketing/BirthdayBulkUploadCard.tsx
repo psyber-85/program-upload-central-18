@@ -21,6 +21,8 @@ interface ParsedRow {
   birth_mmdd: string; // MM-DD
   program_name: string;
   key_skills: string | null;
+  derived_from_nric?: boolean;
+  mismatch_warning?: string;
 }
 
 interface RowError {
@@ -29,10 +31,42 @@ interface RowError {
   data: any;
 }
 
-const REQUIRED = ['name', 'email', 'nric_number', 'birth_date', 'program_name'];
+const REQUIRED = ['name', 'email', 'nric_number', 'program_name'];
 const TEMPLATE_HEADERS = ['name', 'email', 'nric_number', 'phone', 'birth_date', 'program_name', 'key_skills'];
 
 const pad = (n: number) => n.toString().padStart(2, '0');
+
+function deriveBirthFromNRIC(nric: string): string | null {
+  const digits = (nric || '').replace(/\D/g, '');
+  if (digits.length < 6) return null;
+  const yy = parseInt(digits.slice(0, 2), 10);
+  const mm = parseInt(digits.slice(2, 4), 10);
+  const dd = parseInt(digits.slice(4, 6), 10);
+  if (isNaN(yy) || isNaN(mm) || isNaN(dd)) return null;
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const candidates = [1900 + yy, 2000 + yy];
+  const valid: number[] = [];
+  for (const yyyy of candidates) {
+    const d = new Date(yyyy, mm - 1, dd);
+    if (
+      d.getFullYear() === yyyy &&
+      d.getMonth() === mm - 1 &&
+      d.getDate() === dd
+    ) {
+      const age = currentYear - yyyy;
+      if (age >= 0 && age <= 100 && d.getTime() <= today.getTime()) {
+        valid.push(yyyy);
+      }
+    }
+  }
+  if (!valid.length) return null;
+  // Prefer 19YY when both valid (typical working age)
+  const chosen = valid.includes(1900 + yy) ? 1900 + yy : valid[0];
+  return `${chosen}-${pad(mm)}-${pad(dd)}`;
+}
 
 function normalizeDate(input: any): string | null {
   if (input == null || input === '') return null;

@@ -148,13 +148,20 @@ const BirthdayBulkUploadCard: React.FC<Props> = ({ onUploaded }) => {
         const email = String(r.email ?? '').trim();
         const nric = String(r.nric_number ?? '').trim();
         const programName = String(r.program_name ?? '').trim();
-        const dateStr = normalizeDate(r.birth_date);
+        const explicitDate = normalizeDate(r.birth_date);
+        const nricDate = nric ? deriveBirthFromNRIC(nric) : null;
+        const dateStr = explicitDate || nricDate;
+        const derivedFromNric = !explicitDate && !!nricDate;
+        const mismatch =
+          explicitDate && nricDate && explicitDate !== nricDate
+            ? `birth_date (${explicitDate}) differs from NRIC-derived (${nricDate})`
+            : undefined;
 
         if (!name) return errs.push({ row: rowNum, reason: 'Missing name', data: raw });
         if (!email || !email.includes('@')) return errs.push({ row: rowNum, reason: 'Invalid email', data: raw });
         if (!nric) return errs.push({ row: rowNum, reason: 'Missing nric_number', data: raw });
         if (!programName) return errs.push({ row: rowNum, reason: 'Missing program_name', data: raw });
-        if (!dateStr) return errs.push({ row: rowNum, reason: 'Invalid birth_date (use YYYY-MM-DD)', data: raw });
+        if (!dateStr) return errs.push({ row: rowNum, reason: 'birth_date missing and could not derive from NRIC', data: raw });
 
         const [, mm, dd] = dateStr.split('-');
         valid.push({
@@ -166,12 +173,18 @@ const BirthdayBulkUploadCard: React.FC<Props> = ({ onUploaded }) => {
           birth_mmdd: `${mm}-${dd}`,
           program_name: programName,
           key_skills: r.key_skills ? String(r.key_skills).trim() : null,
+          derived_from_nric: derivedFromNric,
+          mismatch_warning: mismatch,
         });
       });
 
       setRows(valid);
       setErrors(errs);
-      toast({ title: 'File parsed', description: `${valid.length} valid rows, ${errs.length} errors` });
+      const derivedCount = valid.filter(v => v.derived_from_nric).length;
+      toast({
+        title: 'File parsed',
+        description: `${valid.length} valid${derivedCount ? ` (${derivedCount} auto-derived from NRIC)` : ''}, ${errs.length} errors`,
+      });
     } catch (err: any) {
       toast({ title: 'Parse failed', description: err.message, variant: 'destructive' });
       setFile(null);

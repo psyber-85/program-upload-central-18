@@ -154,7 +154,7 @@ export const updateCrmLeadField = async (
 
   const { error } = await supabase
     .from('crm_leads')
-    .update({ [dbField]: value })
+    .update({ [dbField]: value } as never)
     .eq('id', leadId);
 
   if (error) {

@@ -149,7 +149,7 @@ class StaffSupabaseRepo implements StaffRepo {
 
     const { error } = await supabase
       .from('sp_staff_profiles')
-      .update(updateData)
+      .update(updateData as never)
       .eq('id', id);
 
     if (error) {
@@ -218,7 +218,7 @@ class StaffSupabaseRepo implements StaffRepo {
 
     const { error } = await supabase
       .from('sp_leave_balances')
-      .update(updateData)
+      .update(updateData as never)
       .eq('user_id', userId)
       .eq('year', year);
 
@@ -284,7 +284,7 @@ class StaffSupabaseRepo implements StaffRepo {
 
     const { error } = await supabase
       .from('sp_training_entitlements')
-      .update(updateData)
+      .update(updateData as never)
       .eq('user_id', userId);
 
     if (error) return null;

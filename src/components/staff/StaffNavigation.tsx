@@ -58,6 +58,7 @@ const StaffNavigation = () => {
                     </Link>
                   </NavigationMenuLink>
                 </NavigationMenuItem>
+                {/* Temporarily hidden: CRM Campaign Tracker
                 <NavigationMenuItem>
                   <NavigationMenuLink asChild>
                     <Link
@@ -71,6 +72,7 @@ const StaffNavigation = () => {
                     </Link>
                   </NavigationMenuLink>
                 </NavigationMenuItem>
+                */}
               </NavigationMenuList>
             </NavigationMenu>
           </div>

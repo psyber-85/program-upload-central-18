@@ -25,13 +25,14 @@ const tools = [
     href: '/staff/marketing/register-tracker',
     color: 'text-green-600',
   },
-  {
-    title: 'CRM Campaign Tracker',
-    description: 'Manage campaigns, leads, and track sales activities',
-    icon: Target,
-    href: '/staff/marketing/crm-tracker',
-    color: 'text-purple-600',
-  },
+  // Temporarily hidden: CRM Campaign Tracker
+  // {
+  //   title: 'CRM Campaign Tracker',
+  //   description: 'Manage campaigns, leads, and track sales activities',
+  //   icon: Target,
+  //   href: '/staff/marketing/crm-tracker',
+  //   color: 'text-purple-600',
+  // },
 ];
 
 const MarketingDashboard = () => {

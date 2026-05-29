@@ -60,7 +60,7 @@ const ProspectTable: React.FC<ProspectTableProps> = ({ programId }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-  const [prospectsPerPage] = useState(10);
+  const [prospectsPerPage, setProspectsPerPage] = useState(20);
   const [showSecondaryColumns, setShowSecondaryColumns] = useState(false);
   const [addProspectModalOpen, setAddProspectModalOpen] = useState(false);
   const { toast } = useToast();

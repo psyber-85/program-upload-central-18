@@ -690,42 +690,61 @@ const ProspectTable: React.FC<ProspectTableProps> = ({ programId }) => {
         </Table>
       </div>
 
-      {/* Smart Pagination */}
-      {totalPages > 1 && (
-        <div className="p-4 border-t">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious 
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                />
-              </PaginationItem>
-              
-              {getVisiblePages().map((page, index) => (
-                <PaginationItem key={index}>
-                  {page === '...' ? (
-                    <PaginationEllipsis />
-                  ) : (
-                    <PaginationLink
-                      onClick={() => setCurrentPage(page as number)}
-                      isActive={currentPage === page}
-                      className="cursor-pointer"
-                    >
-                      {page}
-                    </PaginationLink>
-                  )}
+      {/* Pagination + Rows-per-page */}
+      {filteredProspects.length > 0 && (
+        <div className="p-4 border-t flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Rows per page:</span>
+            <Select
+              value={String(prospectsPerPage)}
+              onValueChange={(v) => setProspectsPerPage(Number(v))}
+            >
+              <SelectTrigger className="w-[80px] h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="20">20</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {totalPages > 1 && (
+            <Pagination className="mx-0 w-auto justify-end">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
                 </PaginationItem>
-              ))}
-              
-              <PaginationItem>
-                <PaginationNext 
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
+
+                {getVisiblePages().map((page, index) => (
+                  <PaginationItem key={index}>
+                    {page === '...' ? (
+                      <PaginationEllipsis />
+                    ) : (
+                      <PaginationLink
+                        onClick={() => setCurrentPage(page as number)}
+                        isActive={currentPage === page}
+                        className="cursor-pointer"
+                      >
+                        {page}
+                      </PaginationLink>
+                    )}
+                  </PaginationItem>
+                ))}
+
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
         </div>
       )}
 

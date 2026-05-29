@@ -169,7 +169,7 @@ const ProspectTable: React.FC<ProspectTableProps> = ({ programId }) => {
   // Separate useEffect to handle filter changes that should reset page
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm, statusFilter, prospectsPerPage]);
 
   const fetchProspects = async () => {
     try {

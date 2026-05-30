@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -10,14 +11,17 @@ import { onboardingRepo } from '@/lib/internal-hub/repos/onboardingRepo';
 import { deriveOnboardingState } from '@/lib/internal-hub/lifecycle';
 import StaffStatusBadge from '@/components/internal-hub/StaffStatusBadge';
 import OnboardingStateBadge from '@/components/internal-hub/OnboardingStateBadge';
+import type { StaffProfile } from '@/lib/internal-hub/types';
 
 const AdminStaffList = () => {
-  const [tick] = useState(0);
-  const all = useMemo(() => staffRepo.list(), [tick]);
+  const { data: all = [], isLoading } = useQuery({
+    queryKey: ['ih-staff-list'],
+    queryFn: () => staffRepo.list(),
+  });
   const active = all.filter((s) => s.status === 'Active');
   const inactive = all.filter((s) => s.status === 'Inactive');
 
-  const renderRows = (rows: typeof all) => (
+  const renderRows = (rows: StaffProfile[]) => (
     <Table>
       <TableHeader>
         <TableRow>
@@ -73,14 +77,20 @@ const AdminStaffList = () => {
 
       <Card>
         <CardContent className="p-2 sm:p-4">
-          <Tabs defaultValue="active">
-            <TabsList>
-              <TabsTrigger value="active">Active ({active.length})</TabsTrigger>
-              <TabsTrigger value="inactive">Inactive ({inactive.length})</TabsTrigger>
-            </TabsList>
-            <TabsContent value="active" className="mt-3">{renderRows(active)}</TabsContent>
-            <TabsContent value="inactive" className="mt-3">{renderRows(inactive)}</TabsContent>
-          </Tabs>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading staff…
+            </div>
+          ) : (
+            <Tabs defaultValue="active">
+              <TabsList>
+                <TabsTrigger value="active">Active ({active.length})</TabsTrigger>
+                <TabsTrigger value="inactive">Inactive ({inactive.length})</TabsTrigger>
+              </TabsList>
+              <TabsContent value="active" className="mt-3">{renderRows(active)}</TabsContent>
+              <TabsContent value="inactive" className="mt-3">{renderRows(inactive)}</TabsContent>
+            </Tabs>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -96,7 +96,7 @@ export const payrollRepo = {
   getOrCreateDraft(month: string): PayrollRun {
     const existing = this.getForMonth(month);
     if (existing) return existing;
-    const active = staffRepo.list().filter((s) => s.status === 'Active');
+    const active = staffRepo.listCached().filter((s) => s.status === 'Active');
     const run: PayrollRun = {
       id: uid('pr'),
       month,
@@ -115,7 +115,7 @@ export const payrollRepo = {
     const run = runs.find((r) => r.id === runId);
     if (!run) return;
     if (run.status === 'Finalized' || run.status === 'Locked') return run;
-    const s = staffRepo.get(staffId);
+    const s = staffRepo.getCached(staffId);
     if (!s) return run;
     const fresh = buildItem(s, run.month);
     // Preserve any existing manual adjustment + notes.

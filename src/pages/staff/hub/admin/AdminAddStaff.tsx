@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
 import StaffFormFields, { StaffFormValues } from '@/components/internal-hub/StaffFormFields';
 import { staffRepo } from '@/lib/internal-hub/repos/staffRepo';
 import { onboardingRepo } from '@/lib/internal-hub/repos/onboardingRepo';
@@ -24,22 +26,32 @@ const empty: StaffFormValues = {
 
 const AdminAddStaff = () => {
   const [values, setValues] = useState<StaffFormValues>(empty);
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!values.fullName || !values.email) {
       toast({ title: 'Name and email are required', variant: 'destructive' });
       return;
     }
-    const created = staffRepo.create(values);
-    // Doc 0.2 §7 — initialize lifecycle artefacts.
-    onboardingRepo.init(created.id);
-    toolAccessRepo.init(created.id);
-    welcomeEmailRepo.queue(created.id);
-    toast({ title: 'Staff created', description: `${created.fullName} is Active. Onboarding initialized.` });
-    navigate(`/staff/admin/staff/${created.id}`);
+    setSubmitting(true);
+    try {
+      const created = await staffRepo.create(values);
+      // Doc 0.2 §7 — initialize lifecycle artefacts (still local until Sub-batch 2D).
+      onboardingRepo.init(created.id);
+      toolAccessRepo.init(created.id);
+      welcomeEmailRepo.queue(created.id);
+      toast({ title: 'Staff invited', description: `${created.fullName} will receive an email invite.` });
+      queryClient.invalidateQueries({ queryKey: ['ih-staff-list'] });
+      navigate(`/staff/admin/staff/${created.id}`);
+    } catch (err) {
+      toast({ title: 'Create failed', description: String((err as Error).message), variant: 'destructive' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -47,7 +59,7 @@ const AdminAddStaff = () => {
       <header className="mb-4">
         <h1 className="text-2xl font-semibold text-foreground">Add staff</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          New staff become Active with onboarding in progress. No passwords are stored anywhere.
+          New staff receive an email invite. No passwords are stored anywhere.
         </p>
       </header>
       <form onSubmit={handleSubmit}>
@@ -58,8 +70,11 @@ const AdminAddStaff = () => {
           </CardContent>
         </Card>
         <div className="mt-4 flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => navigate('/staff/admin/staff')}>Cancel</Button>
-          <Button type="submit">Create staff</Button>
+          <Button type="button" variant="outline" onClick={() => navigate('/staff/admin/staff')} disabled={submitting}>Cancel</Button>
+          <Button type="submit" disabled={submitting}>
+            {submitting && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+            Create staff
+          </Button>
         </div>
       </form>
     </div>

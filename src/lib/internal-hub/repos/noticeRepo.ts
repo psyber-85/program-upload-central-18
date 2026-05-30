@@ -90,11 +90,11 @@ export const noticeRepo = {
     saveNotices([notice, ...all]);
 
     // Doc 1.2 §12 — persist a broadcast log entry for the (future) email fanout.
-    // Lazy import staffRepo to avoid a circular dependency.
+    // Use cached staff list (warmed by StaffHome/AdminStaffList queries).
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { staffRepo } = require('./staffRepo') as typeof import('./staffRepo');
     const recipientCount = staffRepo
-      .list()
+      .listCached()
       .filter((s) => s.status === 'Active' && audienceMatches(notice.audience, s))
       .length;
     const log = readJSON<BroadcastLogEntry[]>(KEY_BROADCAST_LOG, []);

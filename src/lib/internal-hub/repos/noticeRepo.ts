@@ -1,5 +1,6 @@
 // Doc 1.2 — notices, broadcasts, ack tracking. Local-only.
 import type {
+  BroadcastLogEntry,
   Notice,
   NoticeAck,
   NoticeAudience,
@@ -15,6 +16,7 @@ import { SEED_NOTICES } from '../seedNotices';
 const KEY_NOTICES = 'notices';
 const KEY_READS = 'notice-reads';
 const KEY_ACKS = 'notice-acks';
+const KEY_BROADCAST_LOG = 'notice-broadcast-log';
 
 function loadNotices(): Notice[] {
   const existing = readJSON<Notice[] | null>(KEY_NOTICES, null);
@@ -86,7 +88,35 @@ export const noticeRepo = {
       archived: false,
     };
     saveNotices([notice, ...all]);
+
+    // Doc 1.2 §12 — persist a broadcast log entry for the (future) email fanout.
+    // Lazy import staffRepo to avoid a circular dependency.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { staffRepo } = require('./staffRepo') as typeof import('./staffRepo');
+    const recipientCount = staffRepo
+      .list()
+      .filter((s) => s.status === 'Active' && audienceMatches(notice.audience, s))
+      .length;
+    const log = readJSON<BroadcastLogEntry[]>(KEY_BROADCAST_LOG, []);
+    const entry: BroadcastLogEntry = {
+      id: uid('blog'),
+      noticeId: notice.id,
+      createdBy: notice.createdBy,
+      createdAt: now,
+      audience: notice.audience,
+      recipientCount,
+      emailRequired: true,
+    };
+    writeJSON(KEY_BROADCAST_LOG, [entry, ...log]);
+
     return notice;
+  },
+  /** Doc 1.2 §12 — list all broadcast log entries (most recent first). */
+  listBroadcastLog(): BroadcastLogEntry[] {
+    return readJSON<BroadcastLogEntry[]>(KEY_BROADCAST_LOG, []);
+  },
+  broadcastLogFor(noticeId: string): BroadcastLogEntry | undefined {
+    return this.listBroadcastLog().find((e) => e.noticeId === noticeId);
   },
   /** Limited edit per §21 — title/message/links only. */
   edit(id: string, patch: Pick<Partial<Notice>, 'title' | 'message' | 'links'>): Notice | undefined {

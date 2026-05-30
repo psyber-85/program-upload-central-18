@@ -1,13 +1,17 @@
-import React from 'react';
-import { Check, CircleDashed, ShieldCheck, UserCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { Check, CircleDashed, ShieldCheck, UserCheck, ExternalLink, Link2, Pencil } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { ChecklistItem, ChecklistStatus } from '@/lib/internal-hub/types';
 
 interface Props {
   item: ChecklistItem;
   viewerIsAdmin: boolean;
   onChange: (status: ChecklistStatus) => void;
+  onLinkChange?: (link: string | null) => void;
 }
 
 const statusOptions: { value: ChecklistStatus; label: string }[] = [
@@ -29,7 +33,47 @@ const statusIcon = (s: ChecklistStatus) => {
   }
 };
 
-const ChecklistItemRow = ({ item, viewerIsAdmin, onChange }: Props) => {
+const LinkEditor = ({ value, onSave }: { value?: string; onSave: (v: string | null) => void }) => {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(value ?? '');
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) setDraft(value ?? ''); }}>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Edit link">
+          {value ? <Pencil className="h-3.5 w-3.5" /> : <Link2 className="h-3.5 w-3.5" />}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-3 space-y-2" align="end">
+        <div className="text-xs font-medium text-foreground">Reference link</div>
+        <Input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="https://…"
+          className="h-8 text-sm"
+        />
+        <div className="flex justify-between gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => { onSave(null); setOpen(false); }}
+          >
+            Clear
+          </Button>
+          <Button
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => { onSave(draft.trim() || null); setOpen(false); }}
+          >
+            Save
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+const ChecklistItemRow = ({ item, viewerIsAdmin, onChange, onLinkChange }: Props) => {
   // Staff can only flip pending <-> staff-checked on their own items.
   const allowed: ChecklistStatus[] = viewerIsAdmin
     ? ['pending', 'staff-checked', 'admin-verified', 'complete']
@@ -42,7 +86,20 @@ const ChecklistItemRow = ({ item, viewerIsAdmin, onChange }: Props) => {
       <div className="flex items-center gap-2 min-w-0">
         {statusIcon(item.status)}
         <div className="min-w-0">
-          <div className="text-sm text-foreground truncate">{item.label}</div>
+          <div className="text-sm text-foreground truncate flex items-center gap-1.5">
+            {item.label}
+            {item.link && (
+              <a
+                href={item.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline inline-flex"
+                aria-label={`Open reference for ${item.label}`}
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            )}
+          </div>
           <div className="text-xs text-muted-foreground capitalize">{item.owner} task</div>
         </div>
       </div>
@@ -50,6 +107,9 @@ const ChecklistItemRow = ({ item, viewerIsAdmin, onChange }: Props) => {
         <Badge variant="outline" className="hidden sm:inline-flex">
           {statusOptions.find((o) => o.value === item.status)?.label}
         </Badge>
+        {viewerIsAdmin && onLinkChange && (
+          <LinkEditor value={item.link} onSave={onLinkChange} />
+        )}
         {allowed.length > 0 ? (
           <Select value={item.status} onValueChange={(v) => onChange(v as ChecklistStatus)}>
             <SelectTrigger className="h-8 w-[150px]">

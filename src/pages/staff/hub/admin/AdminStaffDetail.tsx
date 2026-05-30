@@ -192,6 +192,7 @@ const AdminStaffDetail = () => {
                   item={item}
                   viewerIsAdmin={viewerIsAdmin}
                   onChange={(status) => { onboardingRepo.setItemStatus(staff.id, item.key, status, currentStaff?.fullName); bump(); }}
+                  onLinkChange={(link) => { onboardingRepo.setItemLink(staff.id, item.key, link); bump(); }}
                 />
               ))}
             </CardContent>

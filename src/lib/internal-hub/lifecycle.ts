@@ -21,17 +21,17 @@ export function isNotionUnlocked(joinDate: string, now = new Date()): boolean {
 }
 
 // Doc 0.2 §9
-const DEFAULT_ONBOARDING: Array<Pick<ChecklistItem, 'key' | 'label' | 'owner'>> = [
+const DEFAULT_ONBOARDING: Array<Pick<ChecklistItem, 'key' | 'label' | 'owner' | 'link'>> = [
   { key: 'portal_account', label: 'Portal account created', owner: 'admin' },
   { key: 'salary_settings', label: 'Salary settings added', owner: 'admin' },
   { key: 'leave_balance_init', label: 'Leave balance initialized', owner: 'admin' },
   { key: 'training_fund_timer', label: 'Training fund timer started', owner: 'admin' },
-  { key: 'youtube_training', label: 'YouTube Training available', owner: 'staff' },
+  { key: 'youtube_training', label: 'YouTube Training available', owner: 'staff', link: 'https://youtube.com/@aihq' },
   { key: 'notion_unlock_set', label: 'Notion unlock date set', owner: 'admin' },
   { key: 'tools_checklist', label: 'Company tools checklist created', owner: 'admin' },
   { key: 'insurance_status', label: 'Insurance status recorded', owner: 'admin' },
   { key: 'welcome_email', label: 'Welcome email sent or queued', owner: 'admin' },
-  { key: 'aihq_ways', label: 'AIHQ Ways of Working assigned', owner: 'staff' },
+  { key: 'aihq_ways', label: 'AIHQ Ways of Working assigned', owner: 'staff', link: 'https://www.notion.so/aihq-ways' },
   { key: 'onboarding_videos', label: 'Onboarding videos assigned', owner: 'staff' },
   { key: 'onboarding_quiz', label: 'Onboarding quiz assigned', owner: 'staff' },
   { key: 'sop_policy_links', label: 'Relevant SOP/policy links assigned', owner: 'staff' },

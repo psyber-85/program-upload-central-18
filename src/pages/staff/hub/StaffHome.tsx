@@ -156,25 +156,6 @@ const StaffHome = () => {
         <SectionsGrid isAdmin={isAdmin} />
       </section>
 
-      {/* Dev impersonation — discreet footer */}
-      <Card className="border-dashed">
-        <CardContent className="flex flex-col sm:flex-row sm:items-center gap-3 p-3">
-          <span className="text-xs uppercase tracking-wide text-muted-foreground">Dev: view as</span>
-          <Select
-            value={impersonatedId ?? currentStaff.id}
-            onValueChange={(v) => { impersonate(v); setTick((t) => t + 1); }}
-          >
-            <SelectTrigger className="h-8 max-w-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {allStaff.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.fullName} — {s.role}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
     </div>
   );
 };

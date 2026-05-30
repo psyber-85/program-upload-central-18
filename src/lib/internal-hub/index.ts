@@ -10,3 +10,7 @@ export { noticeRepo, audienceMatches } from './repos/noticeRepo';
 export { resourceRepo } from './repos/resourceRepo';
 export { requestSummaryRepo } from './repos/requestSummaryRepo';
 export { payslipSummaryRepo } from './repos/payslipSummaryRepo';
+export { claimRepo } from './repos/claimRepo';
+export { payrollRepo, computeNetPay } from './repos/payrollRepo';
+export { payslipRepo } from './repos/payslipRepo';
+export { financeSnapshotRepo } from './repos/financeSnapshotRepo';

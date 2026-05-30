@@ -1,15 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   CalendarPlus, FileHeart, FileText, GraduationCap, Heart, MoreHorizontal, Receipt, Mail,
   Megaphone, ClipboardCheck, UserPlus, Banknote, BarChart3, BookOpen,
 } from 'lucide-react';
 import { useHub } from '@/lib/internal-hub/HubContext';
 import {
-  noticeRepo, resourceRepo, requestSummaryRepo, payslipSummaryRepo, onboardingRepo, staffRepo,
+  noticeRepo, resourceRepo, requestSummaryRepo, payslipRepo, onboardingRepo, staffRepo,
+  payrollRepo, financeSnapshotRepo,
 } from '@/lib/internal-hub';
 import { canAccessAdminArea } from '@/lib/internal-hub/access';
 import { checklistProgress } from '@/lib/internal-hub/lifecycle';
-import { IT_SUPPORT_EMAIL } from '@/lib/internal-hub/types';
+import { IT_SUPPORT_EMAIL, PAYROLL_STATUS_LABELS, FINANCE_STATUS_LABELS } from '@/lib/internal-hub/types';
 import SummaryCard from '@/components/internal-hub/home/SummaryCard';
 import QuickActionsGrid, { QuickActionItem } from '@/components/internal-hub/home/QuickActionsGrid';
 import LatestNoticesPreview from '@/components/internal-hub/home/LatestNoticesPreview';
@@ -36,9 +37,17 @@ const StaffHome = () => {
     [currentStaff?.id, tick],
   );
   const payslips = useMemo(
-    () => (currentStaff ? payslipSummaryRepo.listForStaff(currentStaff.id, 2) : []),
+    () => (currentStaff ? payslipRepo.listForStaff(currentStaff.id, 2) : []),
     [currentStaff?.id, tick],
   );
+
+  // Doc 3.1 §7 — idempotent payroll reminder (admin, after the 25th).
+  useEffect(() => {
+    if (!currentStaff || !isAdmin) return;
+    const d = new Date();
+    const m = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+    payrollRepo.ensureReminderForMonth(m, currentStaff.id);
+  }, [currentStaff?.id, isAdmin]);
 
   if (!currentStaff) return null;
 
@@ -56,18 +65,27 @@ const StaffHome = () => {
       }).length
     : 0;
 
+  const month = (() => {
+    const d = new Date();
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  })();
+  const payrollStatus = PAYROLL_STATUS_LABELS[payrollRepo.statusFor(month)];
+  const financeStatusRaw = financeSnapshotRepo.statusFor(month);
+  const financeStatus = financeStatusRaw === 'NotStarted' ? 'Not Started' : FINANCE_STATUS_LABELS[financeStatusRaw];
+  const latestPayslip = payslips[0];
+
   const summaries = isAdmin
     ? [
         { title: 'Pending Approvals', value: pendingApprovals, tone: pendingApprovals > 0 ? 'attention' : 'muted', to: '/staff/admin/approvals' },
         { title: 'Staff Onboarding', value: inProgressOnboardings, caption: 'in progress', tone: 'default', to: '/staff/admin/staff' },
-        { title: 'Payroll Status', value: 'Draft', caption: 'this month', tone: 'muted', to: '/staff/admin/payroll' },
-        { title: 'Ack Required', value: ackPending, tone: ackPending > 0 ? 'attention' : 'muted', to: '/staff/notices' },
+        { title: 'Payroll', value: payrollStatus, caption: month, tone: 'muted', to: '/staff/admin/payroll' },
+        { title: 'Finance Snapshot', value: financeStatus, caption: month, tone: 'muted', to: '/staff/admin/finance' },
       ] as const
     : [
         { title: 'My Pending Actions', value: ackPending + myPendingRequests, tone: ackPending + myPendingRequests > 0 ? 'attention' : 'success', caption: ackPending + myPendingRequests === 0 ? "You're all caught up." : undefined, to: '/staff/notices' },
         { title: 'My Requests', value: myPendingRequests, caption: 'pending', tone: 'muted', to: '/staff/requests' },
         { title: 'Notices / Ack', value: unread, caption: ackPending > 0 ? `${ackPending} ack required` : undefined, tone: ackPending > 0 ? 'attention' : 'muted', to: '/staff/notices' },
-        { title: 'Payslip Status', value: payslipSummaryRepo.latestStatusFor(currentStaff.id), tone: 'muted', to: '/staff/payslips' },
+        { title: 'Payslip Status', value: latestPayslip ? latestPayslip.availability : 'No payslip', tone: 'muted', to: '/staff/payslips' },
       ] as const;
 
   const staffActions: QuickActionItem[] = [

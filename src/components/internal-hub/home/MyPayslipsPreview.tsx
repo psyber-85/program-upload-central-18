@@ -5,16 +5,22 @@ import { Button } from '@/components/ui/button';
 import { Receipt } from 'lucide-react';
 import type { Payslip } from '@/lib/internal-hub/types';
 
-const MyPayslipsPreview = ({ items }: { items: Payslip[] }) => (
+const MyPayslipsPreview = ({ items, disabled = false }: { items: Payslip[]; disabled?: boolean }) => (
   <Card>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle className="text-base">My Payslips</CardTitle>
-      <Button asChild variant="ghost" size="sm" className="h-7 text-xs">
-        <Link to="/staff/payslips">View all</Link>
-      </Button>
+      {!disabled && (
+        <Button asChild variant="ghost" size="sm" className="h-7 text-xs">
+          <Link to="/staff/payslips">View all</Link>
+        </Button>
+      )}
     </CardHeader>
     <CardContent className="pt-0">
-      {items.length === 0 ? (
+      {disabled ? (
+        <div className="py-6 text-center text-xs text-muted-foreground">
+          Payslip access deactivated. Contact HR.
+        </div>
+      ) : items.length === 0 ? (
         <div className="py-6 flex flex-col items-center text-center gap-2">
           <Receipt className="h-6 w-6 text-muted-foreground" />
           <div className="text-sm text-muted-foreground">No payslips available yet</div>

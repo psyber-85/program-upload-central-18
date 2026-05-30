@@ -2,6 +2,10 @@
 // Async API. RLS enforces admin-only writes; staff can only read own row.
 // Create flow uses the ih-create-staff edge function (sends invite email).
 // Deactivation uses ih-deactivate-staff (also revokes sessions).
+//
+// Transitional sync helpers (`listCached`, `getCached`) are provided so other
+// repos that haven't been converted yet (payrollRepo, noticeRepo) keep
+// working. Components should prefer the async methods.
 import { supabase } from '@/integrations/supabase/client';
 import type { StaffProfile } from '../types';
 
@@ -47,9 +51,12 @@ function mapRow(r: DbRow): StaffProfile {
   };
 }
 
-function toBusinessArmDb(arm: StaffProfile['businessArm']) {
+function toBusinessArmDb(arm: StaffProfile['businessArm']): 'Training' | 'Solutions' | 'Both' {
   return arm === 'Solutions' ? 'Solutions' : arm === 'Admin/General' ? 'Both' : 'Training';
 }
+
+// In-memory cache populated on every async list() — used by transitional sync helpers.
+let _cache: StaffProfile[] = [];
 
 export const staffRepo = {
   async list(): Promise<StaffProfile[]> {
@@ -58,7 +65,14 @@ export const staffRepo = {
       .select('*')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return (data as DbRow[] | null)?.map(mapRow) ?? [];
+    const mapped = (data as DbRow[] | null)?.map(mapRow) ?? [];
+    _cache = mapped;
+    return mapped;
+  },
+
+  /** Last-known list (sync, may be stale or empty). Used by other repos pre-conversion. */
+  listCached(): StaffProfile[] {
+    return _cache;
   },
 
   async get(id: string): Promise<StaffProfile | undefined> {
@@ -69,6 +83,11 @@ export const staffRepo = {
       .maybeSingle();
     if (error) throw error;
     return data ? mapRow(data as DbRow) : undefined;
+  },
+
+  /** Sync read from cache only. */
+  getCached(id: string): StaffProfile | undefined {
+    return _cache.find((s) => s.id === id);
   },
 
   async getByEmail(email: string): Promise<StaffProfile | undefined> {
@@ -100,12 +119,13 @@ export const staffRepo = {
     if (input.baseSalary || input.epfRate || input.socsoRate || input.adminNotes) {
       await supabase
         .from('ih_staff_profiles')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .update({
           salary_base: input.baseSalary,
           epf_rate: input.epfRate,
           socso_rate: input.socsoRate,
           admin_notes: input.adminNotes ?? null,
-        })
+        } as any)
         .eq('id', data.user_id);
     }
 
@@ -115,7 +135,8 @@ export const staffRepo = {
   },
 
   async update(id: string, patch: Partial<StaffProfile>): Promise<StaffProfile | undefined> {
-    const dbPatch: Record<string, unknown> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dbPatch: any = {};
     if (patch.fullName !== undefined) dbPatch.name = patch.fullName;
     if (patch.email !== undefined) dbPatch.email = patch.email;
     if (patch.role !== undefined) dbPatch.role = patch.role === 'Admin' ? 'admin' : 'staff';
@@ -147,7 +168,8 @@ export const staffRepo = {
   async reactivate(id: string): Promise<StaffProfile | undefined> {
     const { error } = await supabase
       .from('ih_staff_profiles')
-      .update({ status: 'Active', deactivated_at: null })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .update({ status: 'Active', deactivated_at: null } as any)
       .eq('id', id);
     if (error) throw error;
     return this.get(id);

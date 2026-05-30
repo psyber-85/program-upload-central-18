@@ -197,7 +197,7 @@ export const payrollRepo = {
     return { ok: true };
   },
 
-  /** Doc 3.1 §23-§24 — finalize + lock; trigger payslip generation + payslip-ready notices. */
+  /** Doc 3.1 §23 — finalize: generate payslips + notices. Status enters Finalized (grace window). */
   finalize(runId: string, adminId: string): PayrollRun {
     const check = this.canFinalize(runId);
     if (!check.ok) throw new Error(check.reason ?? 'Cannot finalize.');
@@ -206,10 +206,9 @@ export const payrollRepo = {
     const now = nowISO();
     const finalized: PayrollRun = {
       ...run,
-      status: 'Locked',
+      status: 'Finalized',
       finalizedAt: now,
       finalizedBy: adminId,
-      lockedAt: now,
     };
     saveRuns(runs.map((r) => (r.id === runId ? finalized : r)));
 
@@ -244,6 +243,20 @@ export const payrollRepo = {
     });
 
     return finalized;
+  },
+
+  /** Doc 3.1 §24 — explicit terminal lock after Finalized grace window. */
+  lockRun(runId: string, _adminId: string): PayrollRun {
+    const runs = loadRuns();
+    const run = runs.find((r) => r.id === runId);
+    if (!run) throw new Error('Run not found.');
+    if (run.status === 'Locked') return run;
+    if (run.status !== 'Finalized') {
+      throw new Error('Only a finalized run can be locked.');
+    }
+    const locked: PayrollRun = { ...run, status: 'Locked', lockedAt: nowISO() };
+    saveRuns(runs.map((r) => (r.id === runId ? locked : r)));
+    return locked;
   },
 
   // ---- Reminder (Doc 3.1 §7) ----

@@ -6,3 +6,7 @@ export { onboardingRepo } from './repos/onboardingRepo';
 export { toolAccessRepo } from './repos/toolAccessRepo';
 export { offboardingRepo } from './repos/offboardingRepo';
 export { welcomeEmailRepo } from './repos/welcomeEmailRepo';
+export { noticeRepo, audienceMatches } from './repos/noticeRepo';
+export { resourceRepo } from './repos/resourceRepo';
+export { requestSummaryRepo } from './repos/requestSummaryRepo';
+export { payslipSummaryRepo } from './repos/payslipSummaryRepo';

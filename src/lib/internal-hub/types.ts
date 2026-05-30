@@ -163,6 +163,18 @@ export interface NoticeAck {
   acknowledgedAt: string;
 }
 
+/** Doc 1.2 §12 — audit log entry created on every admin broadcast. */
+export interface BroadcastLogEntry {
+  id: string;
+  noticeId: string;
+  createdBy: string; // staffId
+  createdAt: string;
+  audience: NoticeAudience;
+  recipientCount: number; // snapshot at broadcast time
+  emailRequired: true;
+  emailSentAt?: string; // reserved for future email integration
+}
+
 export const NOTICE_TYPE_LABELS: Record<NoticeType, string> = {
   AdminBroadcast: 'Admin Broadcast',
   SystemNotification: 'System',

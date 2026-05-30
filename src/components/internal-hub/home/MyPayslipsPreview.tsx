@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Receipt } from 'lucide-react';
-import type { PayslipSummary } from '@/lib/internal-hub/types';
+import type { Payslip } from '@/lib/internal-hub/types';
 
-const MyPayslipsPreview = ({ items }: { items: PayslipSummary[] }) => (
+const MyPayslipsPreview = ({ items }: { items: Payslip[] }) => (
   <Card>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle className="text-base">My Payslips</CardTitle>
@@ -23,8 +23,10 @@ const MyPayslipsPreview = ({ items }: { items: PayslipSummary[] }) => (
         <ul className="divide-y divide-border">
           {items.map((p) => (
             <li key={p.id} className="py-2.5 flex items-center justify-between text-sm">
-              <span className="text-foreground">{p.month}</span>
-              <span className="text-xs text-muted-foreground">{p.status}</span>
+              <Link to={`/staff/payslips/${p.id}`} className="text-foreground hover:underline">
+                {p.month}
+              </Link>
+              <span className="text-xs text-muted-foreground">{p.availability}</span>
             </li>
           ))}
         </ul>

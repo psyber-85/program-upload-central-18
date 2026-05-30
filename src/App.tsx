@@ -32,7 +32,13 @@ import ResourcesIndex from "./pages/staff/hub/resources/ResourcesIndex";
 import ManageResources from "./pages/staff/hub/resources/admin/ManageResources";
 import RequestsIndex from "./pages/staff/hub/requests/RequestsIndex";
 import PayslipsIndex from "./pages/staff/hub/payslips/PayslipsIndex";
-import { Approvals, PayrollAdmin, FinanceSnapshot, SettingsAdmin } from "./pages/staff/hub/admin/Stubs";
+import { Approvals, SettingsAdmin } from "./pages/staff/hub/admin/Stubs";
+import PayrollIndex from "./pages/staff/hub/admin/payroll/PayrollIndex";
+import PayrollRunDetail from "./pages/staff/hub/admin/payroll/PayrollRunDetail";
+import AdminPayslips from "./pages/staff/hub/admin/payroll/AdminPayslips";
+import FinanceIndex from "./pages/staff/hub/admin/finance/FinanceIndex";
+import FinanceSnapshotDetail from "./pages/staff/hub/admin/finance/FinanceSnapshotDetail";
+import PayslipDetail from "./pages/staff/hub/payslips/PayslipDetail";
 
 // Marketing Portal (untouched)
 import MarketingLayout from "./components/marketing/MarketingLayout";
@@ -81,6 +87,7 @@ const App = () => (
               {/* Staff-facing stubs (owned by later cards) */}
               <Route path="requests" element={<RequestsIndex />} />
               <Route path="payslips" element={<PayslipsIndex />} />
+              <Route path="payslips/:id" element={<PayslipDetail />} />
 
               {/* Admin */}
               <Route path="admin/staff" element={
@@ -105,10 +112,19 @@ const App = () => (
                 <ProtectedRoute requireAdmin><Approvals /></ProtectedRoute>
               } />
               <Route path="admin/payroll" element={
-                <ProtectedRoute requireAdmin><PayrollAdmin /></ProtectedRoute>
+                <ProtectedRoute requireAdmin><PayrollIndex /></ProtectedRoute>
+              } />
+              <Route path="admin/payroll/:runId" element={
+                <ProtectedRoute requireAdmin><PayrollRunDetail /></ProtectedRoute>
+              } />
+              <Route path="admin/payslips" element={
+                <ProtectedRoute requireAdmin><AdminPayslips /></ProtectedRoute>
               } />
               <Route path="admin/finance" element={
-                <ProtectedRoute requireAdmin><FinanceSnapshot /></ProtectedRoute>
+                <ProtectedRoute requireAdmin><FinanceIndex /></ProtectedRoute>
+              } />
+              <Route path="admin/finance/:id" element={
+                <ProtectedRoute requireAdmin><FinanceSnapshotDetail /></ProtectedRoute>
               } />
               <Route path="admin/settings" element={
                 <ProtectedRoute requireAdmin><SettingsAdmin /></ProtectedRoute>

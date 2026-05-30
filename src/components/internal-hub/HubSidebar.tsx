@@ -42,6 +42,7 @@ const HubSidebar = () => {
     { to: '/staff/admin/notices/new', label: 'Broadcast', icon: Megaphone },
     { to: '/staff/admin/approvals', label: 'Approvals', icon: ClipboardCheck },
     { to: '/staff/admin/payroll', label: 'Payroll', icon: Banknote },
+    { to: '/staff/admin/payslips', label: 'All Payslips', icon: Receipt },
     { to: '/staff/admin/resources', label: 'Manage Resources', icon: BookOpen },
     { to: '/staff/admin/finance', label: 'Finance Snapshot', icon: BarChart3 },
     { to: '/staff/admin/settings', label: 'Settings', icon: SettingsIcon },

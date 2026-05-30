@@ -1,5 +1,6 @@
 // Doc 1.2 — notices, broadcasts, ack tracking. Local-only.
 import type {
+  BroadcastLogEntry,
   Notice,
   NoticeAck,
   NoticeAudience,
@@ -15,6 +16,7 @@ import { SEED_NOTICES } from '../seedNotices';
 const KEY_NOTICES = 'notices';
 const KEY_READS = 'notice-reads';
 const KEY_ACKS = 'notice-acks';
+const KEY_BROADCAST_LOG = 'notice-broadcast-log';
 
 function loadNotices(): Notice[] {
   const existing = readJSON<Notice[] | null>(KEY_NOTICES, null);

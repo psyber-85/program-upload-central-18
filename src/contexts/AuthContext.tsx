@@ -72,32 +72,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+    let bootstrapped = false;
+    const finishBootstrap = () => {
+      if (!bootstrapped) {
+        bootstrapped = true;
+        setIsLoading(false);
+      }
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, newSession) => {
+      (event, newSession) => {
         setSession(newSession);
-        if (newSession?.user) {
-          setTimeout(() => {
-            fetchUserProfile(newSession.user.id).then(setUser);
-          }, 0);
-        } else {
+
+        if (event === 'SIGNED_OUT' || !newSession?.user) {
           setUser(null);
+          finishBootstrap();
+          return;
         }
+
+        // Token refresh doesn't change the profile — skip refetch to avoid
+        // blink-to-null while RLS revalidates.
+        if (event === 'TOKEN_REFRESHED') {
+          finishBootstrap();
+          return;
+        }
+
+        // INITIAL_SESSION / SIGNED_IN / USER_UPDATED — load profile.
+        // Never overwrite a known-good user with null on transient failure.
+        setTimeout(() => {
+          fetchUserProfile(newSession.user.id)
+            .then((profile) => {
+              if (cancelled) return;
+              if (profile) setUser(profile);
+            })
+            .finally(finishBootstrap);
+        }, 0);
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
-      setSession(existingSession);
-      if (existingSession?.user) {
-        fetchUserProfile(existingSession.user.id).then((profile) => {
-          setUser(profile);
-          setIsLoading(false);
-        });
-      } else {
-        setIsLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -137,7 +154,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session,
     user,
     isLoading,
-    isAuthenticated: !!session && !!user,
+    // Authentication only depends on session. Role-gating happens via `user`
+    // / `isAdmin` separately so a momentary profile-fetch hiccup can't
+    // bounce the user to /login.
+    isAuthenticated: !!session,
     isAdmin: user?.role === 'admin',
     login,
     logout,

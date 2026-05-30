@@ -1,47 +1,43 @@
-# Loop 1 continuation — Auth pages + repo migration to Supabase
+# Fix: page flashes then disappears after login
 
-Loop 1 already shipped: `ih_*` schema + RLS + helpers, `ih-bootstrap-admin`, `ih-create-staff`, Supabase-backed `HubContext`. What remains is large (13 localStorage repos + login UI + RLS tests), so I'll split it into 3 small build messages so each is reviewable.
+## Root cause — Lovable's AuthContext, not the docs
 
-## Message A — Auth surface + identity repo
+In `src/contexts/AuthContext.tsx` the `onAuthStateChange` handler fires for **every** auth event (including `TOKEN_REFRESHED`, which Supabase emits regularly — your auth logs show many `/user` and `/token` calls within seconds of login). On every event it:
 
-1. **`/staff/login`** page using `supabase.auth.signInWithPassword`. Redirect to `/staff` on success. Inactive profile → toast + sign out (mirrors `InternalHubLayout` guard).
-2. **`/reset-password`** public route handling `type=recovery` link from invite/reset emails. Sets new password via `supabase.auth.updateUser`.
-3. Wire both into `App.tsx` router. Existing role-switcher demo login is removed.
-4. **`staffRepo`** → Supabase. List/get/upsert/deactivate against `ih_staff_profiles` + `ih_user_roles`. `addStaff` becomes a thin wrapper that invokes the existing `ih-create-staff` edge function.
-5. **`ih-deactivate-staff`** edge function: admin-only, sets `status='Inactive'`, `deactivated_at=now()`, calls `auth.admin.signOut(user_id)`.
+1. Re-runs `fetchUserProfile(...)`.
+2. If that fetch returns `null` or errors transiently (network blip, RLS race right after our security migration, etc.), it calls `setUser(null)`.
 
-## Message B — Operational repos (notices, resources, requests, lifecycle)
+Combined with this line:
 
-Swap these repos to Supabase against the tables already migrated. Public method signatures stay identical so consumer pages don't change:
+```ts
+isAuthenticated: !!session && !!user,
+```
 
-- `noticeRepo` → `ih_notices` + `ih_notice_reads` + `ih_notice_acks` (audience filter handled by RLS).
-- `resourceRepo` → `ih_resources`.
-- `requestSummaryRepo` → derived from `ih_requests` (count by status for home preview).
-- `onboardingRepo` / `offboardingRepo` → `ih_access_checklist` (one row per item).
-- `toolAccessRepo` → `ih_tool_access`.
-- `welcomeEmailRepo` → `ih_welcome_emails`.
-- `claimRepo` → reads `ih_requests` where `kind='claim' AND status='Approved'`, writes `payload.included_in_payroll_month`.
+…any momentary `user === null` flips `isAuthenticated` to `false`, and `ProtectedRoute` immediately `<Navigate to="/login" />`. That's the "shows for ~1s then disappears" behavior.
 
-`storage.ts` keeps `nowISO`/`uid` helpers; `readJSON/writeJSON` deprecated and removed once no callers remain.
+Two secondary issues amplify it:
+- `INITIAL_SESSION` from `onAuthStateChange` and the manual `getSession()` both kick off `fetchUserProfile` in parallel — whichever finishes last wins, and a `null` result wipes a valid user.
+- `setIsLoading(false)` is only called in the `getSession()` path; `onAuthStateChange` never toggles loading, so the gate relies entirely on whichever path resolves first.
 
-## Message C — Payroll/finance repos + RLS tests
+## Fix (single file: `src/contexts/AuthContext.tsx`)
 
-- `payrollRepo` → `ih_payroll_runs` + `ih_payroll_items`.
-- `payslipRepo` + `payslipSummaryRepo` → `ih_payslips` + `ih_payslip_downloads`.
-- `financeSnapshotRepo` → `ih_finance_snapshots`.
-- Delete `seed.ts` / `seedNotices.ts` auto-seed; move SEED_* constants under a dev-only `/staff/admin/seed` button that inserts via Supabase and is hidden in prod.
-- **`ih-rls-tests`** Deno test: two seeded users verify the 11 boundaries from Doc 4.1 §27 (staff cannot read others' profiles/requests/payslips; admin can; inactive staff blocked; sensitive columns hidden from staff via view).
-- Run `supabase--linter`; fix any new warnings.
+1. **Don't overwrite `user` with `null` on transient fetch failures.** Only clear `user` when the event is an actual sign-out (`SIGNED_OUT`) or when there's no session.
+2. **Skip profile refetch on `TOKEN_REFRESHED`** — the profile hasn't changed; just update the session.
+3. **Gate `isAuthenticated` on session only**, not on `user`. Use a separate `hasProfile` / `user` check inside `ProtectedRoute` for the role gate, with a loading state while the profile is still resolving.
+4. **Single source of truth for the initial fetch.** Let `onAuthStateChange` (which fires `INITIAL_SESSION` on mount) own the bootstrap; drop the parallel `getSession().then(fetchUserProfile)` to remove the race.
+5. **Track `isLoading` correctly:** set it `false` once we've received the first auth event AND (if there's a session) the first profile fetch has resolved.
 
-## Out of scope (still)
+## Update `ProtectedRoute` (`src/components/staff/ProtectedRoute.tsx`)
 
-`/marketing/**`, TryHire, CRM/Register/Birthday trackers, legacy `sp_*` tables, Loop 2 (SendGrid/Calendar/PDF), Loop 3 (audit/system issues/AI).
+- While `isLoading` OR (session exists but profile not yet loaded) → show the spinner, don't redirect.
+- Only redirect to `/login` when there is no session.
+- Only redirect off `requireAdmin` routes after the profile has loaded.
 
-## Acceptance for Loop 1 close
+## Verdict on the question
 
-- Sign in at `/staff/login` as `pang@theaihq.net` lands on `/staff` with admin nav.
-- A demo staff added by admin receives invite, sets password via `/reset-password`, lands on `/staff` without admin nav.
-- All hub pages render real Supabase data; no `readJSON/writeJSON` calls remain.
-- `ih-rls-tests` passes.
+This is **Lovable's scaffold**, not the auth implementation doc. The doc correctly says "register `onAuthStateChange` early"; it does not tell you to refetch+overwrite the profile on every event, nor to couple `isAuthenticated` to a derived `user` object that can blink to null. The bug is in the generated `AuthContext`.
 
-Approve and I'll ship Message A first.
+## Out of scope
+
+- No DB / RLS changes — last migration is correct.
+- No changes to `/staff/marketing` auth surface.

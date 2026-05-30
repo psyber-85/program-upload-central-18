@@ -48,6 +48,16 @@ export const onboardingRepo = {
     save(store);
     return c;
   },
+  setItemLink(staffId: string, key: string, link: string | null) {
+    const store = load();
+    const c = store[staffId] ?? buildDefaultOnboarding(staffId);
+    c.items = c.items.map((i) =>
+      i.key === key ? { ...i, link: link ?? undefined } : i,
+    );
+    store[staffId] = c;
+    save(store);
+    return c;
+  },
   hasAny(staffId: string) {
     return !!load()[staffId];
   },

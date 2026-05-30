@@ -218,6 +218,816 @@ export type Database = {
           },
         ]
       }
+      ih_access_checklist: {
+        Row: {
+          id: string
+          item_key: string
+          staff_id: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          item_key: string
+          staff_id: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          item_key?: string
+          staff_id?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ih_access_checklist_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ih_access_checklist_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles_self"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ih_finance_snapshots: {
+        Row: {
+          created_at: string
+          id: string
+          line_items: Json
+          locked_at: string | null
+          locked_by: string | null
+          month: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["ih_finance_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          line_items?: Json
+          locked_at?: string | null
+          locked_by?: string | null
+          month: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["ih_finance_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          line_items?: Json
+          locked_at?: string | null
+          locked_by?: string | null
+          month?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["ih_finance_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ih_leave_balances: {
+        Row: {
+          al_total: number
+          al_used: number
+          id: string
+          sl_total: number
+          sl_used: number
+          staff_id: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          al_total?: number
+          al_used?: number
+          id?: string
+          sl_total?: number
+          sl_used?: number
+          staff_id: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          al_total?: number
+          al_used?: number
+          id?: string
+          sl_total?: number
+          sl_used?: number
+          staff_id?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ih_leave_balances_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ih_leave_balances_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles_self"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ih_notice_acks: {
+        Row: {
+          acked_at: string
+          notice_id: string
+          staff_id: string
+        }
+        Insert: {
+          acked_at?: string
+          notice_id: string
+          staff_id: string
+        }
+        Update: {
+          acked_at?: string
+          notice_id?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ih_notice_acks_notice_id_fkey"
+            columns: ["notice_id"]
+            isOneToOne: false
+            referencedRelation: "ih_notices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ih_notice_acks_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ih_notice_acks_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles_self"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ih_notice_reads: {
+        Row: {
+          notice_id: string
+          read_at: string
+          staff_id: string
+        }
+        Insert: {
+          notice_id: string
+          read_at?: string
+          staff_id: string
+        }
+        Update: {
+          notice_id?: string
+          read_at?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ih_notice_reads_notice_id_fkey"
+            columns: ["notice_id"]
+            isOneToOne: false
+            referencedRelation: "ih_notices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ih_notice_reads_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ih_notice_reads_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles_self"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ih_notices: {
+        Row: {
+          ack_required: boolean
+          archived_at: string | null
+          audience: string
+          audience_staff_id: string | null
+          body: string
+          created_at: string
+          created_by: string | null
+          email_required: boolean
+          id: string
+          importance: Database["public"]["Enums"]["ih_notice_importance"]
+          title: string
+        }
+        Insert: {
+          ack_required?: boolean
+          archived_at?: string | null
+          audience?: string
+          audience_staff_id?: string | null
+          body: string
+          created_at?: string
+          created_by?: string | null
+          email_required?: boolean
+          id?: string
+          importance?: Database["public"]["Enums"]["ih_notice_importance"]
+          title: string
+        }
+        Update: {
+          ack_required?: boolean
+          archived_at?: string | null
+          audience?: string
+          audience_staff_id?: string | null
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          email_required?: boolean
+          id?: string
+          importance?: Database["public"]["Enums"]["ih_notice_importance"]
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ih_notices_audience_staff_id_fkey"
+            columns: ["audience_staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ih_notices_audience_staff_id_fkey"
+            columns: ["audience_staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles_self"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ih_payroll_items: {
+        Row: {
+          base_salary: number
+          claims_total: number | null
+          created_at: string
+          days_worked: number | null
+          employer_epf: number | null
+          employer_socso: number | null
+          epf: number | null
+          id: string
+          net_pay: number
+          run_id: string
+          socso: number | null
+          staff_id: string
+          staff_name: string
+          total_company_cost: number
+          total_days: number | null
+          training_total: number | null
+        }
+        Insert: {
+          base_salary?: number
+          claims_total?: number | null
+          created_at?: string
+          days_worked?: number | null
+          employer_epf?: number | null
+          employer_socso?: number | null
+          epf?: number | null
+          id?: string
+          net_pay?: number
+          run_id: string
+          socso?: number | null
+          staff_id: string
+          staff_name: string
+          total_company_cost?: number
+          total_days?: number | null
+          training_total?: number | null
+        }
+        Update: {
+          base_salary?: number
+          claims_total?: number | null
+          created_at?: string
+          days_worked?: number | null
+          employer_epf?: number | null
+          employer_socso?: number | null
+          epf?: number | null
+          id?: string
+          net_pay?: number
+          run_id?: string
+          socso?: number | null
+          staff_id?: string
+          staff_name?: string
+          total_company_cost?: number
+          total_days?: number | null
+          training_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ih_payroll_items_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ih_payroll_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ih_payroll_items_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ih_payroll_items_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles_self"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ih_payroll_runs: {
+        Row: {
+          created_at: string
+          finalized_at: string | null
+          finalized_by: string | null
+          id: string
+          locked_at: string | null
+          locked_by: string | null
+          month: string
+          status: Database["public"]["Enums"]["ih_payroll_status"]
+          total_work_days: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          finalized_at?: string | null
+          finalized_by?: string | null
+          id?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          month: string
+          status?: Database["public"]["Enums"]["ih_payroll_status"]
+          total_work_days?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          finalized_at?: string | null
+          finalized_by?: string | null
+          id?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          month?: string
+          status?: Database["public"]["Enums"]["ih_payroll_status"]
+          total_work_days?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ih_payslip_downloads: {
+        Row: {
+          downloaded_at: string
+          id: string
+          payslip_id: string
+          staff_id: string
+        }
+        Insert: {
+          downloaded_at?: string
+          id?: string
+          payslip_id: string
+          staff_id: string
+        }
+        Update: {
+          downloaded_at?: string
+          id?: string
+          payslip_id?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ih_payslip_downloads_payslip_id_fkey"
+            columns: ["payslip_id"]
+            isOneToOne: false
+            referencedRelation: "ih_payslips"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ih_payslip_downloads_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ih_payslip_downloads_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles_self"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ih_payslips: {
+        Row: {
+          base_salary: number
+          claims_total: number | null
+          created_at: string
+          employer_epf: number | null
+          employer_socso: number | null
+          epf: number | null
+          id: string
+          month: string
+          net_pay: number
+          pdf_path: string | null
+          run_id: string
+          socso: number | null
+          staff_id: string
+          training_total: number | null
+        }
+        Insert: {
+          base_salary?: number
+          claims_total?: number | null
+          created_at?: string
+          employer_epf?: number | null
+          employer_socso?: number | null
+          epf?: number | null
+          id?: string
+          month: string
+          net_pay?: number
+          pdf_path?: string | null
+          run_id: string
+          socso?: number | null
+          staff_id: string
+          training_total?: number | null
+        }
+        Update: {
+          base_salary?: number
+          claims_total?: number | null
+          created_at?: string
+          employer_epf?: number | null
+          employer_socso?: number | null
+          epf?: number | null
+          id?: string
+          month?: string
+          net_pay?: number
+          pdf_path?: string | null
+          run_id?: string
+          socso?: number | null
+          staff_id?: string
+          training_total?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ih_payslips_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ih_payroll_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ih_payslips_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ih_payslips_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles_self"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ih_request_attachments: {
+        Row: {
+          id: string
+          kind: string | null
+          mime: string | null
+          path: string
+          request_id: string
+          size: number | null
+          staff_id: string
+          uploaded_at: string
+        }
+        Insert: {
+          id?: string
+          kind?: string | null
+          mime?: string | null
+          path: string
+          request_id: string
+          size?: number | null
+          staff_id: string
+          uploaded_at?: string
+        }
+        Update: {
+          id?: string
+          kind?: string | null
+          mime?: string | null
+          path?: string
+          request_id?: string
+          size?: number | null
+          staff_id?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ih_request_attachments_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "ih_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ih_request_attachments_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ih_request_attachments_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles_self"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ih_requests: {
+        Row: {
+          calendar_event_id: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decision_note: string | null
+          id: string
+          kind: Database["public"]["Enums"]["ih_request_kind"]
+          payload: Json
+          staff_id: string
+          status: Database["public"]["Enums"]["ih_request_status"]
+          updated_at: string
+        }
+        Insert: {
+          calendar_event_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_note?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["ih_request_kind"]
+          payload?: Json
+          staff_id: string
+          status?: Database["public"]["Enums"]["ih_request_status"]
+          updated_at?: string
+        }
+        Update: {
+          calendar_event_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_note?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["ih_request_kind"]
+          payload?: Json
+          staff_id?: string
+          status?: Database["public"]["Enums"]["ih_request_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ih_requests_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ih_requests_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles_self"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ih_resources: {
+        Row: {
+          archived_at: string | null
+          audience: string
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          title: string
+          url: string
+        }
+        Insert: {
+          archived_at?: string | null
+          audience?: string
+          category: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          title: string
+          url: string
+        }
+        Update: {
+          archived_at?: string | null
+          audience?: string
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          title?: string
+          url?: string
+        }
+        Relationships: []
+      }
+      ih_staff_profiles: {
+        Row: {
+          admin_notes: string | null
+          business_arm: Database["public"]["Enums"]["ih_business_arm"] | null
+          created_at: string
+          deactivated_at: string | null
+          email: string
+          epf_rate: number | null
+          id: string
+          insurance_notes: string | null
+          job_title: string | null
+          join_date: string
+          name: string
+          notion_unlocked_at: string | null
+          role: Database["public"]["Enums"]["ih_app_role"]
+          salary_base: number | null
+          socso_rate: number | null
+          status: Database["public"]["Enums"]["ih_staff_status"]
+          updated_at: string
+          welcome_email_status: string | null
+        }
+        Insert: {
+          admin_notes?: string | null
+          business_arm?: Database["public"]["Enums"]["ih_business_arm"] | null
+          created_at?: string
+          deactivated_at?: string | null
+          email: string
+          epf_rate?: number | null
+          id: string
+          insurance_notes?: string | null
+          job_title?: string | null
+          join_date?: string
+          name: string
+          notion_unlocked_at?: string | null
+          role?: Database["public"]["Enums"]["ih_app_role"]
+          salary_base?: number | null
+          socso_rate?: number | null
+          status?: Database["public"]["Enums"]["ih_staff_status"]
+          updated_at?: string
+          welcome_email_status?: string | null
+        }
+        Update: {
+          admin_notes?: string | null
+          business_arm?: Database["public"]["Enums"]["ih_business_arm"] | null
+          created_at?: string
+          deactivated_at?: string | null
+          email?: string
+          epf_rate?: number | null
+          id?: string
+          insurance_notes?: string | null
+          job_title?: string | null
+          join_date?: string
+          name?: string
+          notion_unlocked_at?: string | null
+          role?: Database["public"]["Enums"]["ih_app_role"]
+          salary_base?: number | null
+          socso_rate?: number | null
+          status?: Database["public"]["Enums"]["ih_staff_status"]
+          updated_at?: string
+          welcome_email_status?: string | null
+        }
+        Relationships: []
+      }
+      ih_tool_access: {
+        Row: {
+          granted_at: string | null
+          id: string
+          staff_id: string
+          status: string
+          tool: string
+        }
+        Insert: {
+          granted_at?: string | null
+          id?: string
+          staff_id: string
+          status?: string
+          tool: string
+        }
+        Update: {
+          granted_at?: string | null
+          id?: string
+          staff_id?: string
+          status?: string
+          tool?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ih_tool_access_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ih_tool_access_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles_self"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ih_user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["ih_app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["ih_app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["ih_app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ih_welcome_emails: {
+        Row: {
+          created_at: string
+          failure_reason: string | null
+          id: string
+          sent_at: string | null
+          staff_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          sent_at?: string | null
+          staff_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          failure_reason?: string | null
+          id?: string
+          sent_at?: string | null
+          staff_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ih_welcome_emails_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ih_welcome_emails_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ih_staff_profiles_self"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       participants: {
         Row: {
           email: string
@@ -1407,9 +2217,63 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      ih_staff_profiles_self: {
+        Row: {
+          business_arm: Database["public"]["Enums"]["ih_business_arm"] | null
+          created_at: string | null
+          deactivated_at: string | null
+          email: string | null
+          id: string | null
+          job_title: string | null
+          join_date: string | null
+          name: string | null
+          notion_unlocked_at: string | null
+          role: Database["public"]["Enums"]["ih_app_role"] | null
+          status: Database["public"]["Enums"]["ih_staff_status"] | null
+          updated_at: string | null
+          welcome_email_status: string | null
+        }
+        Insert: {
+          business_arm?: Database["public"]["Enums"]["ih_business_arm"] | null
+          created_at?: string | null
+          deactivated_at?: string | null
+          email?: string | null
+          id?: string | null
+          job_title?: string | null
+          join_date?: string | null
+          name?: string | null
+          notion_unlocked_at?: string | null
+          role?: Database["public"]["Enums"]["ih_app_role"] | null
+          status?: Database["public"]["Enums"]["ih_staff_status"] | null
+          updated_at?: string | null
+          welcome_email_status?: string | null
+        }
+        Update: {
+          business_arm?: Database["public"]["Enums"]["ih_business_arm"] | null
+          created_at?: string | null
+          deactivated_at?: string | null
+          email?: string | null
+          id?: string | null
+          job_title?: string | null
+          join_date?: string | null
+          name?: string | null
+          notion_unlocked_at?: string | null
+          role?: Database["public"]["Enums"]["ih_app_role"] | null
+          status?: Database["public"]["Enums"]["ih_staff_status"] | null
+          updated_at?: string | null
+          welcome_email_status?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      has_ih_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["ih_app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       has_sp_role: {
         Args: {
           _role: Database["public"]["Enums"]["sp_app_role"]
@@ -1417,11 +2281,25 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_active_ih_staff: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       crm_activity_type: "Contacted" | "Call" | "Email"
       crm_lead_score: "A" | "B" | "C" | "D" | "E"
       crm_lead_status: "Success" | "Lost" | "Future"
+      ih_app_role: "admin" | "staff"
+      ih_business_arm: "Training" | "Solutions" | "Both"
+      ih_finance_status: "Draft" | "Reviewed" | "Locked"
+      ih_notice_importance: "Normal" | "Important" | "Critical"
+      ih_payroll_status: "Draft" | "Finalized" | "Locked"
+      ih_request_kind: "Leave" | "MC" | "Claim" | "Training" | "Benefit"
+      ih_request_status:
+        | "Submitted"
+        | "Approved"
+        | "Rejected"
+        | "NeedsCorrection"
+        | "Cancelled"
+      ih_staff_status: "Pending" | "Active" | "Inactive"
       sp_app_role: "admin" | "staff"
       sp_bill_status: "Draft" | "Paid"
       sp_business_arm: "Training" | "Solutions"
@@ -1573,6 +2451,20 @@ export const Constants = {
       crm_activity_type: ["Contacted", "Call", "Email"],
       crm_lead_score: ["A", "B", "C", "D", "E"],
       crm_lead_status: ["Success", "Lost", "Future"],
+      ih_app_role: ["admin", "staff"],
+      ih_business_arm: ["Training", "Solutions", "Both"],
+      ih_finance_status: ["Draft", "Reviewed", "Locked"],
+      ih_notice_importance: ["Normal", "Important", "Critical"],
+      ih_payroll_status: ["Draft", "Finalized", "Locked"],
+      ih_request_kind: ["Leave", "MC", "Claim", "Training", "Benefit"],
+      ih_request_status: [
+        "Submitted",
+        "Approved",
+        "Rejected",
+        "NeedsCorrection",
+        "Cancelled",
+      ],
+      ih_staff_status: ["Pending", "Active", "Inactive"],
       sp_app_role: ["admin", "staff"],
       sp_bill_status: ["Draft", "Paid"],
       sp_business_arm: ["Training", "Solutions"],

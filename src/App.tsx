@@ -16,11 +16,16 @@ import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 
-// Staff Portal (legacy moved to src/_backup/staff-legacy — revamp in progress)
+// Internal Hub (/staff) — new portal per Doc 0.1 + 0.2
 import ProtectedRoute from "./components/staff/ProtectedRoute";
-import StaffComingSoon from "./pages/staff/StaffComingSoon";
+import InternalHubLayout from "./components/internal-hub/InternalHubLayout";
+import StaffHome from "./pages/staff/hub/StaffHome";
+import MyProfile from "./pages/staff/hub/MyProfile";
+import AdminStaffList from "./pages/staff/hub/admin/AdminStaffList";
+import AdminAddStaff from "./pages/staff/hub/admin/AdminAddStaff";
+import AdminStaffDetail from "./pages/staff/hub/admin/AdminStaffDetail";
 
-// Marketing Portal
+// Marketing Portal (untouched)
 import MarketingLayout from "./components/marketing/MarketingLayout";
 import MarketingDashboard from "./pages/staff/marketing/MarketingDashboard";
 import Index from "./pages/Index";
@@ -48,8 +53,24 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
-            {/* Staff Portal placeholder (legacy backed up; revamp pending) */}
-            <Route path="/staff" element={<StaffComingSoon />} />
+            {/* Internal Hub */}
+            <Route path="/staff" element={
+              <ProtectedRoute>
+                <InternalHubLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<StaffHome />} />
+              <Route path="profile" element={<MyProfile />} />
+              <Route path="admin/staff" element={
+                <ProtectedRoute requireAdmin><AdminStaffList /></ProtectedRoute>
+              } />
+              <Route path="admin/staff/new" element={
+                <ProtectedRoute requireAdmin><AdminAddStaff /></ProtectedRoute>
+              } />
+              <Route path="admin/staff/:id" element={
+                <ProtectedRoute requireAdmin><AdminStaffDetail /></ProtectedRoute>
+              } />
+            </Route>
 
             {/* Marketing Portal routes (protected, nested under /staff/marketing) */}
             <Route path="/staff/marketing" element={

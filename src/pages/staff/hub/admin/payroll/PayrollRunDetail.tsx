@@ -81,6 +81,7 @@ const PayrollRunDetail = () => {
           <p className="text-sm text-muted-foreground mt-1">
             Status: <Badge variant="secondary">{PAYROLL_STATUS_LABELS[run.status]}</Badge>
             {run.finalizedAt && ` · Finalized ${new Date(run.finalizedAt).toLocaleString()}`}
+            {run.lockedAt && ` · Locked ${new Date(run.lockedAt).toLocaleString()}`}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -90,6 +91,11 @@ const PayrollRunDetail = () => {
           {!locked && (
             <Button onClick={handleFinalize} disabled={!canFinalize.ok} title={canFinalize.reason}>
               Finalize Payroll
+            </Button>
+          )}
+          {isFinalized && (
+            <Button variant="outline" onClick={handleLock}>
+              <Lock className="h-4 w-4 mr-1" /> Lock Run
             </Button>
           )}
         </div>

@@ -1,94 +1,87 @@
-# Plan — Ship Docs 4.1 / 4.2 / 4.3 (Internal Hub, /staff only)
+# Plan — Phase 2: Repo → Supabase swap (sub-batched)
 
-Scope strictly limited to `/staff/*` (Internal Hub). `/staff/marketing` and the main site are untouched (per Core memory).
+## The core challenge
 
-This is large. I'll ship in **5 phases** so each is reviewable. After each phase you can test and approve the next.
+Today's repos return data **synchronously** (`staffRepo.list()` → `StaffProfile[]`). Supabase calls are **async**. So every callsite — ~35 components — must change from direct sync calls to either `useEffect`+state or TanStack Query hooks.
 
----
-
-## Phase 1 — Critical security / RLS fixes (DB-only, fastest win)
-
-Single migration. No app code needed.
-
-1. **Tighten `ih_requests` self-update WITH CHECK** — prevent staff self-approving.
-   `WITH CHECK (staff_id = auth.uid() AND status = 'Submitted')`
-2. **Revoke staff column access to sensitive fields** on `ih_staff_profiles`:
-   `REVOKE SELECT (salary_base, epf_rate, socso_rate, admin_notes, insurance_notes) FROM authenticated`
-   (Admin reads via `has_ih_role`; staff use `ih_staff_profiles_self` view.)
-3. **Hard-delete protection** on `ih_notices` and `ih_resources` — split admin `FOR ALL` into INSERT/UPDATE/SELECT only; add `BEFORE DELETE` trigger that raises (force soft-delete via `archived_at`).
-4. **Add `archived_at`** to `ih_notices` (matches `ih_resources` pattern). Update RLS to filter it.
-5. **Add explicit DELETE policy** for `ih_request_attachments` (owner + admin).
-6. **Create `payslips` private storage bucket** + owner/admin RLS.
+To control blast radius, I'll ship in **4 sub-batches**, each touching one functional domain. After each, you test and approve.
 
 ---
 
-## Phase 2 — Repo → Supabase swap (the Critical blocker)
+## Strategy (applies to every sub-batch)
 
-Replace `localStorage` data layer with Supabase across 13 repos in `src/lib/internal-hub/repos/*`. Only `/staff` hub pages affected.
-
-Order (dependency-first):
-1. `staffRepo` → `ih_staff_profiles` + `ih_staff_profiles_self` view
-2. `noticeRepo` → `ih_notices`, `ih_notice_reads`, `ih_notice_acks`
-3. `resourceRepo` → `ih_resources`
-4. `requestRepo` / `claimRepo` / `requestSummaryRepo` → `ih_requests` + `ih_request_attachments` (Supabase Storage uploads)
-5. `payrollRepo` → `ih_payroll_runs`, `ih_payroll_items`
-6. `payslipRepo` / `payslipSummaryRepo` → `ih_payslips`, `ih_payslip_downloads`
-7. `financeSnapshotRepo` → `ih_finance_snapshots`
-8. `toolAccessRepo` / `onboardingRepo` / `offboardingRepo` → `ih_tool_access`, `ih_access_checklist`
-9. `welcomeEmailRepo` → `ih_welcome_emails`
-
-Each repo keeps the same exported function signatures so calling components don't change. `storage.ts` localStorage helpers stay as a no-op shim for any unmigrated callers, then deleted in Phase 5 cleanup.
+1. Rewrite the repo file: same exported method names, but each returns `Promise<T>`.
+2. Wrap callsites in TanStack Query (`useQuery`/`useMutation`) — `@tanstack/react-query` is already in the project.
+3. Drop seed/`ensureSeed()` logic — data lives in Supabase. (`seed.ts` and `seedNotices.ts` become unused; deleted in Sub-batch 2D cleanup.)
+4. Keep type mapping (DB snake_case → app camelCase) inside each repo so component code is unchanged in shape.
+5. Lazy `require()` calls (e.g. noticeRepo→staffRepo) replaced with awaited Supabase queries — fixes the residual circular-dep issue too.
 
 ---
 
-## Phase 3 — Doc 4.2 integrations
+## Sub-batch 2A — Staff + Profiles (foundation)
 
-1. **Notices email fanout** — `ih-broadcast-notice` edge function: on insert with `email_required=true`, resolve audience from `ih_staff_profiles`, SendGrid send via existing `SENDGRID_API_KEY`/`FROM_EMAIL`. In-app record persisted even if SendGrid fails.
-2. **Upload validation** — client-side guard in request/claim upload paths: `accept="image/png,image/jpeg,application/pdf"`, `file.size ≤ 10 MB`. Reject before upload.
-3. **Payslip PDF generation** — `ih-generate-payslip-pdf` edge function using `pdf-lib` (Deno). Triggered on payroll finalize. Writes to `payslips` bucket, stores path in `ih_payslips.pdf_path`. `payslipRepo.downloadPdf()` issues signed URL.
-4. **Payslip email** — uses portal-link rule (per mem://internal-hub/payslips-doc-3.2: no PDF email attachments). Existing `send-payslip-notification` already conforms — add a "View payslip" link to `/staff/hub/payslips`.
-5. **Google Calendar sync** — `ih-sync-leave-calendar` edge function. **Requires user to supply Google service-account JSON + calendar ID.** I'll set up the function shell and ask for the secret when Phase 3 starts.
-
----
-
-## Phase 4 — Doc 4.3 hardening
-
-1. **`ih_audit_log` table** (immutable, admin-read-only): `id, actor_id, action, entity, entity_id, payload jsonb, created_at`. INSERT-only RLS; no UPDATE/DELETE policies.
-2. **`ih_system_issues` table** for operational errors (edge function failures, SendGrid failures, etc.). Admin-only.
-3. **Admin pages**:
-   - `/staff/hub/admin/audit-log` — filter by actor/entity/date.
-   - `/staff/hub/admin/system-issues` — list with status (Open/Resolved).
-4. **Audit writes** — wrap admin mutations (approve/reject request, archive notice, finalize payroll, deactivate staff) via a small `auditRepo.write()` helper.
-5. **Deactivation realtime** — `AuthContext` subscribes to own `ih_staff_profiles` row; logout if `status='Inactive'`.
+**Repo:** `staffRepo`
+**DB:** `ih_staff_profiles` (already used by `HubContext`)
+**Callsites (~7):** `AdminStaffList`, `AdminStaffDetail`, `AdminAddStaff`, `MyProfile`, `StaffFormFields`, `StaffStatusBadge`, `home/MyRecentRequestsPreview`.
+**Notes:**
+- `staffRepo.list()` admin-only (RLS already enforces).
+- `create()` becomes: invite via auth admin (already done by `AdminAddStaff` edge function) + insert profile row.
+- `deactivate()`/`reactivate()` → `update({status})`; sensitive-field trigger from earlier migration enforces admin-only.
 
 ---
 
-## Phase 5 — Optional AI extraction (Doc 4.3 §3.9–3.14)
+## Sub-batch 2B — Notices + Resources
 
-1. Add `ai_extracted boolean`, `ai_confidence numeric`, `ai_review_state text` to `ih_request_attachments`.
-2. `ih-extract-receipt` edge function using `LOVABLE_API_KEY` (Gemini vision). Pulls amount/date/vendor. Always editable; manual fallback preserved.
-3. UI: "Auto-fill from receipt" button in claim form; confidence badge; required review if confidence < 0.7.
-
----
-
-## Out of scope (will NOT touch)
-
-- `/staff/marketing` and all marketing components
-- `src/pages/Index.tsx` and main site routes
-- CRM tracker public-access flows
-- Placement portal
-- Any `auth.users`, `storage`, `realtime` schema changes
+**Repos:** `noticeRepo`, `resourceRepo`
+**DB:** `ih_notices`, `ih_notice_reads`, `ih_notice_acks`, `ih_resources`
+**Callsites (~10):** `NoticesList`, `NoticeDetail`, `BroadcastForm`, `AckReport`, `ResourcesIndex`, `ManageResources`, `home/LatestNoticesPreview`, plus the unread-count badge in `HubSidebar`/`HubMobileNav`.
+**Notes:**
+- `broadcast()` writes Notice + audience-resolution lives client-side (we already gate on RLS); SendGrid fanout deferred to Phase 3.
+- `archive()` sets `archived_at = now()` (NOT delete — trigger from Phase 1 blocks hard-delete).
+- `ackReport()` becomes admin-only Supabase query joining `ih_staff_profiles` + `ih_notice_acks`.
 
 ---
 
-## Technical notes
+## Sub-batch 2C — Requests, Claims, Attachments
 
-- **No new secrets needed for Phases 1, 2, 4.** SendGrid secrets already set for Phase 3.1. Phase 3.5 (calendar) and Phase 5 (AI) will request secrets at their respective phases.
-- **Migrations are additive and reversible.** No data loss; localStorage data is mock/seed only.
-- **Each phase is independently deployable** — you can stop after any phase.
+**Repos:** `claimRepo`, `requestSummaryRepo`
+**DB:** `ih_requests`, `ih_request_attachments` + `request-attachments` storage bucket (already exists)
+**Callsites (~5):** existing request/claim pages + `home/MyRecentRequestsPreview`.
+**Notes:**
+- File uploads switch from base64-in-localStorage to Supabase Storage (signed URL on download).
+- Sensitive WITH CHECK from Phase 1 enforces no self-approval.
 
 ---
 
-## Suggested first step
+## Sub-batch 2D — Payroll, Payslips, Finance, Lifecycle (admin-heavy)
 
-Approve this plan, and I start with **Phase 1** (the security-tightening migration). It's contained, reviewable, and unblocks everything else without touching app code.
+**Repos:** `payrollRepo`, `payslipRepo`, `payslipSummaryRepo`, `financeSnapshotRepo`, `toolAccessRepo`, `onboardingRepo`, `offboardingRepo`, `welcomeEmailRepo`
+**DB:** `ih_payroll_runs`, `ih_payroll_items`, `ih_payslips`, `ih_payslip_downloads`, `ih_finance_snapshots`, `ih_tool_access`, `ih_access_checklist`, `ih_welcome_emails`
+**Callsites (~13):** all admin payroll/finance pages + `MyPayslipsPreview`, `PayslipsIndex`, `PayslipDetail`, `ChecklistItemRow`, `NotionUnlockBanner`, `ToolAccessRow`, `OnboardingStateBadge`, `WelcomeEmailStatus`.
+**Cleanup at the end:** delete `storage.ts`, `seed.ts`, `seedNotices.ts`.
+
+---
+
+## Risk mitigation
+
+- **Loading states**: every converted component will show a skeleton/spinner instead of empty render.
+- **Error handling**: toast on mutation failure; query errors logged.
+- **Optimistic updates** where the current UX feels instant (e.g., `markRead`).
+- **Rollback**: each sub-batch is one git commit-equivalent change; if 2A breaks, 2B–2D haven't shipped yet.
+
+---
+
+## Out of scope for Phase 2
+
+- SendGrid fanout (Phase 3)
+- Google Calendar (Phase 3)
+- PDF generation (Phase 3)
+- Audit log writes (Phase 4)
+- AI extraction (Phase 5)
+- Anything outside `/staff/hub/*` and `src/components/internal-hub/*`
+
+---
+
+## Recommended next step
+
+Approve, and I'll start with **Sub-batch 2A (Staff)** — smallest, foundation for the rest. Ship → you verify staff list/profile pages still work → approve 2B.

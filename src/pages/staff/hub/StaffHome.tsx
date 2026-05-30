@@ -147,7 +147,7 @@ const StaffHome = () => {
       {/* 5–6. Requests + Payslips previews */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <MyRecentRequestsPreview items={requests} />
-        <MyPayslipsPreview items={payslips} />
+        <MyPayslipsPreview items={payslips} disabled={!isAdmin && currentStaff.status !== 'Active'} />
       </div>
 
       {/* 7. Sections */}

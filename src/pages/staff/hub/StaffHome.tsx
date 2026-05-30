@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   CalendarPlus, FileHeart, FileText, GraduationCap, Heart, MoreHorizontal, Receipt, Mail,
   Megaphone, ClipboardCheck, UserPlus, Banknote, BarChart3, BookOpen,
@@ -27,7 +28,12 @@ const StaffHome = () => {
 
   const isAdmin = canAccessAdminArea(currentStaff);
 
-  const allStaff = useMemo(() => staffRepo.list(), [tick]);
+  // Admin needs full staff list for the onboarding-in-progress metric; staff don't.
+  const { data: allStaff = [] } = useQuery({
+    queryKey: ['ih-staff-list'],
+    queryFn: () => staffRepo.list(),
+    enabled: isAdmin,
+  });
   const notices = useMemo(
     () => (currentStaff ? noticeRepo.visibleFor(currentStaff).slice(0, 3) : []),
     [currentStaff?.id, tick],

@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Trash2, UserX, UserCheck } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, Trash2, UserX, UserCheck, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -34,64 +35,99 @@ const AdminStaffDetail = () => {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { currentStaff } = useHub();
   const viewerIsAdmin = currentStaff?.role === 'Admin';
   const [tick, setTick] = useState(0);
   const bump = () => setTick((t) => t + 1);
 
-  const staff = useMemo(() => staffRepo.get(id), [id, tick]);
+  const { data: staff, isLoading } = useQuery({
+    queryKey: ['ih-staff', id],
+    queryFn: () => staffRepo.get(id),
+    enabled: !!id,
+  });
+
   const onboarding = useMemo(() => (staff ? onboardingRepo.get(staff.id) : undefined), [staff?.id, tick]);
   const tools = useMemo(() => (staff ? toolAccessRepo.get(staff.id) : []), [staff?.id, tick]);
   const offboarding = useMemo(() => (staff ? offboardingRepo.get(staff.id) : undefined), [staff?.id, tick]);
   const welcome = useMemo(() => (staff ? welcomeEmailRepo.get(staff.id) : undefined), [staff?.id, tick]);
 
   const [editValues, setEditValues] = useState<StaffFormValues | null>(null);
-  React.useEffect(() => {
+  useEffect(() => {
     if (staff) {
       const { id: _id, status: _s, createdAt: _c, updatedAt: _u, ...rest } = staff;
       setEditValues(rest);
     }
-  }, [staff?.id]);
+  }, [staff]);
 
-  if (!staff || !editValues) {
+  if (isLoading || !staff || !editValues) {
     return (
       <div className="p-6 max-w-3xl mx-auto">
-        <p className="text-sm text-muted-foreground">Staff not found.</p>
-        <Button variant="outline" className="mt-3" onClick={() => navigate('/staff/admin/staff')}>
-          <ArrowLeft className="h-4 w-4 mr-1" /> Back
-        </Button>
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground flex items-center"><Loader2 className="h-4 w-4 mr-2 animate-spin" />Loading…</p>
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground">Staff not found.</p>
+            <Button variant="outline" className="mt-3" onClick={() => navigate('/staff/admin/staff')}>
+              <ArrowLeft className="h-4 w-4 mr-1" /> Back
+            </Button>
+          </>
+        )}
       </div>
     );
   }
 
-  const handleSave = () => {
-    staffRepo.update(staff.id, editValues);
-    toast({ title: 'Profile updated' });
-    bump();
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['ih-staff', id] });
+    queryClient.invalidateQueries({ queryKey: ['ih-staff-list'] });
   };
 
-  const handleDeactivate = () => {
-    staffRepo.deactivate(staff.id);
-    offboardingRepo.start(staff.id);
-    toast({ title: 'Staff deactivated', description: 'Offboarding checklist created.' });
-    bump();
+  const handleSave = async () => {
+    try {
+      await staffRepo.update(staff.id, editValues);
+      toast({ title: 'Profile updated' });
+      invalidate();
+    } catch (e) {
+      toast({ title: 'Update failed', description: String((e as Error).message), variant: 'destructive' });
+    }
   };
 
-  const handleReactivate = () => {
-    staffRepo.reactivate(staff.id);
-    toast({ title: 'Staff reactivated' });
-    bump();
+  const handleDeactivate = async () => {
+    try {
+      await staffRepo.deactivate(staff.id);
+      offboardingRepo.start(staff.id);
+      toast({ title: 'Staff deactivated', description: 'Offboarding checklist created.' });
+      invalidate();
+      bump();
+    } catch (e) {
+      toast({ title: 'Deactivation failed', description: String((e as Error).message), variant: 'destructive' });
+    }
+  };
+
+  const handleReactivate = async () => {
+    try {
+      await staffRepo.reactivate(staff.id);
+      toast({ title: 'Staff reactivated' });
+      invalidate();
+    } catch (e) {
+      toast({ title: 'Reactivation failed', description: String((e as Error).message), variant: 'destructive' });
+    }
   };
 
   const activity = hasActivity(staff, { onboarding, tools, offboarding });
-  const handleHardDelete = () => {
+  const handleHardDelete = async () => {
     if (activity) return;
-    staffRepo.hardDelete(staff.id);
-    onboardingRepo.remove(staff.id);
-    toolAccessRepo.remove(staff.id);
-    offboardingRepo.remove(staff.id);
-    toast({ title: 'Staff record removed (mistake-only hard delete)' });
-    navigate('/staff/admin/staff');
+    try {
+      await staffRepo.hardDelete(staff.id);
+      onboardingRepo.remove(staff.id);
+      toolAccessRepo.remove(staff.id);
+      offboardingRepo.remove(staff.id);
+      toast({ title: 'Staff record removed (mistake-only hard delete)' });
+      queryClient.invalidateQueries({ queryKey: ['ih-staff-list'] });
+      navigate('/staff/admin/staff');
+    } catch (e) {
+      toast({ title: 'Delete failed', description: String((e as Error).message), variant: 'destructive' });
+    }
   };
 
   const notionTool = tools.find((t) => t.tool === 'Notion');

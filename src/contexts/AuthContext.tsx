@@ -154,7 +154,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session,
     user,
     isLoading,
-    isAuthenticated: !!session && !!user,
+    // Authentication only depends on session. Role-gating happens via `user`
+    // / `isAdmin` separately so a momentary profile-fetch hiccup can't
+    // bounce the user to /login.
+    isAuthenticated: !!session,
     isAdmin: user?.role === 'admin',
     login,
     logout,

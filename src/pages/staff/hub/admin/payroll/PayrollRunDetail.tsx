@@ -35,6 +35,8 @@ const PayrollRunDetail = () => {
     return <div className="p-6 text-sm text-muted-foreground">Payroll run not found.</div>;
   }
   const locked = run.status === 'Finalized' || run.status === 'Locked';
+  const isFinalized = run.status === 'Finalized';
+  const isLocked = run.status === 'Locked';
   const incomplete = run.items.filter((i) => i.rowStatus === 'Incomplete');
   const canFinalize = payrollRepo.canFinalize(runId);
 
@@ -49,6 +51,16 @@ const PayrollRunDetail = () => {
       refresh();
     } catch (e: any) {
       toast({ title: 'Cannot finalize', description: e.message, variant: 'destructive' });
+    }
+  };
+  const handleLock = () => {
+    if (!confirm('Lock this payroll run? Locking prevents future status changes. Corrections must use a future-payroll adjustment.')) return;
+    try {
+      payrollRepo.lockRun(runId, currentStaff!.id);
+      toast({ title: 'Payroll locked' });
+      refresh();
+    } catch (e: any) {
+      toast({ title: 'Cannot lock', description: e.message, variant: 'destructive' });
     }
   };
 

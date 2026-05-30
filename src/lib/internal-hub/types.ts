@@ -251,3 +251,188 @@ export interface PayslipSummary {
 }
 
 export const IT_SUPPORT_EMAIL = 'wani@theaihq.net';
+
+// ============================================================
+// Doc 3.1 — Payroll Preparation & Finalization
+// ============================================================
+export type PayrollRunStatus =
+  | 'NotPrepared'
+  | 'Draft'
+  | 'ReadyForReview'
+  | 'Finalized'
+  | 'Locked';
+
+export type PayrollItemRowStatus = 'Complete' | 'Incomplete';
+
+export type ClaimInclusionState =
+  | 'NotIncluded'
+  | 'QueuedForPayroll'
+  | 'IncludedInPayroll';
+
+export interface ManualAdjustment {
+  amount: number; // may be positive or negative (Doc 3.1 §21)
+  reason: string; // required
+}
+
+export type PayrollMissingField = 'baseSalary' | 'epfRate' | 'socsoRate';
+
+export interface PayrollItem {
+  staffId: string;
+  staffName: string;
+  month: string; // YYYY-MM
+  baseSalary: number;
+  epfAmount: number;
+  socsoAmount: number;
+  claimsTotal: number;
+  trainingClaimsTotal: number;
+  adjustment: ManualAdjustment | null;
+  netPay: number;
+  rowStatus: PayrollItemRowStatus;
+  missingFields: PayrollMissingField[];
+  includedClaimIds: string[];
+  includedTrainingClaimIds: string[];
+  notes?: string;
+}
+
+export interface PayrollRun {
+  id: string;
+  month: string; // YYYY-MM
+  status: PayrollRunStatus;
+  items: PayrollItem[];
+  adminNotes?: string;
+  createdAt: string;
+  preparedAt?: string;
+  finalizedAt?: string;
+  finalizedBy?: string;
+  lockedAt?: string;
+}
+
+export type ClaimType = 'Claim' | 'TrainingClaim';
+
+export interface ApprovedClaim {
+  id: string;
+  staffId: string;
+  type: ClaimType;
+  amount: number;
+  description?: string;
+  approvedAt: string; // ISO date
+  inclusionState: ClaimInclusionState;
+  includedInPayrollRunId?: string;
+  includedInMonth?: string;
+}
+
+export const PAYROLL_STATUS_LABELS: Record<PayrollRunStatus, string> = {
+  NotPrepared: 'Not Prepared',
+  Draft: 'Draft',
+  ReadyForReview: 'Ready for Review',
+  Finalized: 'Finalized',
+  Locked: 'Locked',
+};
+
+export const PAYROLL_MISSING_FIELD_LABELS: Record<PayrollMissingField, string> = {
+  baseSalary: 'Base salary',
+  epfRate: 'EPF rate',
+  socsoRate: 'SOCSO rate',
+};
+
+// ============================================================
+// Doc 3.2 — Payslips
+// ============================================================
+export type PayslipAvailability =
+  | 'NotGenerated'
+  | 'Generated'
+  | 'Available'
+  | 'Error';
+
+export interface Payslip {
+  id: string;
+  payrollRunId: string;
+  staffId: string;
+  staffName: string;
+  month: string;
+  baseSalary: number;
+  epf: number;
+  socso: number;
+  claimsTotal: number;
+  trainingClaimsTotal: number;
+  adjustment: ManualAdjustment | null;
+  netPay: number;
+  finalizedAt: string;
+  availability: PayslipAvailability;
+  pdfRef?: string; // placeholder ref — real storage is Card 4
+  correctionRef?: string; // Doc 3.2 §17/§18
+}
+
+export interface PayslipDownloadLogEntry {
+  id: string;
+  payslipId: string;
+  actorId: string;
+  actorRole: HubRole;
+  downloadedAt: string;
+}
+
+export const PAYSLIP_AVAILABILITY_LABELS: Record<PayslipAvailability, string> = {
+  NotGenerated: 'Not Generated',
+  Generated: 'Generated',
+  Available: 'Available',
+  Error: 'Error',
+};
+
+export const CONFIDENTIAL_PAYSLIP_LABEL = 'Confidential payroll document';
+
+// ============================================================
+// Doc 3.3 — Admin Finance Snapshot
+// ============================================================
+export type FinanceLineCategory =
+  | 'Income'
+  | 'Expense'
+  | 'TransferAdjustment'
+  | 'Other';
+
+export interface FinanceLineItem {
+  id: string;
+  snapshotId: string;
+  category: FinanceLineCategory;
+  amount: number;
+  note: string;
+  link?: string;
+  createdAt: string;
+  createdBy: string;
+  isCorrection?: boolean;
+}
+
+export type FinanceSnapshotStatus = 'Draft' | 'Reviewed' | 'Locked';
+
+export interface FinanceSnapshot {
+  id: string;
+  month: string; // YYYY-MM
+  status: FinanceSnapshotStatus;
+  openingBalance?: number;
+  closingBalance?: number;
+  payrollTotal: number;
+  claimsTotal: number;
+  trainingClaimsTotal: number;
+  epfSocsoTotal: number;
+  manualAdjustmentTotal: number;
+  notes?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const FINANCE_CATEGORY_LABELS: Record<FinanceLineCategory, string> = {
+  Income: 'Income',
+  Expense: 'Expense',
+  TransferAdjustment: 'Transfer / Adjustment',
+  Other: 'Other',
+};
+
+export const FINANCE_STATUS_LABELS: Record<FinanceSnapshotStatus, string> = {
+  Draft: 'Draft',
+  Reviewed: 'Reviewed',
+  Locked: 'Locked',
+};
+
+export const FINANCE_SNAPSHOT_DISCLAIMER =
+  'Internal monthly reference — not accounting, tax, or bank reconciliation.';

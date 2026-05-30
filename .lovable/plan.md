@@ -1,26 +1,63 @@
-## Goal
-Let users choose how many prospects to show per page (20 / 50 / 100) in the Prospect List table inside Program Details, instead of being locked to a fixed size.
+# Plan: Backup existing /staff frontend (preserve marketing)
 
-## Context found in codebase
-- The table lives in `src/components/ProspectTable.tsx`, rendered by `src/components/registration/ProgramCard.tsx` under the "Prospect List" tab.
-- Page size is currently hardcoded: `const [prospectsPerPage] = useState(10)` (line 63). The "Showing 20 of 20" text in the screenshot is the filtered/total count — not the page size; the actual page slice is 10. The new default will be 20 to match user expectation.
-- Pagination math (`totalPages`, `startIndex`, `currentProspects`) already keys off `prospectsPerPage`, so no algorithmic changes are needed.
-- A separate `useEffect` already resets `currentPage` to 1 when filters change — we'll extend it to also reset when page size changes.
-- The component already imports shadcn `Select`, used for the status filter, so we'll reuse the same component for visual consistency.
+## Scope
+Front-end only. Marketing portal (`/staff/marketing/*` and everything under `src/components/marketing/`, `src/pages/staff/marketing/`) is **untouched**. TryHire, auth, and all other areas are **untouched**. No backend, DB, or edge-function changes.
 
-## Changes (single file: `src/components/ProspectTable.tsx`)
+## What gets moved to backup
+Move (not delete) the following into a new `src/_backup/staff-legacy/` directory, preserving relative paths so re-introduction is trivial:
 
-1. Convert page size to stateful: `const [prospectsPerPage, setProspectsPerPage] = useState(20)`.
-2. Add a small "Rows per page" `Select` (options: 20, 50, 100) placed next to the existing pagination controls at the bottom of the table. Inline, right-aligned with the page numbers, using the same `text-sm text-gray-600` styling as the "Showing X of Y" helper text so it visually belongs to the table chrome.
-3. On change, reset `currentPage` to 1 (add `prospectsPerPage` to the existing filter-reset `useEffect`).
-4. Keep the "Showing X of Y prospects" summary text — it already reflects filtered totals, not page size, so it stays accurate.
+**Pages**
+- `src/pages/staff/StaffHome.tsx`
+- `src/pages/staff/StaffRequests.tsx`
+- `src/pages/staff/NewRequest.tsx`
+- `src/pages/staff/RequestDetail.tsx`
+- `src/pages/staff/StaffDocs.tsx`
+- `src/pages/staff/StaffPayslips.tsx`
+- `src/pages/staff/PayslipDetail.tsx`
+- `src/pages/staff/MyEntries.tsx`
+- `src/pages/staff/StaffDashboard.tsx`
+- entire `src/pages/staff/admin/` (Payroll, PayrollRunDetail, Billing, Payments, Settings)
 
-## Out of scope (intentionally untouched)
-- Data fetching: prospects continue to load all-at-once per program (client-side pagination, same as today). No backend / Supabase changes.
-- Sorting, filtering, search, real-time subscriptions, column toggle, modals, Add Prospect, Bulk Upload tab.
-- Other tables elsewhere in the app — only the Program Details → Prospect List table per your request.
+**Staff-only components** (marketing components live in `src/components/marketing/` — not touched)
+- `src/components/staff/PortalLayout.tsx`
+- `src/components/staff/StaffSidebar.tsx`
+- `src/components/staff/StaffNavigation.tsx`
+- `src/components/staff/StaffLayout.tsx`
+- `src/components/staff/PortalNavigation.tsx`
+- `src/components/staff/MobileBottomNav.tsx`
+- `src/components/staff/RoleSwitcher.tsx`
+- `src/components/staff/FileUpload.tsx`
 
-## UX notes
-- Default 20 matches what the user currently perceives, so existing users see no behavior change unless they opt in.
-- Selector placed at the bottom near pagination (standard table convention), not at the top, to avoid crowding the search/filter row.
-- If a user picks a size larger than total filtered rows, pagination simply collapses to a single page — no edge-case handling needed beyond the existing `totalPages` guard.
+**Kept in place** (still used by marketing or other areas):
+- `src/components/staff/ProtectedRoute.tsx` — used by `/staff/marketing` route guard
+- `src/components/staff/ErrorBoundary.tsx` — generic, may be reused
+
+## Routing changes (`src/App.tsx`)
+- Remove all imports for the moved pages and `PortalLayout`.
+- Remove the entire `<Route path="/staff" element={<PortalLayout/>}>...</Route>` block (lines 67–106) including admin sub-routes.
+- Add a single placeholder route so visiting `/staff` doesn't 404 unexpectedly:
+  ```tsx
+  <Route path="/staff" element={<StaffComingSoon />} />
+  ```
+- **Keep** the `/staff/marketing/*` block exactly as-is (lines 109–119). Because React Router matches more specific paths first, the marketing nested routes continue to work.
+
+## New placeholder page
+- `src/pages/staff/StaffComingSoon.tsx` — minimal page using existing design tokens: centered card, heading "Staff Portal", body "This portal is being revamped. The Marketing tools remain available at /staff/marketing.", and a link button to `/staff/marketing`.
+
+## What stays exactly the same
+- `/staff/marketing` and every page/component under it (MarketingLayout, MarketingNavigation, MarketingDashboard, BirthdayDashboard, RegisterTracker, CRMTracker, Participant Manager, all `src/components/marketing/*`, all `src/components/registration/*`, all `src/components/crm/*`, `ProspectTable`, etc.)
+- TryHire pages, Login, ResetPassword, NotFound
+- All backend (`supabase/`), DAL, contexts (`AuthContext` is still used by marketing)
+- `tailwind.config.ts`, `index.css`, design tokens
+
+## Verification
+After the move:
+1. Build passes (no dangling imports).
+2. `/staff` renders the placeholder.
+3. `/staff/marketing` and every marketing sub-route load unchanged.
+4. `/` (TryHire) and `/login` unchanged.
+
+## Out of scope
+- The revamp itself (new pages, new IA, new design) — that comes next, separately.
+- Any DB / Supabase changes.
+- Touching marketing code in any way.

@@ -1,43 +1,94 @@
-# Fix: page flashes then disappears after login
+# Plan — Ship Docs 4.1 / 4.2 / 4.3 (Internal Hub, /staff only)
 
-## Root cause — Lovable's AuthContext, not the docs
+Scope strictly limited to `/staff/*` (Internal Hub). `/staff/marketing` and the main site are untouched (per Core memory).
 
-In `src/contexts/AuthContext.tsx` the `onAuthStateChange` handler fires for **every** auth event (including `TOKEN_REFRESHED`, which Supabase emits regularly — your auth logs show many `/user` and `/token` calls within seconds of login). On every event it:
+This is large. I'll ship in **5 phases** so each is reviewable. After each phase you can test and approve the next.
 
-1. Re-runs `fetchUserProfile(...)`.
-2. If that fetch returns `null` or errors transiently (network blip, RLS race right after our security migration, etc.), it calls `setUser(null)`.
+---
 
-Combined with this line:
+## Phase 1 — Critical security / RLS fixes (DB-only, fastest win)
 
-```ts
-isAuthenticated: !!session && !!user,
-```
+Single migration. No app code needed.
 
-…any momentary `user === null` flips `isAuthenticated` to `false`, and `ProtectedRoute` immediately `<Navigate to="/login" />`. That's the "shows for ~1s then disappears" behavior.
+1. **Tighten `ih_requests` self-update WITH CHECK** — prevent staff self-approving.
+   `WITH CHECK (staff_id = auth.uid() AND status = 'Submitted')`
+2. **Revoke staff column access to sensitive fields** on `ih_staff_profiles`:
+   `REVOKE SELECT (salary_base, epf_rate, socso_rate, admin_notes, insurance_notes) FROM authenticated`
+   (Admin reads via `has_ih_role`; staff use `ih_staff_profiles_self` view.)
+3. **Hard-delete protection** on `ih_notices` and `ih_resources` — split admin `FOR ALL` into INSERT/UPDATE/SELECT only; add `BEFORE DELETE` trigger that raises (force soft-delete via `archived_at`).
+4. **Add `archived_at`** to `ih_notices` (matches `ih_resources` pattern). Update RLS to filter it.
+5. **Add explicit DELETE policy** for `ih_request_attachments` (owner + admin).
+6. **Create `payslips` private storage bucket** + owner/admin RLS.
 
-Two secondary issues amplify it:
-- `INITIAL_SESSION` from `onAuthStateChange` and the manual `getSession()` both kick off `fetchUserProfile` in parallel — whichever finishes last wins, and a `null` result wipes a valid user.
-- `setIsLoading(false)` is only called in the `getSession()` path; `onAuthStateChange` never toggles loading, so the gate relies entirely on whichever path resolves first.
+---
 
-## Fix (single file: `src/contexts/AuthContext.tsx`)
+## Phase 2 — Repo → Supabase swap (the Critical blocker)
 
-1. **Don't overwrite `user` with `null` on transient fetch failures.** Only clear `user` when the event is an actual sign-out (`SIGNED_OUT`) or when there's no session.
-2. **Skip profile refetch on `TOKEN_REFRESHED`** — the profile hasn't changed; just update the session.
-3. **Gate `isAuthenticated` on session only**, not on `user`. Use a separate `hasProfile` / `user` check inside `ProtectedRoute` for the role gate, with a loading state while the profile is still resolving.
-4. **Single source of truth for the initial fetch.** Let `onAuthStateChange` (which fires `INITIAL_SESSION` on mount) own the bootstrap; drop the parallel `getSession().then(fetchUserProfile)` to remove the race.
-5. **Track `isLoading` correctly:** set it `false` once we've received the first auth event AND (if there's a session) the first profile fetch has resolved.
+Replace `localStorage` data layer with Supabase across 13 repos in `src/lib/internal-hub/repos/*`. Only `/staff` hub pages affected.
 
-## Update `ProtectedRoute` (`src/components/staff/ProtectedRoute.tsx`)
+Order (dependency-first):
+1. `staffRepo` → `ih_staff_profiles` + `ih_staff_profiles_self` view
+2. `noticeRepo` → `ih_notices`, `ih_notice_reads`, `ih_notice_acks`
+3. `resourceRepo` → `ih_resources`
+4. `requestRepo` / `claimRepo` / `requestSummaryRepo` → `ih_requests` + `ih_request_attachments` (Supabase Storage uploads)
+5. `payrollRepo` → `ih_payroll_runs`, `ih_payroll_items`
+6. `payslipRepo` / `payslipSummaryRepo` → `ih_payslips`, `ih_payslip_downloads`
+7. `financeSnapshotRepo` → `ih_finance_snapshots`
+8. `toolAccessRepo` / `onboardingRepo` / `offboardingRepo` → `ih_tool_access`, `ih_access_checklist`
+9. `welcomeEmailRepo` → `ih_welcome_emails`
 
-- While `isLoading` OR (session exists but profile not yet loaded) → show the spinner, don't redirect.
-- Only redirect to `/login` when there is no session.
-- Only redirect off `requireAdmin` routes after the profile has loaded.
+Each repo keeps the same exported function signatures so calling components don't change. `storage.ts` localStorage helpers stay as a no-op shim for any unmigrated callers, then deleted in Phase 5 cleanup.
 
-## Verdict on the question
+---
 
-This is **Lovable's scaffold**, not the auth implementation doc. The doc correctly says "register `onAuthStateChange` early"; it does not tell you to refetch+overwrite the profile on every event, nor to couple `isAuthenticated` to a derived `user` object that can blink to null. The bug is in the generated `AuthContext`.
+## Phase 3 — Doc 4.2 integrations
 
-## Out of scope
+1. **Notices email fanout** — `ih-broadcast-notice` edge function: on insert with `email_required=true`, resolve audience from `ih_staff_profiles`, SendGrid send via existing `SENDGRID_API_KEY`/`FROM_EMAIL`. In-app record persisted even if SendGrid fails.
+2. **Upload validation** — client-side guard in request/claim upload paths: `accept="image/png,image/jpeg,application/pdf"`, `file.size ≤ 10 MB`. Reject before upload.
+3. **Payslip PDF generation** — `ih-generate-payslip-pdf` edge function using `pdf-lib` (Deno). Triggered on payroll finalize. Writes to `payslips` bucket, stores path in `ih_payslips.pdf_path`. `payslipRepo.downloadPdf()` issues signed URL.
+4. **Payslip email** — uses portal-link rule (per mem://internal-hub/payslips-doc-3.2: no PDF email attachments). Existing `send-payslip-notification` already conforms — add a "View payslip" link to `/staff/hub/payslips`.
+5. **Google Calendar sync** — `ih-sync-leave-calendar` edge function. **Requires user to supply Google service-account JSON + calendar ID.** I'll set up the function shell and ask for the secret when Phase 3 starts.
 
-- No DB / RLS changes — last migration is correct.
-- No changes to `/staff/marketing` auth surface.
+---
+
+## Phase 4 — Doc 4.3 hardening
+
+1. **`ih_audit_log` table** (immutable, admin-read-only): `id, actor_id, action, entity, entity_id, payload jsonb, created_at`. INSERT-only RLS; no UPDATE/DELETE policies.
+2. **`ih_system_issues` table** for operational errors (edge function failures, SendGrid failures, etc.). Admin-only.
+3. **Admin pages**:
+   - `/staff/hub/admin/audit-log` — filter by actor/entity/date.
+   - `/staff/hub/admin/system-issues` — list with status (Open/Resolved).
+4. **Audit writes** — wrap admin mutations (approve/reject request, archive notice, finalize payroll, deactivate staff) via a small `auditRepo.write()` helper.
+5. **Deactivation realtime** — `AuthContext` subscribes to own `ih_staff_profiles` row; logout if `status='Inactive'`.
+
+---
+
+## Phase 5 — Optional AI extraction (Doc 4.3 §3.9–3.14)
+
+1. Add `ai_extracted boolean`, `ai_confidence numeric`, `ai_review_state text` to `ih_request_attachments`.
+2. `ih-extract-receipt` edge function using `LOVABLE_API_KEY` (Gemini vision). Pulls amount/date/vendor. Always editable; manual fallback preserved.
+3. UI: "Auto-fill from receipt" button in claim form; confidence badge; required review if confidence < 0.7.
+
+---
+
+## Out of scope (will NOT touch)
+
+- `/staff/marketing` and all marketing components
+- `src/pages/Index.tsx` and main site routes
+- CRM tracker public-access flows
+- Placement portal
+- Any `auth.users`, `storage`, `realtime` schema changes
+
+---
+
+## Technical notes
+
+- **No new secrets needed for Phases 1, 2, 4.** SendGrid secrets already set for Phase 3.1. Phase 3.5 (calendar) and Phase 5 (AI) will request secrets at their respective phases.
+- **Migrations are additive and reversible.** No data loss; localStorage data is mock/seed only.
+- **Each phase is independently deployable** — you can stop after any phase.
+
+---
+
+## Suggested first step
+
+Approve this plan, and I start with **Phase 1** (the security-tightening migration). It's contained, reviewable, and unblocks everything else without touching app code.

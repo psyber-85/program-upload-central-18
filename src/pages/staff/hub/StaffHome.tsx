@@ -1,15 +1,16 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   CalendarPlus, FileHeart, FileText, GraduationCap, Heart, MoreHorizontal, Receipt, Mail,
   Megaphone, ClipboardCheck, UserPlus, Banknote, BarChart3, BookOpen,
 } from 'lucide-react';
 import { useHub } from '@/lib/internal-hub/HubContext';
 import {
-  noticeRepo, resourceRepo, requestSummaryRepo, payslipSummaryRepo, onboardingRepo, staffRepo,
+  noticeRepo, resourceRepo, requestSummaryRepo, payslipRepo, onboardingRepo, staffRepo,
+  payrollRepo, financeSnapshotRepo,
 } from '@/lib/internal-hub';
 import { canAccessAdminArea } from '@/lib/internal-hub/access';
 import { checklistProgress } from '@/lib/internal-hub/lifecycle';
-import { IT_SUPPORT_EMAIL } from '@/lib/internal-hub/types';
+import { IT_SUPPORT_EMAIL, PAYROLL_STATUS_LABELS, FINANCE_STATUS_LABELS } from '@/lib/internal-hub/types';
 import SummaryCard from '@/components/internal-hub/home/SummaryCard';
 import QuickActionsGrid, { QuickActionItem } from '@/components/internal-hub/home/QuickActionsGrid';
 import LatestNoticesPreview from '@/components/internal-hub/home/LatestNoticesPreview';

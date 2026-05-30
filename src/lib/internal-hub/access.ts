@@ -19,3 +19,10 @@ export function canEditStaffProfile(viewer?: StaffProfile | null) {
   // Doc 0.1 §16 — staff cannot edit own profile in Day 1
   return isAdmin(viewer);
 }
+
+/** Doc 3.2 §10 — Inactive staff cannot access the portal payslip surface (admin retains history). */
+export function canAccessOwnPayslips(s?: StaffProfile | null) {
+  if (!s) return false;
+  if (isAdmin(s)) return true;
+  return isActiveStaff(s);
+}

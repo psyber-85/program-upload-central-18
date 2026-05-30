@@ -6,12 +6,25 @@ import { Badge } from '@/components/ui/badge';
 import { Download, ShieldAlert, Receipt } from 'lucide-react';
 import { useHub } from '@/lib/internal-hub/HubContext';
 import { payslipRepo } from '@/lib/internal-hub';
-import { CONFIDENTIAL_PAYSLIP_LABEL } from '@/lib/internal-hub/types';
+import { CONFIDENTIAL_PAYSLIP_LABEL, IT_SUPPORT_EMAIL } from '@/lib/internal-hub/types';
+import { canAccessOwnPayslips } from '@/lib/internal-hub/access';
 import { toast } from '@/hooks/use-toast';
 
 const PayslipsIndex = () => {
   const { currentStaff } = useHub();
   if (!currentStaff) return null;
+  if (!canAccessOwnPayslips(currentStaff)) {
+    return (
+      <div className="p-4 sm:p-6 max-w-3xl mx-auto">
+        <Card>
+          <CardContent className="p-6 text-sm text-muted-foreground">
+            Payslip access has been deactivated for your account. Contact HR at{' '}
+            <a className="underline" href={`mailto:${IT_SUPPORT_EMAIL}`}>{IT_SUPPORT_EMAIL}</a>.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   const items = payslipRepo.listForStaff(currentStaff.id);
 
   const handleDownload = (id: string) => {

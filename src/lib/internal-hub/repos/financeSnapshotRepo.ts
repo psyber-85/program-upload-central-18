@@ -143,10 +143,21 @@ export const financeSnapshotRepo = {
   /** Doc 3.3 §19-§20 — Mark Month Reviewed (never "Finalize Accounts"). */
   markReviewed(id: string, adminId: string): FinanceSnapshot | undefined {
     return this._patch(id, {
-      status: 'Locked',
+      status: 'Reviewed',
       reviewedAt: nowISO(),
       reviewedBy: adminId,
     });
+  },
+
+  /** Optional terminal lock after Reviewed grace window (mirrors payroll lockRun). */
+  lockSnapshot(id: string): FinanceSnapshot | undefined {
+    const snap = this.getById(id);
+    if (!snap) return;
+    if (snap.status === 'Locked') return snap;
+    if (snap.status !== 'Reviewed') {
+      throw new Error('Only a reviewed snapshot can be locked.');
+    }
+    return this._patch(id, { status: 'Locked' });
   },
 
   _appendItem(snapshotId: string, input: Omit<FinanceLineItem, 'id' | 'snapshotId' | 'createdAt'>): FinanceLineItem {

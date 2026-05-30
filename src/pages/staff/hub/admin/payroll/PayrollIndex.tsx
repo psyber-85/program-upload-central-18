@@ -19,7 +19,7 @@ const statusVariant: Record<PayrollRunStatus, 'default' | 'secondary' | 'destruc
   Draft: 'secondary',
   ReadyForReview: 'default',
   Finalized: 'default',
-  Locked: 'default',
+  Locked: 'secondary',
 };
 
 const PayrollIndex = () => {

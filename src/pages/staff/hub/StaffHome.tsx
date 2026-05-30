@@ -21,8 +21,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const StaffHome = () => {
-  const { currentStaff, impersonate, impersonatedId } = useHub();
-  const [tick, setTick] = useState(0);
+  const { currentStaff } = useHub();
+  const [tick] = useState(0);
   void tick;
 
   const isAdmin = canAccessAdminArea(currentStaff);

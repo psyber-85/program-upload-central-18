@@ -264,14 +264,13 @@ export const payrollRepo = {
    * Idempotent admin reminder on day-of-month >= 25 if payroll not yet prepared.
    * Runs in-browser when an admin opens the hub.
    */
-  ensureReminderForMonth(month: string, adminId: string) {
+  async ensureReminderForMonth(month: string, adminId: string) {
     const today = new Date();
     if (today.getUTCDate() < 25) return;
     if (this.statusFor(month) !== 'NotPrepared' && this.statusFor(month) !== 'Draft') return;
     const log = readJSON<string[]>(KEY_REMINDER_LOG, []);
     if (log.includes(month)) return;
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { noticeRepo } = require('./noticeRepo') as typeof import('./noticeRepo');
+    const { noticeRepo } = await import('./noticeRepo');
     noticeRepo.broadcast({
       title: `Payroll reminder — prepare ${month}`,
       message:

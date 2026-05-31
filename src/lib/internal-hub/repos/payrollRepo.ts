@@ -1,4 +1,4 @@
-// Doc 3.1 — Payroll Preparation & Finalization.
+// Doc 3.1 — Payroll Preparation & Finalization (Patch 002).
 // Backed by `ih_payroll_runs` + `ih_payroll_items` + `ih_payroll_reminders`.
 // All methods async. Admin-only RLS enforced server-side.
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -15,21 +15,36 @@ import { staffRepo } from './staffRepo';
 import { claimRepo } from './claimRepo';
 import { logAudit } from '../audit';
 
+// Patch 002 default employer rates (fall-back when staff profile has none set).
+const DEFAULT_EMPLOYER_EPF_RATE = 13;
+const DEFAULT_EMPLOYER_SOCSO_RATE = 1.75;
+const DEFAULT_EMPLOYER_EIS_RATE = 0.2;
+
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/** Doc 3.1 §15 — Net Pay formula. */
+/** Patch 002 §13/§20 — Net Pay formula. */
 export function computeNetPay(it: PayrollItem): number {
   const adj = it.adjustment?.amount ?? 0;
   return round2(
-    it.baseSalary -
-      it.epfAmount -
-      it.socsoAmount +
-      it.claimsTotal +
-      it.trainingClaimsTotal +
-      adj,
+    it.baseSalary
+      - it.epfAmount
+      - it.socsoAmount
+      - it.eisAmount
+      + it.claimsTotal
+      + it.trainingClaimsTotal
+      + it.bonusTotal
+      + it.otherAdditionTotal
+      + adj,
   );
+}
+
+function totals(it: PayrollItem) {
+  return {
+    totalEmployeeDeductions: round2(it.epfAmount + it.socsoAmount + it.eisAmount),
+    totalEmployerContribution: round2(it.employerEpf + it.employerSocso + it.employerEis),
+  };
 }
 
 function missingFor(s: StaffProfile): PayrollMissingField[] {
@@ -37,19 +52,28 @@ function missingFor(s: StaffProfile): PayrollMissingField[] {
   if (!s.baseSalary || s.baseSalary <= 0) missing.push('baseSalary');
   if (s.epfRate === undefined || s.epfRate === null) missing.push('epfRate');
   if (s.socsoRate === undefined || s.socsoRate === null) missing.push('socsoRate');
+  if (s.eisRate === undefined || s.eisRate === null) missing.push('eisRate');
   return missing;
 }
 
 function mapItem(r: any): PayrollItem {
-  return {
+  const it: PayrollItem = {
     staffId: r.staff_id,
     staffName: r.staff_name,
     month: r.month ?? '',
     baseSalary: Number(r.base_salary ?? 0),
     epfAmount: Number(r.epf ?? 0),
     socsoAmount: Number(r.socso ?? 0),
+    eisAmount: Number(r.eis ?? 0),
+    totalEmployeeDeductions: Number(r.total_employee_deductions ?? 0),
+    employerEpf: Number(r.employer_epf ?? 0),
+    employerSocso: Number(r.employer_socso ?? 0),
+    employerEis: Number(r.employer_eis ?? 0),
+    totalEmployerContribution: Number(r.total_employer_contribution ?? 0),
     claimsTotal: Number(r.claims_total ?? 0),
     trainingClaimsTotal: Number(r.training_total ?? 0),
+    bonusTotal: Number(r.bonus_total ?? 0),
+    otherAdditionTotal: Number(r.other_addition_total ?? 0),
     adjustment: (r.adjustment as ManualAdjustment | null) ?? null,
     netPay: Number(r.net_pay ?? 0),
     rowStatus: (r.row_status as PayrollItem['rowStatus']) ?? 'Complete',
@@ -58,9 +82,17 @@ function mapItem(r: any): PayrollItem {
     includedTrainingClaimIds: (r.included_training_claim_ids as string[]) ?? [],
     notes: r.notes ?? undefined,
   };
+  // Back-fill totals if older row has zeros.
+  if (!it.totalEmployeeDeductions || !it.totalEmployerContribution) {
+    const t = totals(it);
+    it.totalEmployeeDeductions ||= t.totalEmployeeDeductions;
+    it.totalEmployerContribution ||= t.totalEmployerContribution;
+  }
+  return it;
 }
 
 function itemToDb(item: PayrollItem, runId: string) {
+  const t = totals(item);
   return {
     run_id: runId,
     staff_id: item.staffId,
@@ -68,10 +100,18 @@ function itemToDb(item: PayrollItem, runId: string) {
     base_salary: item.baseSalary,
     epf: item.epfAmount,
     socso: item.socsoAmount,
+    eis: item.eisAmount,
+    total_employee_deductions: t.totalEmployeeDeductions,
+    employer_epf: item.employerEpf,
+    employer_socso: item.employerSocso,
+    employer_eis: item.employerEis,
+    total_employer_contribution: t.totalEmployerContribution,
     claims_total: item.claimsTotal,
     training_total: item.trainingClaimsTotal,
+    bonus_total: item.bonusTotal,
+    other_addition_total: item.otherAdditionTotal,
     net_pay: item.netPay,
-    total_company_cost: round2(item.baseSalary + item.epfAmount + item.socsoAmount),
+    total_company_cost: round2(item.baseSalary + t.totalEmployerContribution),
     row_status: item.rowStatus,
     missing_fields: item.missingFields,
     adjustment: item.adjustment,
@@ -84,12 +124,19 @@ function itemToDb(item: PayrollItem, runId: string) {
 function buildItem(
   s: StaffProfile,
   month: string,
-  claims: ReturnType<typeof claimRepo.queueableForMonth> extends Promise<infer T> ? T : never,
+  claims: Awaited<ReturnType<typeof claimRepo.queueableForMonth>>,
 ): PayrollItem {
   const missing = missingFor(s);
   const base = Number(s.baseSalary) || 0;
   const epf = round2((base * (Number(s.epfRate) || 0)) / 100);
   const socso = round2((base * (Number(s.socsoRate) || 0)) / 100);
+  const eis = round2((base * (Number(s.eisRate) || 0)) / 100);
+  const erEpfRate = s.employerEpfRate ?? DEFAULT_EMPLOYER_EPF_RATE;
+  const erSocsoRate = s.employerSocsoRate ?? DEFAULT_EMPLOYER_SOCSO_RATE;
+  const erEisRate = s.employerEisRate ?? DEFAULT_EMPLOYER_EIS_RATE;
+  const employerEpf = round2((base * erEpfRate) / 100);
+  const employerSocso = round2((base * erSocsoRate) / 100);
+  const employerEis = round2((base * erEisRate) / 100);
 
   const mine = claims.filter((c) => c.staffId === s.id);
   const claimRows = mine.filter((c) => c.type === 'Claim');
@@ -104,8 +151,16 @@ function buildItem(
     baseSalary: base,
     epfAmount: epf,
     socsoAmount: socso,
+    eisAmount: eis,
+    totalEmployeeDeductions: round2(epf + socso + eis),
+    employerEpf,
+    employerSocso,
+    employerEis,
+    totalEmployerContribution: round2(employerEpf + employerSocso + employerEis),
     claimsTotal,
     trainingClaimsTotal: trainingTotal,
+    bonusTotal: 0,
+    otherAdditionTotal: 0,
     adjustment: null,
     netPay: 0,
     rowStatus: missing.length > 0 ? 'Incomplete' : 'Complete',
@@ -158,7 +213,6 @@ export const payrollRepo = {
       console.error('[payrollRepo.listRuns]', error);
       return [];
     }
-    // Resolve items in parallel.
     const runs = await Promise.all(((data ?? []) as any[]).map((r) => loadRun(r.id)));
     return runs.filter((r): r is PayrollRun => !!r);
   },
@@ -182,11 +236,9 @@ export const payrollRepo = {
     return r?.status ?? 'NotPrepared';
   },
 
-  /** Doc 3.1 §9-§10. */
   async getOrCreateDraft(month: string): Promise<PayrollRun> {
     const existing = await this.getForMonth(month);
     if (existing) return existing;
-    // Refresh staff cache + load queueable claims in parallel.
     const [allStaff, claims] = await Promise.all([
       staffRepo.list(),
       claimRepo.queueableForMonth(month),
@@ -208,7 +260,6 @@ export const payrollRepo = {
     return (await loadRun(run.id))!;
   },
 
-  /** Re-pull row from current staff profile. Preserves adjustment + notes. */
   async refreshRow(runId: string, staffId: string): Promise<PayrollRun | undefined> {
     const run = await loadRun(runId);
     if (!run) return undefined;
@@ -223,6 +274,8 @@ export const payrollRepo = {
     if (old) {
       fresh.adjustment = old.adjustment;
       fresh.notes = old.notes;
+      fresh.bonusTotal = old.bonusTotal;
+      fresh.otherAdditionTotal = old.otherAdditionTotal;
       fresh.netPay = computeNetPay(fresh);
     }
     const { error } = await supabase
@@ -260,6 +313,42 @@ export const payrollRepo = {
     return loadRun(runId);
   },
 
+  /** Patch 002 §11 — bonus is an addition outside Total Income. */
+  async setBonus(runId: string, staffId: string, amount: number): Promise<PayrollRun | undefined> {
+    return this._setAddition(runId, staffId, { bonusTotal: round2(amount) });
+  },
+
+  async setOtherAddition(runId: string, staffId: string, amount: number): Promise<PayrollRun | undefined> {
+    return this._setAddition(runId, staffId, { otherAdditionTotal: round2(amount) });
+  },
+
+  async _setAddition(
+    runId: string,
+    staffId: string,
+    patch: Partial<Pick<PayrollItem, 'bonusTotal' | 'otherAdditionTotal'>>,
+  ): Promise<PayrollRun | undefined> {
+    const run = await loadRun(runId);
+    if (!run) return undefined;
+    if (run.status === 'Finalized' || run.status === 'Locked') {
+      throw new Error('Payroll is finalized and locked.');
+    }
+    const item = run.items.find((i) => i.staffId === staffId);
+    if (!item) return run;
+    const next: PayrollItem = { ...item, ...patch };
+    next.netPay = computeNetPay(next);
+    const { error } = await supabase
+      .from('ih_payroll_items')
+      .update({
+        bonus_total: next.bonusTotal,
+        other_addition_total: next.otherAdditionTotal,
+        net_pay: next.netPay,
+      } as any)
+      .eq('run_id', runId)
+      .eq('staff_id', staffId);
+    if (error) throw error;
+    return loadRun(runId);
+  },
+
   async setRunNotes(runId: string, notes: string): Promise<PayrollRun | undefined> {
     const { error } = await supabase
       .from('ih_payroll_runs')
@@ -289,7 +378,6 @@ export const payrollRepo = {
     return loadRun(runId);
   },
 
-  /** Doc 3.1 §11. */
   async canFinalize(runId: string): Promise<{ ok: boolean; reason?: string }> {
     const run = await loadRun(runId);
     if (!run) return { ok: false, reason: 'Run not found.' };
@@ -303,7 +391,6 @@ export const payrollRepo = {
     return { ok: true };
   },
 
-  /** Doc 3.1 §23 — finalize: mark claims included, generate payslips, broadcast notices. */
   async finalize(runId: string, adminId: string): Promise<PayrollRun> {
     const check = await this.canFinalize(runId);
     if (!check.ok) throw new Error(check.reason ?? 'Cannot finalize.');
@@ -323,11 +410,9 @@ export const payrollRepo = {
       await claimRepo.markIncluded(allClaimIds, finalized.id, finalized.month);
     }
 
-    // Generate payslips (Doc 3.2 §5).
     const { payslipRepo } = await import('./payslipRepo');
     const payslips = await payslipRepo.generateForRun(finalized);
 
-    // Payslip-ready notices per staff (Doc 3.2 §16).
     const { noticeRepo } = await import('./noticeRepo');
     await Promise.all(
       payslips.map((ps) =>
@@ -344,7 +429,6 @@ export const payrollRepo = {
       ),
     );
 
-    // Doc 4.3 §6 — audit payroll finalization.
     void logAudit({
       action: 'payroll.finalized',
       targetTable: 'ih_payroll_runs',
@@ -356,7 +440,6 @@ export const payrollRepo = {
     return finalized;
   },
 
-  /** Doc 3.1 §24 — terminal lock. */
   async lockRun(runId: string, _adminId: string): Promise<PayrollRun> {
     const run = await loadRun(runId);
     if (!run) throw new Error('Run not found.');
@@ -378,18 +461,15 @@ export const payrollRepo = {
     return (await loadRun(runId))!;
   },
 
-  /** Doc 3.1 §7 — idempotent admin reminder on day ≥ 25 if payroll not yet prepared. */
   async ensureReminderForMonth(month: string, adminId: string): Promise<void> {
     const today = new Date();
     if (today.getUTCDate() < 25) return;
     const status = await this.statusFor(month);
     if (status !== 'NotPrepared' && status !== 'Draft') return;
-    // Use unique constraint as idempotency guard.
     const { error: insertErr } = await supabase
       .from('ih_payroll_reminders')
       .insert({ month } as any);
     if (insertErr) {
-      // 23505 = unique_violation → reminder already sent for this month.
       return;
     }
     const { noticeRepo } = await import('./noticeRepo');

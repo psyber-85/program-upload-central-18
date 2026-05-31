@@ -1,7 +1,7 @@
 // DEV-ONLY fixture data. Writes to localStorage only — never to Supabase.
 // Production bootstrap is documented in docs/production-seed.md.
 // Do NOT import this from production code paths.
-// Seed data — safe for dev. No passwords. (Doc 0.1 §27)
+// Seed data — safe for dev. No passwords. (Doc 0.1 §27 + Patch 002)
 import type { StaffProfile } from './types';
 
 
@@ -18,6 +18,7 @@ export const SEED_STAFF: StaffProfile[] = [
     baseSalary: 12000,
     epfRate: 11,
     socsoRate: 0.5,
+    eisRate: 0.2,
     insuranceCovered: true,
     insuranceStartDate: '2024-02-01',
     insurancePolicyLink: '',
@@ -37,6 +38,7 @@ export const SEED_STAFF: StaffProfile[] = [
     baseSalary: 6500,
     epfRate: 11,
     socsoRate: 0.5,
+    eisRate: 0.2,
     insuranceCovered: true,
     insuranceStartDate: '2025-10-01',
     adminNotes: '',
@@ -55,6 +57,7 @@ export const SEED_STAFF: StaffProfile[] = [
     baseSalary: 5500,
     epfRate: 11,
     socsoRate: 0.5,
+    eisRate: 0.2,
     insuranceCovered: false,
     adminNotes: '',
     createdAt: '2026-04-20T00:00:00.000Z',

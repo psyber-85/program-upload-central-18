@@ -177,6 +177,12 @@ export const payslipRepo = {
     await supabase.from('ih_payslips').update({ pdf_error: null } as any).eq('id', id);
     const { error } = await supabase.functions.invoke('ih-generate-payslip-pdf', { body: { payslip_id: id } });
     if (error) throw error;
+    void logAudit({
+      action: 'payslip.pdf_regenerated',
+      targetTable: 'ih_payslips',
+      targetId: id,
+      summary: `Payslip PDF regeneration triggered`,
+    });
   },
 
   /** Returns a short-lived signed URL for the PDF, or null if not yet generated. */

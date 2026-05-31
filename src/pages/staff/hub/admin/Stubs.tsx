@@ -1,9 +1,16 @@
+// Patch 1.3 §21 — Replaced legacy ComingSoonStub usage with explicit routes.
+// Approvals now routes to AdminWorkbench filtered to Requests.
+// SettingsAdmin uses the ComingLater pattern.
 import React from 'react';
-import ComingSoonStub from '@/components/internal-hub/ComingSoonStub';
+import { Navigate } from 'react-router-dom';
+import ComingLater from '@/components/internal-hub/ComingLater';
 
-export const Approvals = () => (
-  <ComingSoonStub title="Approvals" description="Admin queue for pending leave, claims, and other requests." owningCard="Card 2" />
-);
+export const Approvals = () => <Navigate to="/staff/admin/workbench?type=Requests" replace />;
+
 export const SettingsAdmin = () => (
-  <ComingSoonStub title="Settings" description="Admin platform settings." owningCard="later card" />
+  <ComingLater
+    feature="Admin Settings"
+    purpose="Platform-level configuration for AIHQ Internal Hub."
+    plannedFor="a later build"
+  />
 );

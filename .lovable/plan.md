@@ -1,87 +1,59 @@
-# Plan — Phase 2: Repo → Supabase swap (sub-batched)
+# Phase 2 — Sub-batch 2B: Notices + Resources → Supabase
 
-## The core challenge
+Migrate `noticeRepo` and `resourceRepo` from localStorage to `ih_notices` / `ih_resources` (+ `ih_notice_reads`, `ih_notice_acks`). RLS already enforces audience/active-staff/archived filtering, so the client just reads/writes.
 
-Today's repos return data **synchronously** (`staffRepo.list()` → `StaffProfile[]`). Supabase calls are **async**. So every callsite — ~35 components — must change from direct sync calls to either `useEffect`+state or TanStack Query hooks.
+## Files to rewrite
 
-To control blast radius, I'll ship in **4 sub-batches**, each touching one functional domain. After each, you test and approve.
+### `src/lib/internal-hub/repos/noticeRepo.ts` (full rewrite, async)
+Maps app types ↔ DB columns:
+- `message` ↔ `body`
+- `publishedAt` ← `created_at`
+- `archived` ← `archived_at !== null`
+- Importance: app `AcknowledgmentRequired` → DB `importance='Critical' + ack_required=true`; `Important`→`Important`; `Normal`→`Normal`.
+- Audience: app `Everyone`/`Admin`/`Arm:Admin/General` → DB `Everyone`; `Arm:Training`→`Training`; `Arm:Solutions`→`Solutions`; `Individual`→`Individual + audience_staff_id`.
+- DB has no `type`/`links`/`editedAt`/broadcast log → defaulted to `'AdminBroadcast'`/`[]`/`undefined`; `listBroadcastLog()`/`broadcastLogFor()` return empty (no-op).
+- Methods become async: `list`, `get`, `visibleFor`, `broadcast`, `edit`, `archive`, `unarchive`, `markRead`, `unreadCount`, `acknowledge`, `ackBy`, `ackRequiredPendingFor`, `ackReport`. Plus new bulk helpers `listReadsForStaff(staffId)` and `listAcksForStaff(staffId)` that return `Set`/`Map` for efficient per-row checks in lists.
 
----
+### `src/lib/internal-hub/repos/resourceRepo.ts` (full rewrite, async)
+- `link` ↔ `url`; `status` ↔ `archived_at`.
+- Audience same mapping as notices.
+- Drops in-app-only fields `owner`/`isNew` (not in DB); `external` derived from `url.startsWith('http')`.
+- Methods become async: `list`, `visibleFor`, `create`, `update`, `archive`, `unarchive`.
 
-## Strategy (applies to every sub-batch)
+## Callsites to update (8 files)
 
-1. Rewrite the repo file: same exported method names, but each returns `Promise<T>`.
-2. Wrap callsites in TanStack Query (`useQuery`/`useMutation`) — `@tanstack/react-query` is already in the project.
-3. Drop seed/`ensureSeed()` logic — data lives in Supabase. (`seed.ts` and `seedNotices.ts` become unused; deleted in Sub-batch 2D cleanup.)
-4. Keep type mapping (DB snake_case → app camelCase) inside each repo so component code is unchanged in shape.
-5. Lazy `require()` calls (e.g. noticeRepo→staffRepo) replaced with awaited Supabase queries — fixes the residual circular-dep issue too.
+All switch to TanStack Query for reads, async mutations:
 
----
+1. **`src/pages/staff/hub/notices/NoticesList.tsx`** — `useQuery(['ih-notices', filter])`, `useQuery(['ih-notice-reads', staffId])`, `useQuery(['ih-notice-acks', staffId])`. Per-row read/ack checks against Sets.
+2. **`src/pages/staff/hub/notices/NoticeDetail.tsx`** — `useQuery(['ih-notice', id])`, async `markRead` on mount via `useMutation`, `edit`/`archive`/`unarchive`/`acknowledge` as `useMutation` calls. `invalidateQueries` on success.
+3. **`src/pages/staff/hub/notices/admin/BroadcastForm.tsx`** — `useMutation` for `broadcast`. Links field stays in UI but is ignored on submit (with a tooltip note added).
+4. **`src/pages/staff/hub/notices/admin/AckReport.tsx`** — already uses `useQuery` for staff; switch `noticeRepo.get` + `ackReport` to async `useQuery`s. Drop the broadcast-log card (no DB table).
+5. **`src/pages/staff/hub/resources/ResourcesIndex.tsx`** — `useQuery(['ih-resources-visible', staffId])`.
+6. **`src/pages/staff/hub/resources/admin/ManageResources.tsx`** — `useQuery(['ih-resources-all'])`, mutations for create/update/archive/unarchive.
+7. **`src/pages/staff/hub/StaffHome.tsx`** — wrap notices preview, unread count, and ack-pending count in `useQuery`. Pass `readSet` down to `LatestNoticesPreview`.
+8. **`src/components/internal-hub/home/LatestNoticesPreview.tsx`** — accept `readSet: Set<string>` instead of `isReadByMe` callback (sync), so it doesn't need to call the repo.
 
-## Sub-batch 2A — Staff + Profiles (foundation)
+## Compatibility shim
 
-**Repo:** `staffRepo`
-**DB:** `ih_staff_profiles` (already used by `HubContext`)
-**Callsites (~7):** `AdminStaffList`, `AdminStaffDetail`, `AdminAddStaff`, `MyProfile`, `StaffFormFields`, `StaffStatusBadge`, `home/MyRecentRequestsPreview`.
-**Notes:**
-- `staffRepo.list()` admin-only (RLS already enforces).
-- `create()` becomes: invite via auth admin (already done by `AdminAddStaff` edge function) + insert profile row.
-- `deactivate()`/`reactivate()` → `update({status})`; sensitive-field trigger from earlier migration enforces admin-only.
+- `noticeRepo` no longer imported from `payrollRepo` (verified earlier); no other repos depend on it.
+- `audienceMatches` stays exported (used by `ackReport` and any future callers).
 
----
+## Loading + error UX
 
-## Sub-batch 2B — Notices + Resources
+- Replace empty render with skeleton/spinner blocks.
+- Toast on mutation failure with `error.message`.
+- `markRead` and `acknowledge` swallow duplicate-key errors (composite PK collisions).
 
-**Repos:** `noticeRepo`, `resourceRepo`
-**DB:** `ih_notices`, `ih_notice_reads`, `ih_notice_acks`, `ih_resources`
-**Callsites (~10):** `NoticesList`, `NoticeDetail`, `BroadcastForm`, `AckReport`, `ResourcesIndex`, `ManageResources`, `home/LatestNoticesPreview`, plus the unread-count badge in `HubSidebar`/`HubMobileNav`.
-**Notes:**
-- `broadcast()` writes Notice + audience-resolution lives client-side (we already gate on RLS); SendGrid fanout deferred to Phase 3.
-- `archive()` sets `archived_at = now()` (NOT delete — trigger from Phase 1 blocks hard-delete).
-- `ackReport()` becomes admin-only Supabase query joining `ih_staff_profiles` + `ih_notice_acks`.
+## Out of scope (deferred)
 
----
+- SendGrid fanout edge function (Phase 3).
+- Broadcast log table / audit log (Phase 4).
+- `type`/`links` columns in `ih_notices` (would require a migration — owners haven't requested; UI gracefully omits).
 
-## Sub-batch 2C — Requests, Claims, Attachments
+## Verification
 
-**Repos:** `claimRepo`, `requestSummaryRepo`
-**DB:** `ih_requests`, `ih_request_attachments` + `request-attachments` storage bucket (already exists)
-**Callsites (~5):** existing request/claim pages + `home/MyRecentRequestsPreview`.
-**Notes:**
-- File uploads switch from base64-in-localStorage to Supabase Storage (signed URL on download).
-- Sensitive WITH CHECK from Phase 1 enforces no self-approval.
+- TypeScript build clean.
+- Manually exercise: list notices, mark read, acknowledge, broadcast (admin), archive/restore, ack report, manage resources (add/edit/archive).
+- `mem://index.md` requires no update — Doc 1.2 rules unchanged.
 
----
-
-## Sub-batch 2D — Payroll, Payslips, Finance, Lifecycle (admin-heavy)
-
-**Repos:** `payrollRepo`, `payslipRepo`, `payslipSummaryRepo`, `financeSnapshotRepo`, `toolAccessRepo`, `onboardingRepo`, `offboardingRepo`, `welcomeEmailRepo`
-**DB:** `ih_payroll_runs`, `ih_payroll_items`, `ih_payslips`, `ih_payslip_downloads`, `ih_finance_snapshots`, `ih_tool_access`, `ih_access_checklist`, `ih_welcome_emails`
-**Callsites (~13):** all admin payroll/finance pages + `MyPayslipsPreview`, `PayslipsIndex`, `PayslipDetail`, `ChecklistItemRow`, `NotionUnlockBanner`, `ToolAccessRow`, `OnboardingStateBadge`, `WelcomeEmailStatus`.
-**Cleanup at the end:** delete `storage.ts`, `seed.ts`, `seedNotices.ts`.
-
----
-
-## Risk mitigation
-
-- **Loading states**: every converted component will show a skeleton/spinner instead of empty render.
-- **Error handling**: toast on mutation failure; query errors logged.
-- **Optimistic updates** where the current UX feels instant (e.g., `markRead`).
-- **Rollback**: each sub-batch is one git commit-equivalent change; if 2A breaks, 2B–2D haven't shipped yet.
-
----
-
-## Out of scope for Phase 2
-
-- SendGrid fanout (Phase 3)
-- Google Calendar (Phase 3)
-- PDF generation (Phase 3)
-- Audit log writes (Phase 4)
-- AI extraction (Phase 5)
-- Anything outside `/staff/hub/*` and `src/components/internal-hub/*`
-
----
-
-## Recommended next step
-
-Approve, and I'll start with **Sub-batch 2A (Staff)** — smallest, foundation for the rest. Ship → you verify staff list/profile pages still work → approve 2B.
+Ready to implement on approval.

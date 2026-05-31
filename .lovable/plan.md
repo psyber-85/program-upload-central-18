@@ -1,59 +1,43 @@
-# Phase 2 — Sub-batch 2B: Notices + Resources → Supabase
+# Sub-batch 2C — Requests, Claims & Attachments → Supabase
 
-Migrate `noticeRepo` and `resourceRepo` from localStorage to `ih_notices` / `ih_resources` (+ `ih_notice_reads`, `ih_notice_acks`). RLS already enforces audience/active-staff/archived filtering, so the client just reads/writes.
+Convert the remaining request/claim repos from `localStorage` to `ih_requests` + `ih_request_attachments` (Phase 1 tables already exist with RLS).
 
-## Files to rewrite
+## Scope
 
-### `src/lib/internal-hub/repos/noticeRepo.ts` (full rewrite, async)
-Maps app types ↔ DB columns:
-- `message` ↔ `body`
-- `publishedAt` ← `created_at`
-- `archived` ← `archived_at !== null`
-- Importance: app `AcknowledgmentRequired` → DB `importance='Critical' + ack_required=true`; `Important`→`Important`; `Normal`→`Normal`.
-- Audience: app `Everyone`/`Admin`/`Arm:Admin/General` → DB `Everyone`; `Arm:Training`→`Training`; `Arm:Solutions`→`Solutions`; `Individual`→`Individual + audience_staff_id`.
-- DB has no `type`/`links`/`editedAt`/broadcast log → defaulted to `'AdminBroadcast'`/`[]`/`undefined`; `listBroadcastLog()`/`broadcastLogFor()` return empty (no-op).
-- Methods become async: `list`, `get`, `visibleFor`, `broadcast`, `edit`, `archive`, `unarchive`, `markRead`, `unreadCount`, `acknowledge`, `ackBy`, `ackRequiredPendingFor`, `ackReport`. Plus new bulk helpers `listReadsForStaff(staffId)` and `listAcksForStaff(staffId)` that return `Set`/`Map` for efficient per-row checks in lists.
+Two repos + their callsites. RequestsIndex itself is still a Card 2 stub, so the actual leave/claim creation UI is **out of scope** — we only wire the data layer + the previews that already consume it.
 
-### `src/lib/internal-hub/repos/resourceRepo.ts` (full rewrite, async)
-- `link` ↔ `url`; `status` ↔ `archived_at`.
-- Audience same mapping as notices.
-- Drops in-app-only fields `owner`/`isNew` (not in DB); `external` derived from `url.startsWith('http')`.
-- Methods become async: `list`, `visibleFor`, `create`, `update`, `archive`, `unarchive`.
+### 1. `requestSummaryRepo.ts` → Supabase
+Back with `ih_requests` table.
+- `listForStaff(staffId, limit?)` → `select id, staff_id, kind, status, created_at` where `staff_id=staffId`, order desc.
+- `pendingCountForStaff(staffId)` → count where `staff_id=staffId AND status='Submitted'`.
+- `pendingApprovalCount()` → count where `status='Submitted'` (admin only; RLS returns 0 for non-admins, which is fine).
+- Map DB `kind` (`Leave|MC|Claim|Training|Benefit`) ↔ app `type` (`Leave|MC|Claim|TrainingFund|Insurance|Other`): `Training→TrainingFund`, `Benefit→Insurance`.
+- Map DB `status` (`Submitted|Approved|Rejected|NeedsCorrection|Cancelled`) ↔ app `RequestStatus` (`Pending|Approved|Rejected|Submitted`): treat `Submitted`/`NeedsCorrection` as `Pending` for display; keep `Submitted` as the canonical pending state for counts.
+- Drop `_seed`.
 
-## Callsites to update (8 files)
+### 2. `claimRepo.ts` → Supabase
+Claims live in `ih_requests` with `kind='Claim'` and a `payload` jsonb carrying `{ amount, description, type: 'Claim'|'TrainingClaim', inclusionState, includedInPayrollRunId, includedInMonth }`. (No separate `ih_claims` table exists — the spec folds them in.)
+- `list()` → all `kind='Claim'` rows, decoded.
+- `queueableForMonth(month)` → approved claims (`status='Approved'`) with `payload->>'inclusionState' != 'IncludedInPayroll'` and `decided_at < first-of-month`.
+- `markIncluded(ids, runId, month)` → update payload jsonb for those rows.
+- `setStateForRun(runId, state)` → same, filtered by `payload->>'includedInPayrollRunId'`.
+- `addManual(input)` → insert row with `kind='Claim'`, `status='Approved'`, `decided_at=now`.
+- All methods become **async**.
 
-All switch to TanStack Query for reads, async mutations:
+### 3. Callsite updates
+- `src/pages/staff/hub/StaffHome.tsx` — wrap `requestSummaryRepo` calls (recent list, `myPendingRequests`, `pendingApprovals`) in `useQuery`. Mirror the pattern already used for notices.
+- `src/lib/internal-hub/repos/payrollRepo.ts` — `claimRepo.queueableForMonth` (line 55) and `claimRepo.markIncluded` (line 221) become awaited calls. The functions that contain them (`previewForMonth`, `finalize`) likely already return promises; if not, promote them. Re-read first and adapt minimally.
+- `MyRecentRequestsPreview.tsx` — check whether it reads directly or via StaffHome; convert to `useQuery` if needed.
 
-1. **`src/pages/staff/hub/notices/NoticesList.tsx`** — `useQuery(['ih-notices', filter])`, `useQuery(['ih-notice-reads', staffId])`, `useQuery(['ih-notice-acks', staffId])`. Per-row read/ack checks against Sets.
-2. **`src/pages/staff/hub/notices/NoticeDetail.tsx`** — `useQuery(['ih-notice', id])`, async `markRead` on mount via `useMutation`, `edit`/`archive`/`unarchive`/`acknowledge` as `useMutation` calls. `invalidateQueries` on success.
-3. **`src/pages/staff/hub/notices/admin/BroadcastForm.tsx`** — `useMutation` for `broadcast`. Links field stays in UI but is ignored on submit (with a tooltip note added).
-4. **`src/pages/staff/hub/notices/admin/AckReport.tsx`** — already uses `useQuery` for staff; switch `noticeRepo.get` + `ackReport` to async `useQuery`s. Drop the broadcast-log card (no DB table).
-5. **`src/pages/staff/hub/resources/ResourcesIndex.tsx`** — `useQuery(['ih-resources-visible', staffId])`.
-6. **`src/pages/staff/hub/resources/admin/ManageResources.tsx`** — `useQuery(['ih-resources-all'])`, mutations for create/update/archive/unarchive.
-7. **`src/pages/staff/hub/StaffHome.tsx`** — wrap notices preview, unread count, and ack-pending count in `useQuery`. Pass `readSet` down to `LatestNoticesPreview`.
-8. **`src/components/internal-hub/home/LatestNoticesPreview.tsx`** — accept `readSet: Set<string>` instead of `isReadByMe` callback (sync), so it doesn't need to call the repo.
+### 4. Attachments
+`ih_request_attachments` table + `request-attachments` storage bucket are already provisioned with RLS. **No repo wrapper needed yet** — no UI in Sub-batch 2C creates requests with attachments (that's Card 2). Defer to when the request-creation UI lands.
 
-## Compatibility shim
-
-- `noticeRepo` no longer imported from `payrollRepo` (verified earlier); no other repos depend on it.
-- `audienceMatches` stays exported (used by `ackReport` and any future callers).
-
-## Loading + error UX
-
-- Replace empty render with skeleton/spinner blocks.
-- Toast on mutation failure with `error.message`.
-- `markRead` and `acknowledge` swallow duplicate-key errors (composite PK collisions).
-
-## Out of scope (deferred)
-
-- SendGrid fanout edge function (Phase 3).
-- Broadcast log table / audit log (Phase 4).
-- `type`/`links` columns in `ih_notices` (would require a migration — owners haven't requested; UI gracefully omits).
+## Out of scope
+- Building the actual request submission/approval UI (Card 2).
+- Audit logging on status changes (Doc 4.3 — separate sub-batch).
+- Realtime subscriptions.
 
 ## Verification
-
-- TypeScript build clean.
-- Manually exercise: list notices, mark read, acknowledge, broadcast (admin), archive/restore, ack report, manage resources (add/edit/archive).
-- `mem://index.md` requires no update — Doc 1.2 rules unchanged.
-
-Ready to implement on approval.
+- `npm run build` clean.
+- StaffHome renders without runtime errors; recent-requests preview shows empty state (DB is empty, expected).
+- Payroll preview page still loads (claims are async now).

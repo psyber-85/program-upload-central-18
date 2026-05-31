@@ -2345,7 +2345,7 @@ export type Database = {
       ih_business_arm: "Training" | "Solutions" | "Both"
       ih_finance_status: "Draft" | "Reviewed" | "Locked"
       ih_notice_importance: "Normal" | "Important" | "Critical"
-      ih_payroll_status: "Draft" | "Finalized" | "Locked"
+      ih_payroll_status: "Draft" | "ReadyForReview" | "Finalized" | "Locked"
       ih_request_kind: "Leave" | "MC" | "Claim" | "Training" | "Benefit"
       ih_request_status:
         | "Submitted"
@@ -2509,7 +2509,7 @@ export const Constants = {
       ih_business_arm: ["Training", "Solutions", "Both"],
       ih_finance_status: ["Draft", "Reviewed", "Locked"],
       ih_notice_importance: ["Normal", "Important", "Critical"],
-      ih_payroll_status: ["Draft", "Finalized", "Locked"],
+      ih_payroll_status: ["Draft", "ReadyForReview", "Finalized", "Locked"],
       ih_request_kind: ["Leave", "MC", "Claim", "Training", "Benefit"],
       ih_request_status: [
         "Submitted",

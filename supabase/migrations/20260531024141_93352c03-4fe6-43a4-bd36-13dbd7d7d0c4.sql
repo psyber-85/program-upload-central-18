@@ -1,0 +1,1 @@
+ALTER TYPE public.ih_payroll_status ADD VALUE IF NOT EXISTS 'ReadyForReview' BEFORE 'Finalized';

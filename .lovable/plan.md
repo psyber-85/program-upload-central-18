@@ -1,31 +1,27 @@
-## Doc 4.3 §6 — Audit coverage fixes
+## Fix: calendar sync "timeRangeEmpty" when end_date < start_date
 
-Scope: extend `logAudit` to remaining important actions listed in §6. No schema changes — `ih_audit_log` + `ih_log_audit` RPC already exist. System Issues filters already in place (type/status/time window), so the earlier "verify filters" finding is closed — no UI change needed.
+### Root cause
+Pang's leave: `start_date=2026-06-01`, `end_date=2026-05-01` (end before start). The all-day event the sync builds becomes `start.date=2026-06-01`, `end.date=2026-05-02`. Google rejects with `timeRangeEmpty` (labeled `timeMax` for any empty range).
+
+The form does not validate that end ≥ start, so an out-of-order range got persisted and approved.
 
 ### Edits
 
-**`src/lib/internal-hub/repos/staffRepo.ts`**
-- Import `logAudit`.
-- Log on `create` → action `staff.created` (summary: name + email + role).
-- Log on `update` → action `staff.updated`; if `patch.role` differs from prior, also emit `staff.role_changed` with `{from, to}` metadata.
-- Log on `deactivate` → action `staff.deactivated`.
-- Log on `reactivate` → action `staff.reactivated`.
-- Log on `hardDelete` → action `staff.hard_deleted` (rare exception path).
+**1. `src/pages/staff/hub/requests/RequestsIndex.tsx` — block submission with invalid range**
+- In the submit handler (around line 51), add: `if (endDate && endDate < startDate) { toast.error('End date cannot be before start date.'); return; }`.
 
-**`src/lib/internal-hub/repos/noticeRepo.ts`**
-- Log on `acknowledge` → action `notice.acknowledged`, target `ih_notices/{noticeId}`, metadata `{staffId}`.
+**2. `supabase/functions/ih-calendar-sync/index.ts` — defensive clamp in `buildEventPayload`**
+- For the full-day branch (line ~46): if `endRaw < startDate`, set `endRaw = startDate` so the event becomes a single-day all-day event instead of failing. Belt-and-braces — UI is the primary guard.
 
-**`src/lib/internal-hub/repos/payslipRepo.ts`**
-- Import `logAudit`.
-- Log on `generateForRun` after insert succeeds → action `payslip.generated`, summary `Generated N payslips for {month}`, metadata `{runId, count}`.
-- Log on `regeneratePdf` → action `payslip.pdf_regenerated`, target `ih_payslips/{id}`.
+**3. One-off data fix for Pang's stuck request**
+- Update `ih_requests.payload` for `c453fcea-e561-4c20-9dfa-f15da6a78a9a` so `end_date = '2026-06-01'` (matching the start, since the original intent isn't recoverable — admin can amend later if needed). Then re-invoke `ih-calendar-sync` for that request via the System Issues retry path so the event syncs and `gcal_sync_error` clears.
 
-All `logAudit` calls use `void logAudit({...})` so audit failures never break the primary workflow (existing pattern).
-
-### Out of scope (per existing memory)
-- AI extraction §16–§24 stays deferred.
-- File upload/delete and integration-failure audit entries are already captured via `ih_email_log`, `ih_calendar_sync_log`, and `ih_payslips.pdf_error` and surfaced in System Issues — no duplicate audit row needed.
-- `toolAccessRepo` is localStorage-only; no DB action to audit.
+### Out of scope
+- No schema/RLS changes.
+- No new audit actions (existing request audit covers it).
+- No changes to half-day branch — it already uses a single date.
 
 ### Expected outcome
-Doc 4.3 compliance moves from 79% → ~95%. Remaining gaps are intentionally deferred (AI extraction).
+- Future leave requests with end < start are blocked at the form.
+- Edge function no longer 400s on out-of-order ranges; it falls back to a single-day event.
+- Pang's stuck request syncs successfully after the data fix + retry.

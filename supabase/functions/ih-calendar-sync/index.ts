@@ -43,8 +43,10 @@ function buildEventPayload(req: any, staffName: string) {
 
   // §18 — full-day(s) all-day event. Google Calendar all-day end.date is exclusive.
   const startDate = String(req.start_date ?? req.date ?? "").slice(0, 10);
-  const endRaw = String(req.end_date ?? req.start_date ?? req.date ?? "").slice(0, 10);
+  let endRaw = String(req.end_date ?? req.start_date ?? req.date ?? "").slice(0, 10);
   if (!startDate) throw new Error("missing_start_date");
+  // Defensive: clamp end < start to a single-day event so Google doesn't 400 with timeRangeEmpty.
+  if (endRaw < startDate) endRaw = startDate;
   const endExclusive = new Date(endRaw);
   endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
   return {

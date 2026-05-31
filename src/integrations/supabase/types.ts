@@ -1066,6 +1066,44 @@ export type Database = {
           },
         ]
       }
+      ih_request_events: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json
+          note: string | null
+          request_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json
+          note?: string | null
+          request_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json
+          note?: string | null
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ih_request_events_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "ih_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ih_requests: {
         Row: {
           archived_at: string | null
@@ -1082,6 +1120,8 @@ export type Database = {
           payload: Json
           staff_id: string
           status: Database["public"]["Enums"]["ih_request_status"]
+          sub_state: string | null
+          training_application_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1099,6 +1139,8 @@ export type Database = {
           payload?: Json
           staff_id: string
           status?: Database["public"]["Enums"]["ih_request_status"]
+          sub_state?: string | null
+          training_application_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1116,6 +1158,8 @@ export type Database = {
           payload?: Json
           staff_id?: string
           status?: Database["public"]["Enums"]["ih_request_status"]
+          sub_state?: string | null
+          training_application_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1131,6 +1175,13 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "ih_staff_profiles_self"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ih_requests_training_application_id_fkey"
+            columns: ["training_application_id"]
+            isOneToOne: false
+            referencedRelation: "ih_requests"
             referencedColumns: ["id"]
           },
         ]

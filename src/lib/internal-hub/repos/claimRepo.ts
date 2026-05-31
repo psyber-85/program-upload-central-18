@@ -46,7 +46,7 @@ async function fetchAllClaims(): Promise<ApprovedClaim[]> {
     console.error('[claimRepo]', error);
     return [];
   }
-  return (data as DbRow[] | null)?.map(mapRow) ?? [];
+  return (data ?? []).map((r) => mapRow(r as unknown as DbRow));
 }
 
 export const claimRepo = {

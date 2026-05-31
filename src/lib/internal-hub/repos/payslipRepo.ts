@@ -1,6 +1,7 @@
 // Doc 3.2 — Payslips backed by Supabase (`ih_payslips` + `ih_payslip_downloads`).
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from '@/integrations/supabase/client';
+import { logAudit } from '../audit';
 import type {
   HubRole,
   ManualAdjustment,
@@ -123,6 +124,14 @@ export const payslipRepo = {
       .select('*');
     if (error) throw error;
     const generated = (data ?? []).map(mapRow);
+    void logAudit({
+      action: 'payslip.generated',
+      targetTable: 'ih_payslips',
+      targetId: run.id,
+      summary: `Generated ${generated.length} payslip(s) for ${run.month}`,
+      metadata: { runId: run.id, month: run.month, count: generated.length },
+    });
+
 
     // Doc 4.2 §32 — generate per-staff PDFs (fire-and-forget; failure must not
     // block payroll finalization). PDF errors land in ih_payslips.pdf_error.
@@ -168,6 +177,12 @@ export const payslipRepo = {
     await supabase.from('ih_payslips').update({ pdf_error: null } as any).eq('id', id);
     const { error } = await supabase.functions.invoke('ih-generate-payslip-pdf', { body: { payslip_id: id } });
     if (error) throw error;
+    void logAudit({
+      action: 'payslip.pdf_regenerated',
+      targetTable: 'ih_payslips',
+      targetId: id,
+      summary: `Payslip PDF regeneration triggered`,
+    });
   },
 
   /** Returns a short-lived signed URL for the PDF, or null if not yet generated. */

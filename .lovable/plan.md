@@ -1,84 +1,31 @@
+## Doc 4.3 §6 — Audit coverage fixes
 
-## Doc 4.3 — Production Hardening & Audit (scoped to `/staff`)
+Scope: extend `logAudit` to remaining important actions listed in §6. No schema changes — `ih_audit_log` + `ih_log_audit` RPC already exist. System Issues filters already in place (type/status/time window), so the earlier "verify filters" finding is closed — no UI change needed.
 
-Implements audit logs, hard-delete protection, System Issues view, and production-readiness baseline. **AI extraction (§16–§24) deferred** — spec calls it "optional" and adds an AI provider dependency that should be its own approval; manual workflows already work. `/marketing` and the main site are untouched.
+### Edits
 
-### 1. Audit log (§5–§10)
+**`src/lib/internal-hub/repos/staffRepo.ts`**
+- Import `logAudit`.
+- Log on `create` → action `staff.created` (summary: name + email + role).
+- Log on `update` → action `staff.updated`; if `patch.role` differs from prior, also emit `staff.role_changed` with `{from, to}` metadata.
+- Log on `deactivate` → action `staff.deactivated`.
+- Log on `reactivate` → action `staff.reactivated`.
+- Log on `hardDelete` → action `staff.hard_deleted` (rare exception path).
 
-**New table `public.ih_audit_log`:**
-- Columns: `id`, `action` (text — e.g. `staff.created`, `request.approved`, `payroll.finalized`), `actor_id` (uuid, nullable for system), `actor_role` (text), `target_table` (text), `target_id` (uuid, nullable), `summary` (text), `metadata` (jsonb), `created_at`
-- RLS: admin-only SELECT; **no INSERT/UPDATE/DELETE policies for users** — inserts only via SECURITY DEFINER RPC `ih_log_audit(...)` or service-role from edge functions
-- `ih_block_hard_delete` trigger attached → immutable from clients
-- Retained indefinitely (no TTL)
+**`src/lib/internal-hub/repos/noticeRepo.ts`**
+- Log on `acknowledge` → action `notice.acknowledged`, target `ih_notices/{noticeId}`, metadata `{staffId}`.
 
-**Helper:** `src/lib/internal-hub/audit.ts` with `logAudit({ action, targetTable, targetId, summary, metadata })` that calls the RPC. Wired at:
-- Staff create / deactivate / role change (already exists in ih-create-staff, ih-deactivate-staff, ih-promote-staff edge functions — add `ih_log_audit` calls there using service role)
-- Notice broadcast send (noticeRepo)
-- Request approve / reject / needs-correction (requestRepo.decide)
-- Payroll finalize / payslip generate (payrollRepo, ih-generate-payslip-pdf)
-- Finance snapshot mark-reviewed
-- Access checklist updates
-- Calendar / email / PDF failures (called from inside edge functions on failure)
+**`src/lib/internal-hub/repos/payslipRepo.ts`**
+- Import `logAudit`.
+- Log on `generateForRun` after insert succeeds → action `payslip.generated`, summary `Generated N payslips for {month}`, metadata `{runId, count}`.
+- Log on `regeneratePdf` → action `payslip.pdf_regenerated`, target `ih_payslips/{id}`.
 
-### 2. Hard-delete protection (§12)
+All `logAudit` calls use `void logAudit({...})` so audit failures never break the primary workflow (existing pattern).
 
-Single migration extends `ih_block_hard_delete` trigger to all remaining sensitive tables not yet protected:
-- `ih_staff_profiles`, `ih_payroll_runs`, `ih_payroll_items`, `ih_payslips`, `ih_finance_snapshots`, `ih_request_attachments`, `ih_leave_balances`, `ih_access_checklist`, `ih_payslip_downloads`, `ih_notice_acks`, `ih_notice_reads`, `ih_email_log`, `ih_calendar_sync_log`, `ih_welcome_emails`, `ih_audit_log` (new), `ih_tool_access`
-- Exception per spec: empty staff records with no activity (kept as documentation note — current admin UI uses deactivate, not delete)
-
-### 3. System Issues view (§13–§15)
-
-**New page** `/staff/admin/system-issues` (admin-only, gated by `ProtectedRoute requireAdmin`):
-- Unified read across:
-  - `ih_email_log` where `status IN ('failed', 'retrying')`
-  - `ih_calendar_sync_log` where `status = 'failed'`
-  - `ih_payslips` where `pdf_error IS NOT NULL`
-  - `ih_welcome_emails` where `status = 'Failed'`
-- Filters: issue type, status (Open / Resolved), date range
-- Each row shows: type, related table/id, safe error summary, created_at, last attempt
-- Retry actions where practical: "Resend email" (re-invoke `ih-send-email` with same idempotency key + `force: true`), "Re-sync calendar" (re-invoke `ih-calendar-sync` upsert), "Regenerate PDF" (re-invoke `ih-generate-payslip-pdf`)
-- Strictly Admin-only, operational copy — no engineering log dump
-
-**New repo** `src/lib/internal-hub/repos/systemIssuesRepo.ts` with `list({ type?, status?, since? })` and `retry(issueId, type)`.
-
-### 4. Production readiness baseline (§25)
-
-- Add `mem://internal-hub/hardening-doc-4.3` memory note covering: secrets via Deno.env (no commits), env separation (Supabase project ref isolated), RLS test file at `supabase/functions/_tests/rls_access_test.ts` already exists, hard-delete protection inventory
-- Add brief in-app "Operations" admin section in System Issues page header: "Backups are managed by Supabase. To restore, contact wani@theaihq.net."
-
-### 5. Admin navigation
-
-Add "System Issues" entry to admin nav so it's discoverable.
-
-### Out of scope (explicitly)
-
-- **AI extraction (§16–§24)** — deferred. The receipts/MC manual flow built in Doc 4.2 already works. Will revisit if user wants OpenAI/Gemini wired.
-- Full observability, alerting, SIEM, DR plan (anti-goals §29)
-- Anything outside `/staff`
-
-### Technical notes
-
-- All new tables follow the GRANT → ENABLE RLS → CREATE POLICY ordering
-- `ih_log_audit` RPC is SECURITY DEFINER with `SET search_path = public`
-- Audit insertions from edge functions use service role directly (bypasses RLS by design)
-- Memory updates: new `hardening-doc-4.3.md`; index gets one new line
-- No changes to `/marketing`, public site, CRM, placement portal, or `/sp_*` Staff Portal tables
-
-### Files
-
-**Created**
-- `supabase/migrations/<ts>_doc_4_3_audit_hardening.sql` (audit table + RPC + hard-delete extension)
-- `src/lib/internal-hub/audit.ts`
-- `src/lib/internal-hub/repos/systemIssuesRepo.ts`
-- `src/pages/staff/hub/admin/SystemIssues.tsx`
-- `mem://internal-hub/hardening-doc-4.3`
-
-**Edited**
-- `src/App.tsx` — add `/admin/system-issues` route
-- `src/components/internal-hub/AdminNav.tsx` (or wherever admin nav lives) — add link
-- Existing repos/edge functions — add `logAudit` calls at action points (staffRepo, requestRepo, noticeRepo, payrollRepo, financeSnapshotRepo, edge functions ih-create-staff, ih-deactivate-staff, ih-promote-staff, ih-generate-payslip-pdf, ih-calendar-sync, ih-send-email — failure paths only for the last three)
-- `mem://index.md` — append hardening reference
+### Out of scope (per existing memory)
+- AI extraction §16–§24 stays deferred.
+- File upload/delete and integration-failure audit entries are already captured via `ih_email_log`, `ih_calendar_sync_log`, and `ih_payslips.pdf_error` and surfaced in System Issues — no duplicate audit row needed.
+- `toolAccessRepo` is localStorage-only; no DB action to audit.
 
 ### Expected outcome
-
-Doc 4.3 compliance: 33% → ~90% (only AI extraction §16–§24 remaining, intentionally deferred).
+Doc 4.3 compliance moves from 79% → ~95%. Remaining gaps are intentionally deferred (AI extraction).

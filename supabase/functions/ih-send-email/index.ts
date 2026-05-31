@@ -51,6 +51,10 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return bad(405, "method_not_allowed");
 
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return bad(auth.status, auth.error);
+
+
   let body: SendRequest;
   try { body = await req.json(); } catch { return bad(400, "invalid_json"); }
 

@@ -173,6 +173,15 @@ export const noticeRepo = {
       console.error('[noticeRepo.broadcast] email dispatch failed', e);
     });
 
+    // Doc 4.3 §6 — audit broadcast send.
+    void logAudit({
+      action: 'notice.broadcast',
+      targetTable: 'ih_notices',
+      targetId: notice.id,
+      summary: `Broadcast "${notice.title}"`,
+      metadata: { audience: notice.audience, importance: notice.importance },
+    });
+
     return notice;
   },
 

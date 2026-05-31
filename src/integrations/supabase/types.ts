@@ -474,6 +474,8 @@ export type Database = {
       }
       ih_leave_balances: {
         Row: {
+          al_carry_forward: number
+          al_carry_forward_expires_on: string | null
           al_total: number
           al_used: number
           id: string
@@ -484,6 +486,8 @@ export type Database = {
           year: number
         }
         Insert: {
+          al_carry_forward?: number
+          al_carry_forward_expires_on?: string | null
           al_total?: number
           al_used?: number
           id?: string
@@ -494,6 +498,8 @@ export type Database = {
           year: number
         }
         Update: {
+          al_carry_forward?: number
+          al_carry_forward_expires_on?: string | null
           al_total?: number
           al_used?: number
           id?: string
@@ -2527,6 +2533,16 @@ export type Database = {
         Returns: boolean
       }
       ih_log_audit: {
+        Args: {
+          _action: string
+          _metadata?: Json
+          _summary: string
+          _target_id: string
+          _target_table: string
+        }
+        Returns: string
+      }
+      ih_log_system_audit: {
         Args: {
           _action: string
           _metadata?: Json

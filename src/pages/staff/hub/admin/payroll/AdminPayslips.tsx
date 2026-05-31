@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Download, ShieldAlert } from 'lucide-react';
 import { useHub } from '@/lib/internal-hub/HubContext';
 import { canAccessAdminArea } from '@/lib/internal-hub/access';
-import { payslipRepo, staffRepo } from '@/lib/internal-hub';
+import { payslipRepo } from '@/lib/internal-hub';
 import { CONFIDENTIAL_PAYSLIP_LABEL } from '@/lib/internal-hub/types';
 import { toast } from '@/hooks/use-toast';
 
@@ -16,11 +17,18 @@ const AdminPayslips = () => {
   const [q, setQ] = useState('');
   const [month, setMonth] = useState('');
 
-  if (!canAccessAdminArea(currentStaff)) {
-    return <div className="p-6 text-sm text-muted-foreground">Admin only.</div>;
-  }
+  const { data: all = [] } = useQuery({
+    queryKey: ['ih-payslips-all'],
+    queryFn: () => payslipRepo.listAll(),
+    enabled: !!currentStaff && canAccessAdminArea(currentStaff),
+  });
+  const downloadMut = useMutation({
+    mutationFn: (id: string) =>
+      payslipRepo.downloadPdf(id, currentStaff!.id, currentStaff!.role),
+    onError: (e: Error) =>
+      toast({ title: 'Download failed', description: e.message, variant: 'destructive' }),
+  });
 
-  const all = payslipRepo.listAll();
   const filtered = useMemo(() => {
     return all.filter((p) => {
       if (month && p.month !== month) return false;
@@ -29,15 +37,14 @@ const AdminPayslips = () => {
     });
   }, [all, q, month]);
 
-  const months = Array.from(new Set(all.map((p) => p.month))).sort().reverse();
+  const months = useMemo(
+    () => Array.from(new Set(all.map((p) => p.month))).sort().reverse(),
+    [all],
+  );
 
-  const handleDownload = (id: string) => {
-    try {
-      payslipRepo.downloadPdf(id, currentStaff!.id, currentStaff!.role);
-    } catch (e: any) {
-      toast({ title: 'Download failed', description: e.message, variant: 'destructive' });
-    }
-  };
+  if (!canAccessAdminArea(currentStaff)) {
+    return <div className="p-6 text-sm text-muted-foreground">Admin only.</div>;
+  }
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
@@ -89,7 +96,7 @@ const AdminPayslips = () => {
                     <Button asChild size="sm" variant="outline">
                       <Link to={`/staff/payslips/${p.id}`}>View</Link>
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleDownload(p.id)}>
+                    <Button size="sm" variant="ghost" onClick={() => downloadMut.mutate(p.id)}>
                       <Download className="h-3.5 w-3.5 mr-1" /> PDF
                     </Button>
                   </div>

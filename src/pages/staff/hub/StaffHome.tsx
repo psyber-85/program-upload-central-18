@@ -107,12 +107,7 @@ const StaffHome = () => {
       }).length
     : 0;
 
-  const month = (() => {
-    const d = new Date();
-    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-  })();
   const payrollStatus = PAYROLL_STATUS_LABELS[payrollStatusRaw];
-  const financeStatusRaw = financeSnapshotRepo.statusFor(month);
   const financeStatus = financeStatusRaw === 'NotStarted' ? 'Not Started' : FINANCE_STATUS_LABELS[financeStatusRaw];
   const latestPayslip = payslips[0];
 

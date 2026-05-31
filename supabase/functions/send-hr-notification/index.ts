@@ -96,6 +96,10 @@ const generateEmailTemplate = async (hrName: string, staffName: string, courseNa
     console.log('Found links for program:', productType, links);
   }
 
+  const safeHrName = escapeHtml(hrName);
+  const safeStaffName = escapeHtml(staffName);
+  const safeCourseName = escapeHtml(courseName);
+
   const htmlTemplate = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
       <p>Dear ${hrName},</p>

@@ -37,7 +37,7 @@ const generateEmailHtml = (data: PayslipNotificationRequest): string => {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Your Payslip for ${data.month}</title>
+  <title>Your Payslip for ${safeMonth}</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f4;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f4;">
@@ -48,16 +48,16 @@ const generateEmailHtml = (data: PayslipNotificationRequest): string => {
           <tr>
             <td style="background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); padding: 30px 40px; border-radius: 8px 8px 0 0;">
               <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">Payslip Notification</h1>
-              <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.8); font-size: 14px;">${data.month}</p>
+              <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.8); font-size: 14px;">${safeMonth}</p>
             </td>
           </tr>
           
           <!-- Content -->
           <tr>
             <td style="padding: 40px;">
-              <p style="margin: 0 0 20px 0; color: #333; font-size: 16px;">Dear ${data.recipientName},</p>
+              <p style="margin: 0 0 20px 0; color: #333; font-size: 16px;">Dear ${safeName},</p>
               <p style="margin: 0 0 30px 0; color: #666; font-size: 14px; line-height: 1.6;">
-                Your payslip for <strong>${data.month}</strong> has been finalized. Please find the summary below:
+                Your payslip for <strong>${safeMonth}</strong> has been finalized. Please find the summary below:
               </p>
               
               <!-- Payslip Summary Table -->

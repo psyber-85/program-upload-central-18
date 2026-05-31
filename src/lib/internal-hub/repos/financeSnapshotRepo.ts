@@ -75,6 +75,7 @@ async function payrollTotalsFor(month: string) {
   let payroll = 0, claims = 0, training = 0, adj = 0, bonus = 0;
   let employeeStat = 0, employerStat = 0;
   let epfTot = 0, socsoTot = 0, eisTot = 0;
+  let employerEpf = 0, employerSocso = 0;
   for (const r of (data ?? []) as any[]) {
     const base = Number(r.base_salary ?? 0);
     const epf = Number(r.epf ?? 0);
@@ -91,6 +92,8 @@ async function payrollTotalsFor(month: string) {
     bonus += Number(r.bonus_total ?? 0);
     employeeStat += empDed;
     employerStat += empCon;
+    employerEpf += eEpf;
+    employerSocso += eSocso;
     epfTot += epf + eEpf;
     socsoTot += socso + eSocso;
     eisTot += eis + eEis;
@@ -101,7 +104,7 @@ async function payrollTotalsFor(month: string) {
     payroll_total: round2(payroll),
     claims_total: round2(claims),
     training_claims_total: round2(training),
-    epf_socso_total: round2(employerStat), // deprecated; preserved for back-compat readers
+    epf_socso_total: round2(employerEpf + employerSocso), // deprecated; preserved for back-compat readers (excludes EIS)
     employee_statutory_total: round2(employeeStat),
     employer_statutory_total: round2(employerStat),
     epf_total: round2(epfTot),

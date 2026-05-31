@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { escapeHtml, jsonError } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,13 +13,31 @@ interface HiringInterestRequest {
   hiringNeeds: string;
 }
 
+function isEmail(s: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { picName, contactNumber, email, hiringNeeds }: HiringInterestRequest = await req.json();
+    const raw = await req.json().catch(() => null) as Partial<HiringInterestRequest> | null;
+    if (!raw) return jsonError(400, "invalid_json");
+    const picName = String(raw.picName ?? "").trim().slice(0, 120);
+    const contactNumber = String(raw.contactNumber ?? "").trim().slice(0, 40);
+    const email = String(raw.email ?? "").trim().slice(0, 200);
+    const hiringNeeds = String(raw.hiringNeeds ?? "").trim().slice(0, 4000);
+    if (!picName || !contactNumber || !email || !hiringNeeds) {
+      return jsonError(400, "missing_fields");
+    }
+    if (!isEmail(email)) return jsonError(400, "invalid_email");
+
+    const safePic = escapeHtml(picName);
+    const safeContact = escapeHtml(contactNumber);
+    const safeEmail = escapeHtml(email);
+    const safeNeeds = escapeHtml(hiringNeeds);
 
     const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
     const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "info@theaihq.net";
@@ -26,6 +45,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (!SENDGRID_API_KEY) {
       throw new Error("SendGrid API key not configured");
     }
+
 
     // Send LOI email to the employer
     const emailResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
@@ -55,13 +75,13 @@ const handler = async (req: Request): Promise<Response> => {
   </div>
   
   <div style="background: #ffffff; padding: 30px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-    <h2 style="color: #1e293b; margin-top: 0;">Dear ${picName},</h2>
+    <h2 style="color: #1e293b; margin-top: 0;">Dear ${safePic},</h2>
     
     <p>Thank you for your interest in TryHire! We're excited to help you find the right talent for your organization.</p>
     
     <div style="background: #f8fafc; border-left: 4px solid #f97316; padding: 15px 20px; margin: 20px 0; border-radius: 0 8px 8px 0;">
       <strong style="color: #1e293b;">Your Hiring Requirements:</strong>
-      <p style="margin: 10px 0 0 0; white-space: pre-wrap;">${hiringNeeds}</p>
+      <p style="margin: 10px 0 0 0; white-space: pre-wrap;">${safeNeeds}</p>
     </div>
     
     <h3 style="color: #1e293b;">Next Steps:</h3>
@@ -109,17 +129,17 @@ const handler = async (req: Request): Promise<Response> => {
       body: JSON.stringify({
         personalizations: [{ to: [{ email: FROM_EMAIL }] }],
         from: { email: FROM_EMAIL, name: "TryHire System" },
-        subject: `New Hiring Interest: ${picName}`,
+        subject: `New Hiring Interest: ${safePic}`,
         content: [
           {
             type: "text/html",
             value: `
 <h2>New Hiring Interest Submission</h2>
-<p><strong>PIC Name:</strong> ${picName}</p>
-<p><strong>Contact:</strong> ${contactNumber}</p>
-<p><strong>Email:</strong> ${email}</p>
+<p><strong>PIC Name:</strong> ${safePic}</p>
+<p><strong>Contact:</strong> ${safeContact}</p>
+<p><strong>Email:</strong> ${safeEmail}</p>
 <h3>Hiring Needs:</h3>
-<p style="white-space: pre-wrap;">${hiringNeeds}</p>
+<p style="white-space: pre-wrap;">${safeNeeds}</p>
             `,
           },
         ],

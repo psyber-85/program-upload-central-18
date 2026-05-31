@@ -4,6 +4,7 @@
 // Logs every send attempt to ih_email_log BEFORE the provider call (§12).
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
+import { requireAdmin } from "../_shared/auth.ts";
 
 const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
 const SENDER_EMAIL = "system@theaihq.net";
@@ -49,6 +50,10 @@ function bad(status: number, error: string) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return bad(405, "method_not_allowed");
+
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return bad(auth.status, auth.error);
+
 
   let body: SendRequest;
   try { body = await req.json(); } catch { return bad(400, "invalid_json"); }

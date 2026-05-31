@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
+import { requireAdmin, escapeHtml, jsonError } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -95,13 +96,17 @@ const generateEmailTemplate = async (hrName: string, staffName: string, courseNa
     console.log('Found links for program:', productType, links);
   }
 
+  const safeHrName = escapeHtml(hrName);
+  const safeStaffName = escapeHtml(staffName);
+  const safeCourseName = escapeHtml(courseName);
+
   const htmlTemplate = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-      <p>Dear ${hrName},</p>
+      <p>Dear ${safeHrName},</p>
       
       <p>I hope this message finds you well.</p>
       
-      <p>I am writing to facilitate the registration of <strong>${staffName}</strong> from your organization for the upcoming training program, <strong>${courseName}</strong>, conducted by AIHQ.</p>
+      <p>I am writing to facilitate the registration of <strong>${safeStaffName}</strong> from your organization for the upcoming training program, <strong>${safeCourseName}</strong>, conducted by AIHQ.</p>
       
       <p>Attached are the following documents for your review:</p>
       
@@ -122,7 +127,7 @@ const generateEmailTemplate = async (hrName: string, staffName: string, courseNa
       
       <p>Should you have any questions or need further assistance, please feel free to contact me directly.</p>
       
-      <p>Thank you for your attention and support. We look forward to welcoming <strong>${staffName}</strong> to the program.</p>
+      <p>Thank you for your attention and support. We look forward to welcoming <strong>${safeStaffName}</strong> to the program.</p>
       
       <p>Warm regards,<br>
       Vino<br>
@@ -175,6 +180,9 @@ const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return jsonError(auth.status, auth.error);
 
   try {
     const body: EmailRequest = await req.json();

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { requireAdmin, escapeHtml, jsonError } from "../_shared/auth.ts";
 
 const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "noreply@theaihq.net";
@@ -18,10 +19,12 @@ interface WelcomeEmailRequest {
 
 const generateEmailHtml = (data: WelcomeEmailRequest): string => {
   const loginUrl = data.loginUrl || "https://theaihq.net/staff";
+  const safeName = escapeHtml(data.recipientName);
+  const safeSender = escapeHtml(data.senderName || 'The AI HQ Team');
   const customParagraphs = data.customMessage
     .split('\n')
     .filter(p => p.trim())
-    .map(p => `<p style="margin: 0 0 15px 0; color: #666; font-size: 14px; line-height: 1.6;">${p}</p>`)
+    .map(p => `<p style="margin: 0 0 15px 0; color: #666; font-size: 14px; line-height: 1.6;">${escapeHtml(p)}</p>`)
     .join('');
 
   return `
@@ -48,7 +51,7 @@ const generateEmailHtml = (data: WelcomeEmailRequest): string => {
           <!-- Content -->
           <tr>
             <td style="padding: 40px;">
-              <p style="margin: 0 0 25px 0; color: #333; font-size: 18px; font-weight: 500;">Dear ${data.recipientName},</p>
+              <p style="margin: 0 0 25px 0; color: #333; font-size: 18px; font-weight: 500;">Dear ${safeName},</p>
               
               ${customParagraphs}
               
@@ -69,7 +72,7 @@ const generateEmailHtml = (data: WelcomeEmailRequest): string => {
               
               <p style="margin: 30px 0 0 0; color: #666; font-size: 14px;">
                 Best regards,<br>
-                <strong>${data.senderName || 'The AI HQ Team'}</strong>
+                <strong>${safeSender}</strong>
               </p>
             </td>
           </tr>
@@ -116,6 +119,9 @@ const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return jsonError(auth.status, auth.error);
 
   try {
     if (!SENDGRID_API_KEY) {

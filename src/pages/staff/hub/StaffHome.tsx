@@ -69,8 +69,8 @@ const StaffHome = () => {
 
   if (!currentStaff) return null;
 
-  const unread = noticeRepo.unreadCount(currentStaff);
-  const ackPending = noticeRepo.ackRequiredPendingFor(currentStaff).length;
+  const unread = noticesAll.filter((n) => !readSet.has(n.id)).length;
+  const ackPending = noticesAll.filter((n) => n.importance === 'AcknowledgmentRequired' && !ackMap.has(n.id)).length;
   const myPendingRequests = requestSummaryRepo.pendingCountForStaff(currentStaff.id);
 
   // Admin metrics
@@ -159,7 +159,7 @@ const StaffHome = () => {
       {/* 4. Latest Notices preview */}
       <LatestNoticesPreview
         notices={notices}
-        isReadByMe={(id) => noticeRepo.isReadBy(id, currentStaff.id)}
+        readSet={readSet}
       />
 
       {/* 5–6. Requests + Payslips previews */}

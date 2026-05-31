@@ -26,3 +26,7 @@ verify_jwt = false
 
 [functions.ih-promote-staff]
 verify_jwt = false
+
+[functions.ih-provision-test-fixtures]
+verify_jwt = false
+

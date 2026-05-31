@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,24 +28,77 @@ const FinanceSnapshotDetail = () => {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const { currentStaff } = useHub();
-  const [tick, setTick] = useState(0);
-  const refresh = () => setTick((t) => t + 1);
+  const qc = useQueryClient();
 
-  if (!canAccessAdminArea(currentStaff)) {
-    return <div className="p-6 text-sm text-muted-foreground">Admin only.</div>;
-  }
-  const snap = useMemo(() => financeSnapshotRepo.getById(id), [id, tick]);
-  const items = useMemo(() => (snap ? financeSnapshotRepo.lineItemsFor(snap.id) : []), [snap?.id, tick]);
-  if (!snap) {
-    return <div className="p-6 text-sm text-muted-foreground">Snapshot not found.</div>;
-  }
-  const locked = snap.status === 'Locked' || snap.status === 'Reviewed';
-
-  // New line item form
+  // New line item form (hooks must run unconditionally)
   const [cat, setCat] = useState<FinanceLineCategory>('Expense');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [link, setLink] = useState('');
+
+  const isAdmin = canAccessAdminArea(currentStaff);
+
+  const { data: snap } = useQuery({
+    queryKey: ['ih-finance-snapshot', id],
+    queryFn: () => financeSnapshotRepo.getById(id),
+    enabled: isAdmin && !!id,
+  });
+  const { data: items = [] } = useQuery({
+    queryKey: ['ih-finance-items', id],
+    queryFn: () => financeSnapshotRepo.lineItemsFor(id),
+    enabled: isAdmin && !!id,
+  });
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['ih-finance-snapshot', id] });
+    qc.invalidateQueries({ queryKey: ['ih-finance-items', id] });
+    qc.invalidateQueries({ queryKey: ['ih-finance-snapshots'] });
+    qc.invalidateQueries({ queryKey: ['ih-finance-status'] });
+  };
+
+  const setOpening = useMutation({
+    mutationFn: (v: number | undefined) => financeSnapshotRepo.setOpeningBalance(id, v),
+    onSuccess: invalidate,
+  });
+  const setClosing = useMutation({
+    mutationFn: (v: number | undefined) => financeSnapshotRepo.setClosingBalance(id, v),
+    onSuccess: invalidate,
+  });
+  const setNotesMut = useMutation({
+    mutationFn: (v: string) => financeSnapshotRepo.setNotes(id, v),
+    onSuccess: invalidate,
+  });
+  const addItem = useMutation({
+    mutationFn: (input: { correction: boolean; payload: { category: FinanceLineCategory; amount: number; note: string; link?: string; createdBy: string } }) =>
+      input.correction
+        ? financeSnapshotRepo.addCorrectionLineItem(id, input.payload)
+        : financeSnapshotRepo.addLineItem(id, input.payload),
+    onSuccess: () => {
+      setAmount(''); setNote(''); setLink('');
+      invalidate();
+    },
+    onError: (e: any) => toast({ title: 'Cannot add', description: e?.message, variant: 'destructive' }),
+  });
+  const removeItem = useMutation({
+    mutationFn: (itemId: string) => financeSnapshotRepo.removeLineItem(id, itemId),
+    onSuccess: invalidate,
+  });
+  const review = useMutation({
+    mutationFn: () => financeSnapshotRepo.markReviewed(id, currentStaff!.id),
+    onSuccess: () => {
+      toast({ title: 'Month marked reviewed' });
+      invalidate();
+    },
+  });
+
+  if (!isAdmin) {
+    return <div className="p-6 text-sm text-muted-foreground">Admin only.</div>;
+  }
+  if (!snap) {
+    return <div className="p-6 text-sm text-muted-foreground">Snapshot not found.</div>;
+  }
+
+  const locked = snap.status === 'Locked' || snap.status === 'Reviewed';
 
   const handleAdd = (correction = false) => {
     const num = parseFloat(amount);
@@ -56,25 +110,15 @@ const FinanceSnapshotDetail = () => {
       toast({ title: 'Note required', variant: 'destructive' });
       return;
     }
-    try {
-      const payload = { category: cat, amount: num, note, link: link || undefined, createdBy: currentStaff!.id };
-      if (correction) {
-        financeSnapshotRepo.addCorrectionLineItem(snap.id, payload);
-      } else {
-        financeSnapshotRepo.addLineItem(snap.id, payload);
-      }
-      setAmount(''); setNote(''); setLink('');
-      refresh();
-    } catch (e: any) {
-      toast({ title: 'Cannot add', description: e.message, variant: 'destructive' });
-    }
+    addItem.mutate({
+      correction,
+      payload: { category: cat, amount: num, note, link: link || undefined, createdBy: currentStaff!.id },
+    });
   };
 
   const handleReview = () => {
     if (!confirm('Mark this month as reviewed? Fields will lock from casual editing (corrections still allowed).')) return;
-    financeSnapshotRepo.markReviewed(snap.id, currentStaff!.id);
-    toast({ title: 'Month marked reviewed' });
-    refresh();
+    review.mutate();
   };
 
   return (
@@ -95,7 +139,7 @@ const FinanceSnapshotDetail = () => {
           <Badge variant="secondary" className="mt-2">{FINANCE_STATUS_LABELS[snap.status]}</Badge>
         </div>
         {!locked && (
-          <Button onClick={handleReview}>Mark Month Reviewed</Button>
+          <Button onClick={handleReview} disabled={review.isPending}>Mark Month Reviewed</Button>
         )}
       </header>
 
@@ -109,12 +153,11 @@ const FinanceSnapshotDetail = () => {
             <Label>Opening balance</Label>
             <Input
               type="number" step="0.01"
-              value={snap.openingBalance ?? ''}
+              defaultValue={snap.openingBalance ?? ''}
               disabled={locked}
-              onChange={(e) => {
+              onBlur={(e) => {
                 const v = e.target.value === '' ? undefined : parseFloat(e.target.value);
-                financeSnapshotRepo.setOpeningBalance(snap.id, v);
-                refresh();
+                setOpening.mutate(v);
               }}
             />
           </div>
@@ -122,12 +165,11 @@ const FinanceSnapshotDetail = () => {
             <Label>Closing balance</Label>
             <Input
               type="number" step="0.01"
-              value={snap.closingBalance ?? ''}
+              defaultValue={snap.closingBalance ?? ''}
               disabled={locked}
-              onChange={(e) => {
+              onBlur={(e) => {
                 const v = e.target.value === '' ? undefined : parseFloat(e.target.value);
-                financeSnapshotRepo.setClosingBalance(snap.id, v);
-                refresh();
+                setClosing.mutate(v);
               }}
             />
           </div>
@@ -176,7 +218,7 @@ const FinanceSnapshotDetail = () => {
                   {!locked && !i.isCorrection && (
                     <Button
                       size="sm" variant="ghost"
-                      onClick={() => { financeSnapshotRepo.removeLineItem(i.id); refresh(); }}
+                      onClick={() => removeItem.mutate(i.id)}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
@@ -198,11 +240,11 @@ const FinanceSnapshotDetail = () => {
             <Input placeholder="Link (optional)" value={link} onChange={(e) => setLink(e.target.value)} />
           </div>
           <div className="flex gap-2">
-            <Button size="sm" onClick={() => handleAdd(false)} disabled={locked}>
+            <Button size="sm" onClick={() => handleAdd(false)} disabled={locked || addItem.isPending}>
               <Plus className="h-3.5 w-3.5 mr-1" /> Add line item
             </Button>
             {locked && (
-              <Button size="sm" variant="outline" onClick={() => handleAdd(true)}>
+              <Button size="sm" variant="outline" onClick={() => handleAdd(true)} disabled={addItem.isPending}>
                 <Plus className="h-3.5 w-3.5 mr-1" /> Add correction
               </Button>
             )}
@@ -221,9 +263,9 @@ const FinanceSnapshotDetail = () => {
         <CardContent>
           <Textarea
             rows={3}
-            value={snap.notes ?? ''}
+            defaultValue={snap.notes ?? ''}
             disabled={locked}
-            onChange={(e) => { financeSnapshotRepo.setNotes(snap.id, e.target.value); refresh(); }}
+            onBlur={(e) => setNotesMut.mutate(e.target.value)}
             placeholder="Founder context, cash notes, follow-ups… never passwords or credentials."
           />
         </CardContent>

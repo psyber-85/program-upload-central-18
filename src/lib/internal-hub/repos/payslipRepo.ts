@@ -124,6 +124,14 @@ export const payslipRepo = {
       .select('*');
     if (error) throw error;
     const generated = (data ?? []).map(mapRow);
+    void logAudit({
+      action: 'payslip.generated',
+      targetTable: 'ih_payslips',
+      targetId: run.id,
+      summary: `Generated ${generated.length} payslip(s) for ${run.month}`,
+      metadata: { runId: run.id, month: run.month, count: generated.length },
+    });
+
 
     // Doc 4.2 §32 — generate per-staff PDFs (fire-and-forget; failure must not
     // block payroll finalization). PDF errors land in ih_payslips.pdf_error.

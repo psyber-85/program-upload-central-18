@@ -205,6 +205,15 @@ export const requestRepo = {
       }
     })();
 
+    // Doc 4.3 §6 — audit request decisions.
+    void logAudit({
+      action: input.decision === 'Approved' ? 'request.approved' : 'request.rejected',
+      targetTable: 'ih_requests',
+      targetId: row.id,
+      summary: `${row.kind} request ${input.decision.toLowerCase()}`,
+      metadata: { note: input.note ?? null, kind: row.kind },
+    });
+
     return row;
   },
 

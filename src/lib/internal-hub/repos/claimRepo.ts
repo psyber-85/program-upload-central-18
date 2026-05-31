@@ -1,6 +1,7 @@
 // Doc 3.1 §16-§20 — claims that feed payroll.
 // Backed by `ih_requests` where kind='Claim'. Payload jsonb holds the claim-
 // specific shape since the spec folds claims into the unified requests table.
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from '@/integrations/supabase/client';
 import type { ApprovedClaim, ClaimInclusionState, ClaimType } from '../types';
 
@@ -13,17 +14,8 @@ interface ClaimPayload {
   includedInMonth?: string;
 }
 
-interface DbRow {
-  id: string;
-  staff_id: string;
-  status: string;
-  payload: ClaimPayload;
-  decided_at: string | null;
-  created_at: string;
-}
-
-function mapRow(r: DbRow): ApprovedClaim {
-  const p = r.payload ?? ({} as ClaimPayload);
+function mapRow(r: any): ApprovedClaim {
+  const p: ClaimPayload = (r.payload as ClaimPayload) ?? ({} as ClaimPayload);
   return {
     id: r.id,
     staffId: r.staff_id,
@@ -37,21 +29,17 @@ function mapRow(r: DbRow): ApprovedClaim {
   };
 }
 
-async function fetchAllClaims(): Promise<ApprovedClaim[]> {
-  const { data, error } = await supabase
-    .from('ih_requests')
-    .select('id, staff_id, status, payload, decided_at, created_at')
-    .eq('kind', 'Claim');
-  if (error) {
-    console.error('[claimRepo]', error);
-    return [];
-  }
-  return (data ?? []).map((r) => mapRow(r as unknown as DbRow));
-}
-
 export const claimRepo = {
   async list(): Promise<ApprovedClaim[]> {
-    return fetchAllClaims();
+    const { data, error } = await supabase
+      .from('ih_requests')
+      .select('id, staff_id, status, payload, decided_at, created_at')
+      .eq('kind', 'Claim');
+    if (error) {
+      console.error('[claimRepo.list]', error);
+      return [];
+    }
+    return (data ?? []).map(mapRow);
   },
 
   /**
@@ -70,9 +58,9 @@ export const claimRepo = {
       console.error('[claimRepo.queueableForMonth]', error);
       return [];
     }
-    return (data as DbRow[] | null)?.map(mapRow).filter(
-      (c) => c.inclusionState !== 'IncludedInPayroll',
-    ) ?? [];
+    return (data ?? [])
+      .map(mapRow)
+      .filter((c) => c.inclusionState !== 'IncludedInPayroll');
   },
 
   ofType(type: ClaimType, claims: ApprovedClaim[]): ApprovedClaim[] {
@@ -81,44 +69,42 @@ export const claimRepo = {
 
   async markIncluded(ids: string[], runId: string, month: string): Promise<void> {
     if (ids.length === 0) return;
-    // Fetch existing payloads so we can merge without losing other keys.
     const { data, error } = await supabase
       .from('ih_requests')
       .select('id, payload')
       .in('id', ids);
     if (error) throw error;
-    const updates = (data as { id: string; payload: ClaimPayload }[] | null) ?? [];
     await Promise.all(
-      updates.map((row) =>
+      (data ?? []).map((row: any) =>
         supabase
           .from('ih_requests')
           .update({
             payload: {
-              ...row.payload,
+              ...((row.payload as ClaimPayload) ?? {}),
               inclusionState: 'IncludedInPayroll' as ClaimInclusionState,
               includedInPayrollRunId: runId,
               includedInMonth: month,
             },
-          })
+          } as any)
           .eq('id', row.id),
       ),
     );
   },
 
   async setStateForRun(runId: string, newState: ClaimInclusionState): Promise<void> {
-    // Filter via JSON containment.
     const { data, error } = await supabase
       .from('ih_requests')
       .select('id, payload')
       .eq('kind', 'Claim')
-      .contains('payload', { includedInPayrollRunId: runId });
+      .contains('payload', { includedInPayrollRunId: runId } as any);
     if (error) throw error;
-    const rows = (data as { id: string; payload: ClaimPayload }[] | null) ?? [];
     await Promise.all(
-      rows.map((row) =>
+      (data ?? []).map((row: any) =>
         supabase
           .from('ih_requests')
-          .update({ payload: { ...row.payload, inclusionState: newState } })
+          .update({
+            payload: { ...((row.payload as ClaimPayload) ?? {}), inclusionState: newState },
+          } as any)
           .eq('id', row.id),
       ),
     );
@@ -134,7 +120,7 @@ export const claimRepo = {
       description: input.description,
       inclusionState: 'QueuedForPayroll',
     };
-    const { data, error } = await supabase
+    const { data, error } = await (supabase
       .from('ih_requests')
       .insert({
         staff_id: input.staffId,
@@ -142,10 +128,10 @@ export const claimRepo = {
         status: 'Approved',
         decided_at: now,
         payload,
-      })
+      } as any)
       .select('id, staff_id, status, payload, decided_at, created_at')
-      .single();
+      .single() as any);
     if (error) throw error;
-    return mapRow(data as DbRow);
+    return mapRow(data);
   },
 };

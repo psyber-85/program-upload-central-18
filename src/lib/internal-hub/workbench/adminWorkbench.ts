@@ -109,14 +109,14 @@ export function buildWorkbenchItems(input: BuildInput): WorkbenchItem[] {
   }
 
   // Payroll status
-  if (payrollStatus === 'Draft' || payrollStatus === 'Ready') {
+  if (payrollStatus === 'Draft' || payrollStatus === 'ReadyForReview') {
     items.push({
       id: `payroll:${payrollMonth}`,
       type: 'Payroll',
       source: 'Payroll',
-      title: payrollStatus === 'Ready' ? `Payroll ready for review — ${payrollMonth}` : `Payroll draft — ${payrollMonth}`,
-      priority: payrollStatus === 'Ready' ? 'urgent' : 'normal',
-      status: payrollStatus,
+      title: payrollStatus === 'ReadyForReview' ? `Payroll ready for review — ${payrollMonth}` : `Payroll draft — ${payrollMonth}`,
+      priority: payrollStatus === 'ReadyForReview' ? 'urgent' : 'normal',
+      status: payrollStatus === 'ReadyForReview' ? 'Ready for Review' : 'Draft',
       primaryAction: 'ReviewPayroll',
       href: '/staff/admin/payroll',
     });
@@ -157,7 +157,7 @@ export function buildWorkbenchItems(input: BuildInput): WorkbenchItem[] {
       id: `issue:${i.id}`,
       type: 'SystemIssues',
       source: 'SystemIssues',
-      title: i.title ?? `${i.type} failure`,
+      title: i.summary,
       priority: 'urgent',
       createdAt: i.createdAt,
       status: 'Open',

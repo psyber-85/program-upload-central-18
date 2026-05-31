@@ -291,6 +291,13 @@ export const noticeRepo = {
       .from('ih_notice_acks')
       .insert({ notice_id: noticeId, staff_id: staffId });
     if (error && !/duplicate|conflict|unique/i.test(error.message)) throw error;
+    void logAudit({
+      action: 'notice.acknowledged',
+      targetTable: 'ih_notices',
+      targetId: noticeId,
+      summary: `Notice acknowledged`,
+      metadata: { staffId },
+    });
   },
 
   async ackRequiredPendingFor(staff: StaffProfile): Promise<Notice[]> {

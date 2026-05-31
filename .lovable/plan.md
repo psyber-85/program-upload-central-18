@@ -1,91 +1,75 @@
-# Sub-batch 2D — Payroll, Claims & Payslips → Supabase
+# Sub-batch 2E — Finance Snapshot → Supabase
 
-Final migration of the localStorage repos in the Internal Hub data layer. After this, every Card 1.x/3.x flow is RLS-enforced.
+Final repo to migrate off `localStorage`. After this, every Doc 3.x flow is RLS-enforced.
 
 ## Schema additions (one migration)
 
-Existing `ih_payroll_runs`, `ih_payroll_items`, `ih_payslips`, `ih_payslip_downloads` are close but missing several Doc 3.1/3.2 fields. Add columns (no breaking changes):
+`ih_finance_snapshots` already exists with `month`, `status` (enum: Draft/Reviewed/Locked), `line_items jsonb`, `locked_*`, `reviewed_*`. Missing the typed totals and balances Doc 3.3 needs. Add columns (non-breaking):
 
 ```sql
-ALTER TABLE public.ih_payroll_runs
-  ADD COLUMN IF NOT EXISTS admin_notes text;
-
-ALTER TABLE public.ih_payroll_items
-  ADD COLUMN IF NOT EXISTS row_status text NOT NULL DEFAULT 'Complete',  -- 'Complete' | 'Incomplete'
-  ADD COLUMN IF NOT EXISTS missing_fields jsonb NOT NULL DEFAULT '[]'::jsonb,
-  ADD COLUMN IF NOT EXISTS adjustment jsonb,                              -- { amount, reason } | null
-  ADD COLUMN IF NOT EXISTS notes text,
-  ADD COLUMN IF NOT EXISTS included_claim_ids jsonb NOT NULL DEFAULT '[]'::jsonb,
-  ADD COLUMN IF NOT EXISTS included_training_claim_ids jsonb NOT NULL DEFAULT '[]'::jsonb;
-
-ALTER TABLE public.ih_payslips
-  ADD COLUMN IF NOT EXISTS staff_name text,
-  ADD COLUMN IF NOT EXISTS adjustment jsonb,
-  ADD COLUMN IF NOT EXISTS finalized_at timestamptz NOT NULL DEFAULT now(),
-  ADD COLUMN IF NOT EXISTS availability text NOT NULL DEFAULT 'Available',
-  ADD COLUMN IF NOT EXISTS correction_ref text;
-
--- Reminder log: replace localStorage idempotency with a tiny admin-only table
-CREATE TABLE IF NOT EXISTS public.ih_payroll_reminders (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  month text NOT NULL UNIQUE,
-  sent_at timestamptz NOT NULL DEFAULT now()
-);
-GRANT SELECT, INSERT ON public.ih_payroll_reminders TO authenticated;
-GRANT ALL ON public.ih_payroll_reminders TO service_role;
-ALTER TABLE public.ih_payroll_reminders ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "ih_payroll_reminders admin only" ON public.ih_payroll_reminders
-  FOR ALL TO authenticated
-  USING (public.has_ih_role(auth.uid(),'admin'))
-  WITH CHECK (public.has_ih_role(auth.uid(),'admin'));
+ALTER TABLE public.ih_finance_snapshots
+  ADD COLUMN IF NOT EXISTS opening_balance         numeric,
+  ADD COLUMN IF NOT EXISTS closing_balance         numeric,
+  ADD COLUMN IF NOT EXISTS payroll_total           numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS claims_total            numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS training_claims_total   numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS epf_socso_total         numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS manual_adjustment_total numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS notes                   text;
 ```
 
-No new tables otherwise — `ih_requests` (kind='Claim') backs claims.
+Line items stay inline in `line_items jsonb` (array of `{id, category, amount, note, link?, createdBy, createdAt, isCorrection}`) — matches existing column and avoids a second table for an admin-only feature.
 
-## Repo rewrites (all async)
+No RLS/GRANT change needed (table already admin-only).
 
-### 1. `claimRepo.ts`
-Backed by `ih_requests` where `kind='Claim'`. Payload stores `{ amount, description, type: 'Claim'|'TrainingClaim', inclusionState, includedInPayrollRunId, includedInMonth }`.
-- `list()`, `queueableForMonth(month)` (status='Approved' AND payload->>'inclusionState' ≠ 'IncludedInPayroll' AND decided_at < first-of-month).
-- `markIncluded(ids, runId, month)` → bulk update payload jsonb.
-- `setStateForRun(runId, state)` → filter by `payload->>'includedInPayrollRunId'`.
-- `addManual(input)` → insert row, `status='Approved'`, `decided_at=now`.
+## Repo rewrite — `financeSnapshotRepo.ts` (all async)
 
-### 2. `payrollRepo.ts`
-Backed by `ih_payroll_runs` + `ih_payroll_items`. All methods async:
-- `listRuns`, `getRun`, `getForMonth`, `statusFor`.
-- `getOrCreateDraft(month)` — load Active staff, queueable claims, insert run + items in one round trip.
-- `refreshRow(runId, staffId)` — rebuild a single item from current staff profile, preserve adjustment/notes.
-- `setAdjustment`, `setRunNotes`, `setRowNotes`, `markReadyForReview` — single-field updates.
-- `canFinalize` — derive from items.
-- `finalize(runId, adminId)` — transaction: set run finalized, call `claimRepo.markIncluded`, generate payslips, broadcast notices.
-- `lockRun` — set status='Locked', locked_at/by.
-- `ensureReminderForMonth(month, adminId)` — guard via `ih_payroll_reminders` upsert (ON CONFLICT DO NOTHING).
+Backed by `ih_finance_snapshots`. Mapping helpers convert row ↔ `FinanceSnapshot` (snake/camel + `lineItems` extracted to `lineItemsFor()` view).
 
-### 3. `payslipRepo.ts`
-Backed by `ih_payslips` + `ih_payslip_downloads`. All async:
-- `list`, `listAll`, `listForStaff`, `getById`, `forRun`.
-- `generateForRun(run)` — insert payslips for rows with row_status='Complete'.
-- `downloadPdf(id, actorId, actorRole)` — insert download log, then generate placeholder .txt blob client-side (Doc 3.2 §7 — real PDF is Card 4 / `ih-generate-payslip-pdf`).
-- `setCorrectionRef`.
+- `listSnapshots()` — order by `month desc`.
+- `getById(id)`, `getForMonth(month)`, `statusFor(month)` (returns `'NotStarted'` when absent).
+- `getOrCreateForMonth(month, adminId)` — select-or-insert. If existing & `status='Draft'`, refresh payroll-linked totals via `payrollTotalsFor(month)` and patch. Otherwise insert with `status='Draft'` + initial totals.
+- `setOpeningBalance / setClosingBalance / setNotes` — single-column updates (Draft only enforced in mutation guards).
+- `lineItemsFor(snapshotId)` — read row, return `line_items` array sorted by `createdAt desc`.
+- `addLineItem` — guard `status='Draft'`, append non-correction item to `line_items`.
+- `addCorrectionLineItem` — append `isCorrection:true` regardless of status (Doc 3.3 §21).
+- `removeLineItem(snapshotId, itemId)` — Draft only, filter from jsonb.
+- `markReviewed(id, adminId)` — set status, `reviewed_at`, `reviewed_by`.
+- `lockSnapshot(id, adminId)` — guard `status='Reviewed'`, set status + `locked_at/by`.
 
-### 4. `payslipSummaryRepo.ts`
-Thin wrapper over `payslipRepo.listForStaff` (used by Home preview only). Async; mapping `availability='Available' → status='Ready'`.
+### `payrollTotalsFor(month)` — Supabase aggregate
+
+Replaces the Sub-batch 2D zero-stub. One query:
+
+```ts
+supabase
+  .from('ih_payroll_items')
+  .select('base_salary, employer_epf, employer_socso, claims_total, training_total, adjustment, ih_payroll_runs!inner(status, month)')
+  .eq('ih_payroll_runs.month', month)
+  .in('ih_payroll_runs.status', ['Finalized', 'Locked'])
+  .eq('row_status', 'Complete');
+```
+
+Sum client-side into `{ payrollTotal: Σ(base + employer_epf + employer_socso), claimsTotal: Σclaims, trainingClaimsTotal: Σtraining, epfSocsoTotal: Σ(employer_epf+employer_socso), manualAdjustmentTotal: Σ(adjustment.amount ?? 0) }`. All rounded to 2dp.
 
 ## Callsite updates (TanStack Query)
-- `StaffHome.tsx` — `payrollRepo.statusFor`, `payslipRepo.listForStaff`, `payrollRepo.ensureReminderForMonth` → `useQuery`/effect.
-- `PayrollIndex.tsx` — listRuns + getForMonth via `useQuery`; "Prepare draft" via `useMutation` invalidating both.
-- `PayrollRunDetail.tsx` — getRun via `useQuery`; setAdjustment/setRunNotes/setRowNotes/refreshRow/markReadyForReview/finalize/lockRun via `useMutation` with invalidation. Drop `tick` state.
-- `PayslipsIndex.tsx`, `PayslipDetail.tsx`, `AdminPayslips.tsx` — async list + download mutation.
-- `MyPayslipsPreview.tsx` — already prop-driven; no change.
+
+- `StaffHome.tsx` — `financeSnapshotRepo.statusFor(month)` → `useQuery(['ih','finance','status',month])`. Already admin-only branch; on staff role the query is skipped via `enabled`.
+- `FinanceIndex.tsx` — `listSnapshots()` → `useQuery`; "Open this month" → `useMutation(getOrCreateForMonth)` with invalidation + navigation.
+- `FinanceSnapshotDetail.tsx` — replace `tick`/`useMemo` pattern:
+  - `useQuery(['ih','finance','snapshot',id])` for snapshot row.
+  - `useQuery(['ih','finance','items',id])` for line items (derived from same row; pull from snapshot data — drop second query, use `snapshot?.lineItems`).
+  - `useMutation` for setOpeningBalance, setClosingBalance, setNotes (debounced text), addLineItem, addCorrectionLineItem, removeLineItem, markReviewed, lockSnapshot — each invalidates the snapshot query.
 
 ## Out of scope (deferred)
-- Real PDF generation (`ih-generate-payslip-pdf` pdf-lib edge function) — Doc 4.2 sub-batch.
-- `ih_audit_log` writes on finalize/lock — Doc 4.3 sub-batch.
-- Card 2 request submission UI.
+- Edge-function-side aggregation / materialized totals — not needed at current volume.
+- Real PDF export of monthly snapshot.
+- `ih_audit_log` writes — Doc 4.3.
 
 ## Verification
 - `npm run build` clean.
-- Admin: open `/staff/admin/payroll`, "Prepare draft", add adjustment, finalize → payslips appear in `/staff/payslips` for that staff user; notice broadcast.
-- Staff: payslip detail loads and download writes one `ih_payslip_downloads` row (verify via SQL).
-- No remaining `readJSON`/`writeJSON` references in `repos/payroll*`, `repos/payslip*`, `repos/claimRepo`.
+- Admin: `/staff/admin/finance` → "Open this month" creates snapshot; payroll-linked totals populate from latest finalized run (verify against `/staff/admin/payroll`).
+- Add line item, add correction line item (still works after marking reviewed), remove line item (blocked after review).
+- Mark Reviewed → status flips; Lock → terminal.
+- Refresh page — all values persist (no localStorage).
+- Grep clean: no `readJSON`/`writeJSON` in `repos/financeSnapshotRepo.ts`; the file becomes the last localStorage-free repo.

@@ -9,17 +9,16 @@ interface Body { payslip_id: string }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "method_not_allowed" }), { status: 405, headers: corsHeaders });
-  }
+  if (req.method !== "POST") return jsonError(405, "method_not_allowed");
+
+  const auth = await authenticate(req);
+  if (!auth.ok) return jsonError(auth.status, auth.error);
 
   let body: Body;
   try { body = await req.json(); } catch {
-    return new Response(JSON.stringify({ error: "invalid_json" }), { status: 400, headers: corsHeaders });
+    return jsonError(400, "invalid_json");
   }
-  if (!body.payslip_id) {
-    return new Response(JSON.stringify({ error: "missing_payslip_id" }), { status: 400, headers: corsHeaders });
-  }
+  if (!body.payslip_id) return jsonError(400, "missing_payslip_id");
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -32,9 +31,13 @@ serve(async (req) => {
     .eq("id", body.payslip_id)
     .maybeSingle();
 
-  if (psErr || !ps) {
-    return new Response(JSON.stringify({ error: "payslip_not_found" }), { status: 404, headers: corsHeaders });
+  if (psErr || !ps) return jsonError(404, "payslip_not_found");
+
+  // Allow admins/service callers; otherwise the caller must be the payslip owner.
+  if (!auth.isAdmin && !auth.isService && ps.staff_id !== auth.userId) {
+    return jsonError(403, "forbidden");
   }
+
 
   try {
     const pdf = await PDFDocument.create();

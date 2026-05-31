@@ -209,7 +209,7 @@ export const financeSnapshotRepo = {
     const row = await fetchById(snapshotId);
     if (!row) return;
     if (row.status !== 'Draft') return;
-    const next = (row.line_items ?? []).filter((i: any) => i.id !== itemId);
+    const next = ((row.line_items ?? []) as any[]).filter((i: any) => i.id !== itemId);
     await patch(row.id, { line_items: next });
   },
 

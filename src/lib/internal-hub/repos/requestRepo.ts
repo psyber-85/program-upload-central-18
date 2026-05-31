@@ -59,11 +59,12 @@ export const requestRepo = {
         staff_id: input.staffId,
         kind: input.kind,
         status: 'Submitted',
-        payload: input.payload,
+        payload: input.payload as never,
         half_day_slot: input.halfDaySlot ?? null,
       })
       .select('*')
       .single();
+
     if (error) throw error;
     return data as RequestRow;
   },

@@ -1,4 +1,7 @@
+// DEV-ONLY. Writes to localStorage only — never to Supabase.
+// Production has no fixture notices/resources. See docs/production-seed.md.
 // Doc 1.2 seed notices & resources. Local only — no real email sent.
+
 import type { Notice, Resource } from './types';
 import { IT_SUPPORT_EMAIL } from './types';
 

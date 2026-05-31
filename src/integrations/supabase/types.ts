@@ -853,6 +853,7 @@ export type Database = {
       }
       ih_requests: {
         Row: {
+          archived_at: string | null
           calendar_event_id: string | null
           created_at: string
           decided_at: string | null
@@ -866,6 +867,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           calendar_event_id?: string | null
           created_at?: string
           decided_at?: string | null
@@ -879,6 +881,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           calendar_event_id?: string | null
           created_at?: string
           decided_at?: string | null

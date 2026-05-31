@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Trash2, UserX, UserCheck, Loader2 } from 'lucide-react';
+import { ArrowLeft, Trash2, UserX, UserCheck, Loader2, ShieldCheck, ShieldOff } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -130,7 +132,30 @@ const AdminStaffDetail = () => {
     }
   };
 
+  const isSelf = currentStaff?.id === staff.id;
+  const targetIsAdmin = staff.role === 'Admin';
+  const canTogglePromotion = viewerIsAdmin && !isSelf && staff.status === 'Active';
+
+  const handlePromotion = async (action: 'promote' | 'revoke') => {
+    try {
+      const { data, error } = await supabase.functions.invoke('ih-promote-staff', {
+        body: { target_user_id: staff.id, action },
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error ?? 'Unknown error');
+      toast({ title: action === 'promote' ? 'Promoted to Admin' : 'Admin revoked' });
+      invalidate();
+    } catch (e) {
+      toast({
+        title: action === 'promote' ? 'Promotion failed' : 'Revoke failed',
+        description: String((e as Error).message),
+        variant: 'destructive',
+      });
+    }
+  };
+
   const notionTool = tools.find((t) => t.tool === 'Notion');
+
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-4">
@@ -139,6 +164,38 @@ const AdminStaffDetail = () => {
           <ArrowLeft className="h-4 w-4 mr-1" /> Back
         </Button>
         <div className="flex items-center gap-2">
+          {canTogglePromotion && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  {targetIsAdmin ? (
+                    <><ShieldOff className="h-4 w-4 mr-1" />Revoke Admin</>
+                  ) : (
+                    <><ShieldCheck className="h-4 w-4 mr-1" />Promote to Admin</>
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {targetIsAdmin ? `Revoke Admin from ${staff.fullName}?` : `Promote ${staff.fullName} to Admin?`}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {targetIsAdmin
+                      ? 'They will lose access to admin-only areas (payroll, finance, staff management). Their staff profile is unchanged. At least one Admin must remain.'
+                      : 'They will gain full admin access: payroll, finance, staff management, and broadcasts. Only promote staff you trust.'}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => handlePromotion(targetIsAdmin ? 'revoke' : 'promote')}>
+                    {targetIsAdmin ? 'Revoke Admin' : 'Promote'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+
           {staff.status === 'Active' ? (
             <AlertDialog>
               <AlertDialogTrigger asChild>

@@ -1,5 +1,9 @@
+// DEV-ONLY fixture data. Writes to localStorage only — never to Supabase.
+// Production bootstrap is documented in docs/production-seed.md.
+// Do NOT import this from production code paths.
 // Seed data — safe for dev. No passwords. (Doc 0.1 §27)
 import type { StaffProfile } from './types';
+
 
 export const SEED_STAFF: StaffProfile[] = [
   {

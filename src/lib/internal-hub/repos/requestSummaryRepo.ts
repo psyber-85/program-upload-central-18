@@ -43,6 +43,7 @@ export const requestSummaryRepo = {
       .from('ih_requests')
       .select('id, staff_id, kind, status, created_at')
       .eq('staff_id', staffId)
+      .is('archived_at', null)
       .order('created_at', { ascending: false });
     if (typeof limit === 'number') q = q.limit(limit);
     const { data, error } = await q;
@@ -58,6 +59,7 @@ export const requestSummaryRepo = {
       .from('ih_requests')
       .select('id', { count: 'exact', head: true })
       .eq('staff_id', staffId)
+      .is('archived_at', null)
       .eq('status', 'Submitted');
     if (error) {
       console.error('[requestSummaryRepo.pendingCountForStaff]', error);
@@ -71,6 +73,7 @@ export const requestSummaryRepo = {
     const { count, error } = await supabase
       .from('ih_requests')
       .select('id', { count: 'exact', head: true })
+      .is('archived_at', null)
       .eq('status', 'Submitted');
     if (error) {
       console.error('[requestSummaryRepo.pendingApprovalCount]', error);
@@ -79,3 +82,4 @@ export const requestSummaryRepo = {
     return count ?? 0;
   },
 };
+

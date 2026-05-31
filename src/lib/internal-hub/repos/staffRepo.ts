@@ -132,10 +132,18 @@ export const staffRepo = {
 
     const created = await this.get(data.user_id);
     if (!created) throw new Error('create_post_lookup_failed');
+    void logAudit({
+      action: 'staff.created',
+      targetTable: 'ih_staff_profiles',
+      targetId: created.id,
+      summary: `Created staff ${created.fullName} (${created.email}) as ${created.role}`,
+      metadata: { role: created.role, businessArm: created.businessArm },
+    });
     return created;
   },
 
   async update(id: string, patch: Partial<StaffProfile>): Promise<StaffProfile | undefined> {
+    const prior = await this.get(id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const dbPatch: any = {};
     if (patch.fullName !== undefined) dbPatch.name = patch.fullName;
@@ -155,15 +163,39 @@ export const staffRepo = {
       .update(dbPatch)
       .eq('id', id);
     if (error) throw error;
+    const changedFields = Object.keys(dbPatch);
+    void logAudit({
+      action: 'staff.updated',
+      targetTable: 'ih_staff_profiles',
+      targetId: id,
+      summary: `Updated staff ${prior?.fullName ?? id} (${changedFields.join(', ') || 'no fields'})`,
+      metadata: { fields: changedFields },
+    });
+    if (prior && patch.role !== undefined && patch.role !== prior.role) {
+      void logAudit({
+        action: 'staff.role_changed',
+        targetTable: 'ih_staff_profiles',
+        targetId: id,
+        summary: `Role changed for ${prior.fullName}: ${prior.role} → ${patch.role}`,
+        metadata: { from: prior.role, to: patch.role },
+      });
+    }
     return this.get(id);
   },
 
   async deactivate(id: string): Promise<void> {
+    const prior = await this.get(id);
     const { data, error } = await supabase.functions.invoke('ih-deactivate-staff', {
       body: { user_id: id },
     });
     if (error) throw error;
     if (!data?.ok) throw new Error(data?.error ?? 'deactivate_failed');
+    void logAudit({
+      action: 'staff.deactivated',
+      targetTable: 'ih_staff_profiles',
+      targetId: id,
+      summary: `Deactivated staff ${prior?.fullName ?? id}`,
+    });
   },
 
   async reactivate(id: string): Promise<StaffProfile | undefined> {
@@ -173,12 +205,27 @@ export const staffRepo = {
       .update({ status: 'Active', deactivated_at: null } as any)
       .eq('id', id);
     if (error) throw error;
-    return this.get(id);
+    const updated = await this.get(id);
+    void logAudit({
+      action: 'staff.reactivated',
+      targetTable: 'ih_staff_profiles',
+      targetId: id,
+      summary: `Reactivated staff ${updated?.fullName ?? id}`,
+    });
+    return updated;
   },
 
   /** Hard delete is admin-only and intended for mistake records with no activity. */
   async hardDelete(id: string): Promise<void> {
+    const prior = await this.get(id);
     const { error } = await supabase.from('ih_staff_profiles').delete().eq('id', id);
     if (error) throw error;
+    void logAudit({
+      action: 'staff.hard_deleted',
+      targetTable: 'ih_staff_profiles',
+      targetId: id,
+      summary: `Hard-deleted staff ${prior?.fullName ?? id} (${prior?.email ?? 'unknown'})`,
+      metadata: { email: prior?.email },
+    });
   },
 };

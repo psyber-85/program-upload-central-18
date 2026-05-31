@@ -81,7 +81,8 @@ export const resourceRepo = {
   },
 
   async update(id: string, patch: Partial<Resource>): Promise<Resource | undefined> {
-    const dbPatch: Record<string, unknown> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dbPatch: any = {};
     if (patch.title !== undefined) dbPatch.title = patch.title;
     if (patch.description !== undefined) dbPatch.description = patch.description;
     if (patch.category !== undefined) dbPatch.category = patch.category;

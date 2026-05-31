@@ -156,7 +156,8 @@ export const noticeRepo = {
 
   /** Limited edit per §21 — title/message only (links not stored in DB). */
   async edit(id: string, patch: Pick<Partial<Notice>, 'title' | 'message' | 'links'>): Promise<Notice | undefined> {
-    const dbPatch: Record<string, unknown> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dbPatch: any = {};
     if (patch.title !== undefined) dbPatch.title = patch.title;
     if (patch.message !== undefined) dbPatch.body = patch.message;
     if (Object.keys(dbPatch).length === 0) return this.get(id);

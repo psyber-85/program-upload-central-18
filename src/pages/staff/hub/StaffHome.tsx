@@ -50,10 +50,21 @@ const StaffHome = () => {
     queryFn: () => noticeRepo.listAcksForStaff(currentStaff!.id),
     enabled: !!currentStaff,
   });
-  const requests = useMemo(
-    () => (currentStaff ? requestSummaryRepo.listForStaff(currentStaff.id, 3) : []),
-    [currentStaff?.id, tick],
-  );
+  const { data: requests = [] } = useQuery({
+    queryKey: ['ih-requests-recent', currentStaff?.id],
+    queryFn: () => requestSummaryRepo.listForStaff(currentStaff!.id, 3),
+    enabled: !!currentStaff,
+  });
+  const { data: myPendingRequests = 0 } = useQuery({
+    queryKey: ['ih-requests-pending-self', currentStaff?.id],
+    queryFn: () => requestSummaryRepo.pendingCountForStaff(currentStaff!.id),
+    enabled: !!currentStaff,
+  });
+  const { data: pendingApprovals = 0 } = useQuery({
+    queryKey: ['ih-requests-pending-all'],
+    queryFn: () => requestSummaryRepo.pendingApprovalCount(),
+    enabled: isAdmin,
+  });
   const payslips = useMemo(
     () => (currentStaff ? payslipRepo.listForStaff(currentStaff.id, 2) : []),
     [currentStaff?.id, tick],
@@ -71,10 +82,8 @@ const StaffHome = () => {
 
   const unread = noticesAll.filter((n) => !readSet.has(n.id)).length;
   const ackPending = noticesAll.filter((n) => n.importance === 'AcknowledgmentRequired' && !ackMap.has(n.id)).length;
-  const myPendingRequests = requestSummaryRepo.pendingCountForStaff(currentStaff.id);
 
   // Admin metrics
-  const pendingApprovals = requestSummaryRepo.pendingApprovalCount();
   const inProgressOnboardings = isAdmin
     ? allStaff.filter((s) => {
         const c = onboardingRepo.get(s.id);

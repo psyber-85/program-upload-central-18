@@ -1,5 +1,5 @@
-import React from 'react';
-import { Mail, Send } from 'lucide-react';
+import React, { useState } from 'react';
+import { Mail, Send, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { welcomeEmailRepo } from '@/lib/internal-hub/repos/welcomeEmailRepo';
@@ -14,17 +14,38 @@ interface Props {
 
 const WelcomeEmailStatus = ({ event, staffId, onUpdate }: Props) => {
   const { toast } = useToast();
+  const [isSending, setIsSending] = useState(false);
 
-  const handleResend = () => {
-    welcomeEmailRepo.resend(staffId);
-    toast({ title: 'Welcome email resend queued', description: 'No real email sent in dev mode.' });
-    onUpdate();
-  };
+  const runSend = async (action: 'queue' | 'resend') => {
+    setIsSending(true);
+    try {
+      const result =
+        action === 'resend'
+          ? await welcomeEmailRepo.resend(staffId)
+          : await welcomeEmailRepo.queue(staffId);
 
-  const handleQueue = () => {
-    welcomeEmailRepo.queue(staffId);
-    toast({ title: 'Welcome email queued' });
-    onUpdate();
+      if (result.status === 'sent' || result.status === 'resent') {
+        toast({
+          title: action === 'resend' ? 'Welcome email resent' : 'Welcome email sent',
+          description: `Delivered to staff inbox via SendGrid.`,
+        });
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Failed to send welcome email',
+          description: 'Check System Issues for details.',
+        });
+      }
+    } catch (e) {
+      toast({
+        variant: 'destructive',
+        title: 'Failed to send welcome email',
+        description: e instanceof Error ? e.message : 'Unknown error',
+      });
+    } finally {
+      setIsSending(false);
+      onUpdate();
+    }
   };
 
   return (
@@ -42,8 +63,17 @@ const WelcomeEmailStatus = ({ event, staffId, onUpdate }: Props) => {
       </div>
       <div className="flex items-center gap-2">
         {event && <Badge variant="outline">{event.status}</Badge>}
-        <Button size="sm" variant="outline" onClick={event ? handleResend : handleQueue}>
-          <Send className="h-3.5 w-3.5 mr-1" />
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={isSending}
+          onClick={() => runSend(event ? 'resend' : 'queue')}
+        >
+          {isSending ? (
+            <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+          ) : (
+            <Send className="h-3.5 w-3.5 mr-1" />
+          )}
           {event ? 'Resend' : 'Queue'}
         </Button>
       </div>

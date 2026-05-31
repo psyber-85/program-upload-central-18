@@ -57,13 +57,13 @@ export const welcomeEmailRepo = {
   get(staffId: string): WelcomeEmailEvent | undefined {
     return load()[staffId];
   },
-  queue(staffId: string): WelcomeEmailEvent {
+  async queue(staffId: string): Promise<WelcomeEmailEvent> {
     const store = load();
     const ev: WelcomeEmailEvent = { staffId, status: 'queued', queuedAt: nowISO() };
     store[staffId] = ev;
     save(store);
-    void dispatchWelcome(staffId);
-    return ev;
+    await dispatchWelcome(staffId);
+    return load()[staffId] ?? ev;
   },
   setStatus(staffId: string, status: WelcomeEmailStatus) {
     const store = load();
@@ -72,11 +72,11 @@ export const welcomeEmailRepo = {
     save(store);
     return store[staffId];
   },
-  resend(staffId: string) {
+  async resend(staffId: string): Promise<WelcomeEmailEvent> {
     const store = load();
     store[staffId] = { ...(store[staffId] ?? { staffId, status: 'queued', queuedAt: nowISO() }), status: 'queued' };
     save(store);
-    void dispatchWelcome(staffId, { force: true });
-    return store[staffId];
+    await dispatchWelcome(staffId, { force: true });
+    return load()[staffId] ?? store[staffId];
   },
 };

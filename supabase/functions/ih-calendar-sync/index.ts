@@ -55,6 +55,11 @@ function buildEventPayload(req: any, staffName: string) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return jsonError(auth.status, auth.error);
+
+
+
   let body: Body;
   try { body = await req.json(); } catch {
     return new Response(JSON.stringify({ error: "invalid_json" }), { status: 400, headers: corsHeaders });

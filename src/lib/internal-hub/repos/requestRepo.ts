@@ -1,19 +1,47 @@
 // Doc 4.2 — Requests CRUD + approval flow.
 // Submit (staff) → Approve/Reject (admin) → calendar sync + outcome email.
+// Patch 1.4 — Extended for Benefit/Other, NeedsCorrection loop, Training Application→Completion→Claim,
+//             proof waiver, and per-event activity timeline entries.
 import { supabase } from '@/integrations/supabase/client';
 import { approvalNeededEmail, approvalOutcomeEmail } from '../email/dispatcher';
 import { logAudit } from '../audit';
+import { requestEventsRepo } from './requestEventsRepo';
 
+// 'Other' is mapped onto the existing 'Benefit' DB enum but flagged via payload.kind_label.
 export type RequestKind = 'Leave' | 'MC' | 'Claim' | 'Training' | 'Benefit';
 export type RequestStatusDb = 'Submitted' | 'Approved' | 'Rejected' | 'NeedsCorrection' | 'Cancelled';
 export type HalfDaySlot = 'morning' | 'afternoon' | null;
+
+export type RequestSubState =
+  | 'ApplicationApproved'   // Training application approved, waiting for completion
+  | 'TrainingCompleted'     // Training marked completed, waiting for claim
+  | 'ClaimSubmitted'        // Training claim record submitted
+  | null;
 
 export interface RequestPayload {
   start_date?: string;       // YYYY-MM-DD (Leave/MC)
   end_date?: string;         // YYYY-MM-DD (Leave/MC)
   reason?: string;           // optional staff note
-  amount?: number;           // Claim only
+  amount?: number;           // Claim / Training Claim
   category?: string;         // Claim only
+  // Training application fields
+  course_name?: string;
+  provider?: string;
+  course_link?: string;
+  expected_completion?: string;
+  justification?: string;
+  cost?: number;
+  // Training completion fields
+  completion_date?: string;
+  completion_note?: string;
+  // Benefit / Other
+  topic?: string;
+  description?: string;
+  kind_label?: string;       // 'Other' marker for Benefit-typed records used as Other
+  // Proof waiver
+  proof_waived?: boolean;
+  proof_waived_reason?: string;
+  proof_waived_by?: string;
   [k: string]: unknown;
 }
 
@@ -29,6 +57,8 @@ export interface RequestRow {
   decision_note: string | null;
   gcal_event_id: string | null;
   gcal_sync_error: string | null;
+  training_application_id: string | null;
+  sub_state: RequestSubState;
   created_at: string;
   updated_at: string;
 }

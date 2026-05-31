@@ -42,6 +42,8 @@ import PayslipDetail from "./pages/staff/hub/payslips/PayslipDetail";
 import EmailLog from "./pages/staff/hub/admin/EmailLog";
 import CalendarSettings from "./pages/staff/hub/admin/CalendarSettings";
 import SystemIssues from "./pages/staff/hub/admin/SystemIssues";
+import MyPendingItems from "./pages/staff/hub/MyPendingItems";
+import AdminWorkbench from "./pages/staff/hub/admin/AdminWorkbench";
 
 // Marketing Portal (untouched)
 import MarketingLayout from "./components/marketing/MarketingLayout";
@@ -91,6 +93,8 @@ const App = () => (
               <Route path="requests" element={<RequestsIndex />} />
               <Route path="payslips" element={<PayslipsIndex />} />
               <Route path="payslips/:id" element={<PayslipDetail />} />
+              <Route path="pending" element={<MyPendingItems />} />
+
 
               {/* Admin */}
               <Route path="admin/staff" element={
@@ -113,6 +117,9 @@ const App = () => (
               } />
               <Route path="admin/approvals" element={
                 <ProtectedRoute requireAdmin><Approvals /></ProtectedRoute>
+              } />
+              <Route path="admin/workbench" element={
+                <ProtectedRoute requireAdmin><AdminWorkbench /></ProtectedRoute>
               } />
               <Route path="admin/payroll" element={
                 <ProtectedRoute requireAdmin><PayrollIndex /></ProtectedRoute>

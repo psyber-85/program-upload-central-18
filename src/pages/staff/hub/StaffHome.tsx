@@ -6,9 +6,11 @@ import {
 } from 'lucide-react';
 import { useHub } from '@/lib/internal-hub/HubContext';
 import {
-  noticeRepo, resourceRepo, requestSummaryRepo, payslipRepo, onboardingRepo, staffRepo,
+  noticeRepo, requestSummaryRepo, payslipRepo, onboardingRepo, staffRepo,
   payrollRepo, financeSnapshotRepo,
 } from '@/lib/internal-hub';
+import { toolAccessRepo } from '@/lib/internal-hub/repos/toolAccessRepo';
+import { listSystemIssues } from '@/lib/internal-hub/repos/systemIssuesRepo';
 import { canAccessAdminArea } from '@/lib/internal-hub/access';
 import { checklistProgress } from '@/lib/internal-hub/lifecycle';
 import { IT_SUPPORT_EMAIL, PAYROLL_STATUS_LABELS, FINANCE_STATUS_LABELS } from '@/lib/internal-hub/types';
@@ -18,8 +20,10 @@ import LatestNoticesPreview from '@/components/internal-hub/home/LatestNoticesPr
 import MyRecentRequestsPreview from '@/components/internal-hub/home/MyRecentRequestsPreview';
 import MyPayslipsPreview from '@/components/internal-hub/home/MyPayslipsPreview';
 import SectionsGrid from '@/components/internal-hub/home/SectionsGrid';
-import { Card, CardContent } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import PendingItemsPreview from '@/components/internal-hub/home/PendingItemsPreview';
+import AdminWorkbenchPreview from '@/components/internal-hub/home/AdminWorkbenchPreview';
+import { buildPendingItems } from '@/lib/internal-hub/workbench/pendingItems';
+import { buildWorkbenchItems } from '@/lib/internal-hub/workbench/adminWorkbench';
 
 const StaffHome = () => {
   const { currentStaff } = useHub();
@@ -28,7 +32,6 @@ const StaffHome = () => {
 
   const isAdmin = canAccessAdminArea(currentStaff);
 
-  // Admin needs full staff list for the onboarding-in-progress metric; staff don't.
   const { data: allStaff = [] } = useQuery({
     queryKey: ['ih-staff-list'],
     queryFn: () => staffRepo.list(),
@@ -55,14 +58,19 @@ const StaffHome = () => {
     queryFn: () => requestSummaryRepo.listForStaff(currentStaff!.id, 3),
     enabled: !!currentStaff,
   });
+  const { data: needsCorrection = [] } = useQuery({
+    queryKey: ['ih-requests-needs-correction', currentStaff?.id],
+    queryFn: () => requestSummaryRepo.listNeedsCorrectionForStaff(currentStaff!.id),
+    enabled: !!currentStaff,
+  });
   const { data: myPendingRequests = 0 } = useQuery({
     queryKey: ['ih-requests-pending-self', currentStaff?.id],
     queryFn: () => requestSummaryRepo.pendingCountForStaff(currentStaff!.id),
     enabled: !!currentStaff,
   });
-  const { data: pendingApprovals = 0 } = useQuery({
-    queryKey: ['ih-requests-pending-all'],
-    queryFn: () => requestSummaryRepo.pendingApprovalCount(),
+  const { data: pendingApprovalsDetailed = [] } = useQuery({
+    queryKey: ['ih-requests-pending-detailed'],
+    queryFn: () => requestSummaryRepo.listPendingApprovalsDetailed(),
     enabled: isAdmin,
   });
   const { data: payslips = [] } = useQuery({
@@ -84,8 +92,12 @@ const StaffHome = () => {
     queryFn: () => financeSnapshotRepo.statusFor(month),
     enabled: isAdmin,
   });
+  const { data: openIssues = [] } = useQuery({
+    queryKey: ['ih-system-issues-open'],
+    queryFn: () => listSystemIssues({ status: 'open' }),
+    enabled: isAdmin,
+  });
 
-  // Doc 3.1 §7 — idempotent payroll reminder (admin, after the 25th).
   useEffect(() => {
     if (!currentStaff || !isAdmin) return;
     const d = new Date();
@@ -93,12 +105,37 @@ const StaffHome = () => {
     void payrollRepo.ensureReminderForMonth(m, currentStaff.id);
   }, [currentStaff?.id, isAdmin]);
 
+  // Aggregators
+  const pendingItems = useMemo(() => {
+    if (!currentStaff) return [];
+    return buildPendingItems({
+      staff: currentStaff,
+      notices: noticesAll,
+      acks: ackMap as Map<string, never>,
+      needsCorrection,
+      recentDecided: [],
+      onboarding: onboardingRepo.get(currentStaff.id),
+      toolAccess: toolAccessRepo.get(currentStaff.id),
+      latestPayslip: payslips[0],
+    });
+  }, [currentStaff, noticesAll, ackMap, needsCorrection, payslips]);
+
+  const workbenchItems = useMemo(() => {
+    if (!isAdmin) return [];
+    return buildWorkbenchItems({
+      pendingApprovals: pendingApprovalsDetailed,
+      staff: allStaff,
+      systemIssues: openIssues,
+      payrollMonth: month,
+      payrollStatus: payrollStatusRaw,
+    });
+  }, [isAdmin, pendingApprovalsDetailed, allStaff, openIssues, month, payrollStatusRaw]);
+
   if (!currentStaff) return null;
 
   const unread = noticesAll.filter((n) => !readSet.has(n.id)).length;
   const ackPending = noticesAll.filter((n) => n.importance === 'AcknowledgmentRequired' && !ackMap.has(n.id)).length;
 
-  // Admin metrics
   const inProgressOnboardings = isAdmin
     ? allStaff.filter((s) => {
         const c = onboardingRepo.get(s.id);
@@ -113,16 +150,16 @@ const StaffHome = () => {
 
   const summaries = isAdmin
     ? [
-        { title: 'Pending Approvals', value: pendingApprovals, tone: pendingApprovals > 0 ? 'attention' : 'muted', to: '/staff/admin/approvals' },
-        { title: 'Staff Onboarding', value: inProgressOnboardings, caption: 'in progress', tone: 'default', to: '/staff/admin/staff' },
+        { title: 'Pending Approvals', value: pendingApprovalsDetailed.length, tone: pendingApprovalsDetailed.length > 0 ? 'attention' : 'muted', to: '/staff/admin/workbench?type=Requests' },
+        { title: 'Staff Onboarding', value: inProgressOnboardings, caption: 'in progress', tone: 'default', to: '/staff/admin/workbench?type=Onboarding' },
         { title: 'Payroll', value: payrollStatus, caption: month, tone: 'muted', to: '/staff/admin/payroll' },
-        { title: 'Finance Snapshot', value: financeStatus, caption: month, tone: 'muted', to: '/staff/admin/finance' },
+        { title: 'System Issues', value: openIssues.length, caption: openIssues.length === 0 ? 'no issues' : 'unresolved', tone: openIssues.length > 0 ? 'attention' : 'success', to: '/staff/admin/system-issues' },
       ] as const
     : [
-        { title: 'My Pending Actions', value: ackPending + myPendingRequests, tone: ackPending + myPendingRequests > 0 ? 'attention' : 'success', caption: ackPending + myPendingRequests === 0 ? "You're all caught up." : undefined, to: '/staff/notices' },
+        { title: 'My Pending Actions', value: pendingItems.length, tone: pendingItems.length > 0 ? 'attention' : 'success', caption: pendingItems.length === 0 ? "You're all caught up." : `${pendingItems.length} item${pendingItems.length === 1 ? '' : 's'}`, to: '/staff/pending' },
         { title: 'My Requests', value: myPendingRequests, caption: 'pending', tone: 'muted', to: '/staff/requests' },
         { title: 'Notices / Ack', value: unread, caption: ackPending > 0 ? `${ackPending} ack required` : undefined, tone: ackPending > 0 ? 'attention' : 'muted', to: '/staff/notices' },
-        { title: 'Payslip Status', value: latestPayslip ? latestPayslip.availability : 'No payslip', tone: 'muted', to: '/staff/payslips' },
+        { title: 'Payslip Status', value: latestPayslip ? latestPayslip.month : 'No payslip', caption: latestPayslip?.availability, tone: 'muted', to: '/staff/payslips' },
       ] as const;
 
   const staffActions: QuickActionItem[] = [
@@ -138,63 +175,80 @@ const StaffHome = () => {
 
   const adminActions: QuickActionItem[] = [
     { label: 'Broadcast Notice', icon: Megaphone, to: '/staff/admin/notices/new' },
-    { label: 'Review Approvals', icon: ClipboardCheck, to: '/staff/admin/approvals' },
+    { label: 'Review Approvals', icon: ClipboardCheck, to: '/staff/admin/workbench?type=Requests' },
     { label: 'Add Staff', icon: UserPlus, to: '/staff/admin/staff/new' },
     { label: 'View Payroll', icon: Banknote, to: '/staff/admin/payroll' },
     { label: 'Finance Snapshot', icon: BarChart3, to: '/staff/admin/finance' },
     { label: 'Manage Resources', icon: BookOpen, to: '/staff/admin/resources' },
-    { label: 'Email Delivery', icon: Mail, to: '/staff/admin/email-log' },
-    { label: 'Calendar Settings', icon: Mail, to: '/staff/admin/calendar-settings' },
   ];
 
   return (
-    <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
-      {/* 1. Welcome header */}
-      <header>
+    <div className="p-4 sm:p-6 max-w-6xl mx-auto flex flex-col gap-6">
+      {/* Welcome */}
+      <header className="order-1">
         <h1 className="text-2xl font-semibold text-foreground">
           Welcome, {currentStaff.fullName.split(' ')[0]}
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">Here's what's happening at AIHQ.</p>
+        <p className="text-sm text-muted-foreground mt-1">Here's what needs your attention.</p>
       </header>
 
-      {/* 2. Operational summary cards */}
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* §24 Mobile order: Pending → Quick Actions → Summary → Notices → Requests → Payslips → Sections */}
+      {/* On desktop: summary cards row first via lg:order-* */}
+
+      {/* 1. Pending / Workbench preview */}
+      <section className="order-2 lg:order-3">
+        {isAdmin ? (
+          <AdminWorkbenchPreview items={workbenchItems} />
+        ) : (
+          <PendingItemsPreview items={pendingItems} />
+        )}
+      </section>
+
+      {/* 2. Quick Actions */}
+      <section className="order-3 lg:order-4 space-y-2">
+        <h2 className="text-sm font-medium text-foreground">Quick Actions</h2>
+        <QuickActionsGrid items={isAdmin ? [...adminActions, ...staffActions] : staffActions} />
+      </section>
+
+      {/* 3. Summary cards */}
+      <section className="order-4 lg:order-2 grid grid-cols-2 lg:grid-cols-4 gap-3">
         {summaries.map((s) => (
           <SummaryCard
             key={s.title}
             title={s.title}
             value={s.value}
             caption={s.caption}
-            tone={s.tone as any}
+            tone={s.tone as never}
             to={s.to}
           />
         ))}
       </section>
 
-      {/* 3. Quick Actions */}
-      <section className="space-y-2">
-        <h2 className="text-sm font-medium text-foreground">Quick Actions</h2>
-        <QuickActionsGrid items={isAdmin ? [...adminActions, ...staffActions] : staffActions} />
+      {/* 4. Latest Notices */}
+      <section className="order-5">
+        <LatestNoticesPreview notices={notices} readSet={readSet} />
       </section>
 
-      {/* 4. Latest Notices preview */}
-      <LatestNoticesPreview
-        notices={notices}
-        readSet={readSet}
-      />
-
-      {/* 5–6. Requests + Payslips previews */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <MyRecentRequestsPreview items={requests} />
+      {/* 5+6. Requests + Payslips */}
+      <section className="order-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <MyRecentRequestsPreview items={requests} needsCorrection={needsCorrection} />
         <MyPayslipsPreview items={payslips} disabled={!isAdmin && currentStaff.status !== 'Active'} />
-      </div>
+      </section>
 
       {/* 7. Sections */}
-      <section className="space-y-2">
+      <section className="order-7 space-y-2">
         <h2 className="text-sm font-medium text-foreground">Sections</h2>
-        <SectionsGrid isAdmin={isAdmin} />
+        <SectionsGrid
+          isAdmin={isAdmin}
+          statuses={{
+            requestsPending: myPendingRequests,
+            noticesAck: ackPending,
+            payslipMonth: latestPayslip?.month,
+            onboardingPending: inProgressOnboardings,
+            payrollStatusLabel: isAdmin ? payrollStatus : undefined,
+          }}
+        />
       </section>
-
     </div>
   );
 };

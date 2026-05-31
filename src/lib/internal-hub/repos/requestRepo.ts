@@ -2,6 +2,7 @@
 // Submit (staff) → Approve/Reject (admin) → calendar sync + outcome email.
 import { supabase } from '@/integrations/supabase/client';
 import { approvalNeededEmail, approvalOutcomeEmail } from '../email/dispatcher';
+import { logAudit } from '../audit';
 
 export type RequestKind = 'Leave' | 'MC' | 'Claim' | 'Training' | 'Benefit';
 export type RequestStatusDb = 'Submitted' | 'Approved' | 'Rejected' | 'NeedsCorrection' | 'Cancelled';

@@ -1,90 +1,42 @@
-# Internal Hub — Spec Gap Fix Plan
+## Diagnosis
 
-Closes the 9 gaps from the audit. Grouped by risk/severity. No scope creep — only what the docs already require.
+**It's a UI copy / wiring bug — not a docs problem and not a broken implementation.**
 
-## Phase 1 — High severity (Requests & Leave correctness)
+- `WelcomeEmailStatus.handleResend` (src/components/internal-hub/WelcomeEmailStatus.tsx:18-22) calls `welcomeEmailRepo.resend(staffId)` and then immediately shows a hard-coded toast: *"Welcome email resend queued — No real email sent in dev mode."*
+- `welcomeEmailRepo.resend` (src/lib/internal-hub/repos/welcomeEmailRepo.ts) **does** dispatch a real send: it kicks off `dispatchWelcome` → `welcomeEmail(...)` → `sendIhEmail(...)` → `supabase.functions.invoke('ih-send-email', ...)`.
+- The `ih-send-email` edge function (supabase/functions/ih-send-email/index.ts) is fully implemented against SendGrid using `SENDGRID_API_KEY` (already configured in secrets) and writes results to `ih_email_log`.
 
-### 1. Human-readable request reference numbers (Doc 2.1)
-- Add `reference_no TEXT UNIQUE` to `ih_requests`.
-- Create sequence `ih_request_ref_seq` + trigger that assigns `REQ-YYYYMM-NNNN` on INSERT.
-- Backfill existing rows.
-- Surface in `RequestsIndex.tsx` list/detail and notice/email templates that reference a request.
+So the email IS being sent for real. The toast text is **leftover copy from the earlier localStorage-only phase** and never got updated when Doc 4.2 wired the dispatcher to SendGrid. It also fires synchronously and ignores the actual result.
 
-### 2. Overlapping leave prevention (Doc 2.2)
-- In `requestRepo.create`, before insert: query `ih_requests` for same `staff_id`, kind in `('AnnualLeave','SickLeave','UnpaidLeave')`, status in `('Submitted','Approved')`, with date-range overlap.
-- Throw a typed `OverlappingLeaveError` → caught in form, shown inline.
-- Add a DB-level `EXCLUDE USING gist` constraint as defense-in-depth.
+Same fire-and-forget pattern (no success/failure feedback) also affects `handleQueue` in the same component, but its toast at least isn't lying.
 
-### 3. Weekend exclusion in leave duration (Doc 2.2)
-- Add `lib/internal-hub/leaveDays.ts` with `countWorkingDays(start, end, halfDaySlot?)` excluding Sat/Sun.
-- Use it in request form (live duration preview) and in `requestRepo.create` to persist `working_days` on the row.
-- Leave public-holiday calendar as a TODO hook (spec marks "public holiday readiness", not active enforcement) — pass an empty array but expose the parameter.
+## Codebase sweep for similar issues
 
-### 4. Training fund annual cycle (Doc 2.3)
-- Already-existing `sp_training_entitlements` is the SP-side equivalent — mirror as `ih_training_entitlements (staff_id, year, allotted_amount, used_amount, carried_in, updated_at)`.
-- On `TrainingApplication` approval: insert `pending_amount`; on `TrainingClaim` approval+payroll-inclusion: convert pending → used.
-- Show balance in Request form ("Training fund remaining: RM X / RM Y for 2026").
-- Block submission when `requested > remaining` unless admin override flag set.
+Searched for "dev mode" / "no real email" across `src` and `supabase`. Only one other hit:
 
-## Phase 2 — Medium severity (balance wiring + payroll math)
+- `src/lib/internal-hub/seedNotices.ts:3` — a code comment on the local notices seeder. That one is **accurate** (notice seeding really is local-only, no email path), so leave it alone.
 
-### 5. AL / SL balance display & deduction (Doc 2.2)
-- `ih_leave_balances` already exists; wire up:
-  - On approve: decrement; on cancel-after-approve: re-credit (idempotent via `request_id` ledger column).
-  - Show balances on `StaffHome` + leave request form header.
-- Add monthly carry-forward / new-joiner prorate per memory `mem://staff-portal/approval-and-leave-balance-mechanics`.
+No other UI surfaces are lying about send mode.
 
-### 6. Claim auto-approval guardrails (Doc 2.3)
-- Add `claim_auto_approve_threshold` to a small config (constant for now, RM 50).
-- In `requestRepo.create` for `Claim`: if `amount <= threshold` AND attachment present AND not flagged → set `status='Approved'`, `auto_approved=true`, audit-log.
-- Anything over threshold or missing proof stays `Submitted` and hits admin queue.
+## Fix plan (frontend-only, surgical)
 
-### 7. Employer EPF / SOCSO calculation (Doc 3.1)
-- Add `employer_epf_rate`, `employer_socso_rate` to `ih_staff_profiles` (defaults 13%, configurable).
-- In `payrollRepo.preparePayroll`: compute `employer_epf`, `employer_socso`; persist into `ih_payroll_items`.
-- Fix `total_company_cost = base + claims + training_claims + employer_epf + employer_socso` (not + employee deductions).
-- Update payslip PDF "Employer contributions" line.
+**File:** `src/components/internal-hub/WelcomeEmailStatus.tsx`
 
-### 8. Finance Snapshot EPF/SOCSO autofill (Doc 3.3) — downstream of #7
-- `financeSnapshotRepo` already sums `employer_epf + employer_socso` from payroll items → becomes correct once #7 lands. Verify with a snapshot for the current month.
+1. Remove the false "No real email sent in dev mode" copy.
+2. Make `handleResend` and `handleQueue` `async`, await the repo call so the toast reflects the actual outcome.
+3. Show:
+   - success toast ("Welcome email sent" / "Welcome email queued and sent") on `status === 'sent' | 'resent'`
+   - destructive toast ("Failed to send welcome email — check System Issues") on `status === 'failed'`
+4. Disable the button while in-flight (local `isSending` state) so admins can't double-click.
+5. Call `onUpdate()` after the dispatch resolves so the badge/timestamp refreshes from the just-written localStorage entry.
 
-## Phase 3 — Low severity
+**Repo change (minimal):** `welcomeEmailRepo.resend` / `queue` currently return synchronously and run dispatch via `void`. To let the UI await the real outcome, change them to `async` and `await dispatchWelcome(...)` before returning the updated event. `dispatchWelcome` already writes the final `sent | resent | failed` status to localStorage, so the returned event is truthful.
+   - Callers to recheck: `AdminAddStaff.tsx` (calls `welcomeEmailRepo.queue` fire-and-forget — keep working by not awaiting; the function returning a Promise is backward-compatible) and `AdminStaffDetail.tsx` (read-only `get`).
 
-### 9. MC distinct accept/reject (Doc 2.2)
-- Add admin action labels: "Accept MC" / "Reject MC" when `kind='SickLeave'` with attachment, mapping to `Approved` / `Rejected` under the hood (no new status, just clearer UX + audit summary text).
+**Out of scope:** no edge function changes, no DB changes, no doctrine changes. SendGrid sender, idempotency, and `ih_email_log` truth source are untouched.
 
-## Technical details
+## Verification
 
-**Migrations (one per phase to keep blast radius small):**
-- `M1`: alter `ih_requests` (`reference_no`, `working_days`, `auto_approved`); add `ih_request_ref_seq` + trigger; backfill; add GiST overlap constraint.
-- `M2`: create `ih_training_entitlements` (+ GRANT to `authenticated` read-own/admin-all, RLS, service_role).
-- `M3`: alter `ih_staff_profiles` add employer rate columns; alter `ih_payroll_items` add `employer_epf`, `employer_socso`.
-
-**Code touch list:**
-- `src/lib/internal-hub/repos/requestRepo.ts` — overlap check, working_days, auto-approve
-- `src/lib/internal-hub/repos/claimRepo.ts` — threshold logic
-- `src/lib/internal-hub/repos/payrollRepo.ts` — employer contrib calc, total_company_cost fix
-- `src/lib/internal-hub/repos/leaveBalanceRepo.ts` (new) — ledger-style debit/credit
-- `src/lib/internal-hub/leaveDays.ts` (new)
-- `src/pages/staff/hub/requests/*` — show balances, reference_no, training remaining
-- `src/pages/staff/hub/StaffHome.tsx` — show AL/SL balances
-- `supabase/functions/ih-generate-payslip-pdf/index.ts` — employer contrib line
-
-**Invariants honored:**
-- RLS preserved (overlap query uses `auth.uid()`), GRANTs included in every new table.
-- No scheduled-job auto-finalize (Patch 001).
-- No PDF email attachments (Doc 3.2).
-- Payroll lock after finalize untouched.
-
-**Memory updates after ship:**
-- Update `mem://internal-hub/payroll-doc-3.1` with employer EPF/SOCSO formula.
-- Append claim auto-approval threshold + leave overlap rule to existing IH memories.
-
-## Out of scope (deliberately)
-- Public holiday calendar source (hook only).
-- Multi-approver workflows.
-- AI extraction (still deferred per Doc 4.3).
-- Any SP / placement / marketing surfaces.
-
-## Suggested execution order
-Phase 1 → Phase 2 → Phase 3, with a verify pass after each (one snapshot, one payroll dry-run, one leave request) before moving on.
+- Click "Resend" on a staff profile with a valid email → expect success toast and `ih_email_log` row with `status='sent'`.
+- Click on a staff profile with no email → expect failure toast (repo already marks status `failed` in that branch).
+- Check `AdminAddStaff` flow still queues a welcome email on staff creation without regression.

@@ -31,6 +31,9 @@ import AckReport from "./pages/staff/hub/notices/admin/AckReport";
 import ResourcesIndex from "./pages/staff/hub/resources/ResourcesIndex";
 import ManageResources from "./pages/staff/hub/resources/admin/ManageResources";
 import RequestsIndex from "./pages/staff/hub/requests/RequestsIndex";
+import NewRequest from "./pages/staff/hub/requests/NewRequest";
+import RequestDetail from "./pages/staff/hub/requests/RequestDetail";
+import AdminRequestsQueue from "./pages/staff/hub/admin/requests/AdminRequestsQueue";
 import PayslipsIndex from "./pages/staff/hub/payslips/PayslipsIndex";
 import { Approvals, SettingsAdmin } from "./pages/staff/hub/admin/Stubs";
 import PayrollIndex from "./pages/staff/hub/admin/payroll/PayrollIndex";
@@ -91,6 +94,8 @@ const App = () => (
 
               {/* Staff-facing stubs (owned by later cards) */}
               <Route path="requests" element={<RequestsIndex />} />
+              <Route path="requests/new" element={<NewRequest />} />
+              <Route path="requests/:id" element={<RequestDetail />} />
               <Route path="payslips" element={<PayslipsIndex />} />
               <Route path="payslips/:id" element={<PayslipDetail />} />
               <Route path="pending" element={<MyPendingItems />} />
@@ -120,6 +125,9 @@ const App = () => (
               } />
               <Route path="admin/workbench" element={
                 <ProtectedRoute requireAdmin><AdminWorkbench /></ProtectedRoute>
+              } />
+              <Route path="admin/requests" element={
+                <ProtectedRoute requireAdmin><AdminRequestsQueue /></ProtectedRoute>
               } />
               <Route path="admin/payroll" element={
                 <ProtectedRoute requireAdmin><PayrollIndex /></ProtectedRoute>

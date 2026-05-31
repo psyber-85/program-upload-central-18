@@ -1,12 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useHub } from '@/lib/internal-hub/HubContext';
 import { noticeRepo } from '@/lib/internal-hub';
 import { canAccessAdminArea } from '@/lib/internal-hub/access';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bell, ShieldAlert, Megaphone } from 'lucide-react';
+import { Bell, ShieldAlert, Megaphone, Loader2 } from 'lucide-react';
 import { NoticeImportanceBadge, NoticeTypeBadge } from '@/components/internal-hub/notices/NoticeBadges';
 
 type Filter = 'all' | 'unread' | 'ack' | 'archived';
@@ -14,18 +15,31 @@ type Filter = 'all' | 'unread' | 'ack' | 'archived';
 const NoticesList = () => {
   const { currentStaff } = useHub();
   const isAdmin = canAccessAdminArea(currentStaff);
-  const [filter, setFilter] = useState<Filter>('all');
-  const [tick, setTick] = useState(0);
-  void tick;
+  const [filter, setFilter] = React.useState<Filter>('all');
+
+  const includeArchived = filter === 'archived' && isAdmin;
+  const { data: notices = [], isLoading } = useQuery({
+    queryKey: ['ih-notices', { includeArchived }],
+    queryFn: () => noticeRepo.list(includeArchived),
+    enabled: !!currentStaff,
+  });
+  const { data: reads = new Set<string>() } = useQuery({
+    queryKey: ['ih-notice-reads', currentStaff?.id],
+    queryFn: () => noticeRepo.listReadsForStaff(currentStaff!.id),
+    enabled: !!currentStaff,
+  });
+  const { data: acks = new Map<string, unknown>() } = useQuery({
+    queryKey: ['ih-notice-acks', currentStaff?.id],
+    queryFn: () => noticeRepo.listAcksForStaff(currentStaff!.id),
+    enabled: !!currentStaff,
+  });
 
   const items = useMemo(() => {
-    if (!currentStaff) return [];
-    const all = noticeRepo.visibleFor(currentStaff, { includeArchived: filter === 'archived' && isAdmin });
-    if (filter === 'unread') return all.filter((n) => !noticeRepo.isReadBy(n.id, currentStaff.id));
-    if (filter === 'ack') return all.filter((n) => n.importance === 'AcknowledgmentRequired' && !noticeRepo.ackBy(n.id, currentStaff.id));
-    if (filter === 'archived') return all.filter((n) => n.archived);
-    return all.filter((n) => !n.archived);
-  }, [currentStaff?.id, filter, tick]);
+    if (filter === 'unread') return notices.filter((n) => !reads.has(n.id));
+    if (filter === 'ack') return notices.filter((n) => n.importance === 'AcknowledgmentRequired' && !acks.has(n.id));
+    if (filter === 'archived') return notices.filter((n) => n.archived);
+    return notices.filter((n) => !n.archived);
+  }, [notices, reads, acks, filter]);
 
   if (!currentStaff) return null;
 
@@ -55,13 +69,15 @@ const NoticesList = () => {
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base">{items.length} notice{items.length === 1 ? '' : 's'}</CardTitle></CardHeader>
         <CardContent>
-          {items.length === 0 ? (
+          {isLoading ? (
+            <div className="py-8 flex items-center justify-center text-sm text-muted-foreground"><Loader2 className="h-4 w-4 mr-2 animate-spin" />Loading…</div>
+          ) : items.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">No notices in this view.</div>
           ) : (
             <ul className="divide-y divide-border">
               {items.map((n) => {
-                const read = noticeRepo.isReadBy(n.id, currentStaff.id);
-                const ackDone = !!noticeRepo.ackBy(n.id, currentStaff.id);
+                const read = reads.has(n.id);
+                const ackDone = acks.has(n.id);
                 return (
                   <li key={n.id}>
                     <Link

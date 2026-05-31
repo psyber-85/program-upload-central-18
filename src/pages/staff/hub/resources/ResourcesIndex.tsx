@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useHub } from '@/lib/internal-hub/HubContext';
 import { resourceRepo } from '@/lib/internal-hub';
 import { canAccessAdminArea } from '@/lib/internal-hub/access';
@@ -9,7 +10,7 @@ import StartHereCards from '@/components/internal-hub/resources/StartHereCards';
 import ResourceCard from '@/components/internal-hub/resources/ResourceCard';
 import ITSupportCard from '@/components/internal-hub/resources/ITSupportCard';
 import NotionKBCard from '@/components/internal-hub/resources/NotionKBCard';
-import { Settings as SettingsIcon } from 'lucide-react';
+import { Settings as SettingsIcon, Loader2 } from 'lucide-react';
 
 const CATEGORY_ORDER: ResourceCategory[] = [
   'CompanyTools', 'Policies', 'Benefits', 'OnboardingMaterials', 'YouTubeTraining', 'NotionKB', 'ITSupport',
@@ -18,10 +19,12 @@ const CATEGORY_ORDER: ResourceCategory[] = [
 const ResourcesIndex = () => {
   const { currentStaff } = useHub();
   const isAdmin = canAccessAdminArea(currentStaff);
-  const resources = useMemo(
-    () => (currentStaff ? resourceRepo.visibleFor(currentStaff) : []),
-    [currentStaff?.id],
-  );
+
+  const { data: resources = [], isLoading } = useQuery({
+    queryKey: ['ih-resources-visible', currentStaff?.id],
+    queryFn: () => resourceRepo.visibleFor(currentStaff!),
+    enabled: !!currentStaff,
+  });
 
   if (!currentStaff) return null;
 
@@ -51,7 +54,9 @@ const ResourcesIndex = () => {
         <StartHereCards />
       </section>
 
-      {grouped.map(({ cat, items }) => (
+      {isLoading ? (
+        <div className="flex items-center text-sm text-muted-foreground"><Loader2 className="h-4 w-4 mr-2 animate-spin" />Loading resources…</div>
+      ) : grouped.map(({ cat, items }) => (
         <section key={cat} id={cat === 'CompanyTools' ? 'company-tools' : undefined} className="space-y-2">
           <h2 className="text-sm font-medium text-foreground">{RESOURCE_CATEGORY_LABELS[cat]}</h2>
           {cat === 'NotionKB' ? (

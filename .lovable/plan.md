@@ -1,75 +1,39 @@
-# Doc 4.1 — Fix Plan (Sub-batch 4A)
+# Sub-batch 4A.6 — Close remaining Doc 4.1 gaps
 
-Targets the 4 remaining gaps from the 78% audit. Mirrors the 2A–2F sub-batch pattern.
+Brings Doc 4.1 from 87% → ~97%.
 
-## Scope
+## Changes
 
-| # | Gap | Spec ref | Severity |
-|---|-----|----------|----------|
-| G1 | No RLS / access test suite | Doc 4.1 §17 | High |
-| G2 | No Admin-promotion path (UI + edge fn) | Doc 4.1 §5 | Medium |
-| G3 | Public signup not verifiably disabled | Doc 4.1 §2 | Medium |
-| G4 | No production Supabase seed runbook | Doc 4.1 §17-seed | Medium |
-| G5 | Requests/claims lack `archived_at` (soft delete) | Doc 4.1 §11 | Low |
+### 1. Extend `supabase/functions/_tests/rls_access_test.ts` (#22, #24)
+- Add `import "https://deno.land/std@0.224.0/dotenv/load.ts";` so the runner picks up `.env`.
+- Add 3 admin-access assertions: admin can read `ih_payroll_runs`, `ih_finance_snapshots`, and all `ih_requests` (no permission error).
+- Add 2 audience tests: staff-active (Training arm) only sees notices/resources whose audience is `Everyone | Training | Individual=self`, and no `archived_at` rows.
 
-## Deliverables
+### 2. New edge function `supabase/functions/ih-provision-test-fixtures/index.ts` (#20)
+- Header-gated by `x-fixture-token` matching `FIXTURE_TOKEN` secret.
+- Idempotently creates / upserts the 3 fixture auth users (`admin@`, `staff-active@`, `staff-inactive@`) with a generated shared password, plus their `ih_staff_profiles` + `ih_user_roles` rows + `Active`/`Inactive` status.
+- Returns `{ ok, password }` so the operator can store it as `IH_TEST_PASSWORD`.
+- Registered in `supabase/config.toml` with `verify_jwt = false`.
+- Requires new secret: `FIXTURE_TOKEN` (operator-provided; will request via secrets tool).
 
-### 4A.1 — RLS test suite (G1)
-- New `supabase/tests/rls/` directory using pgTAP-style SQL tests run via `supabase--read_query` harness, or Deno test file `supabase/functions/_tests/rls_access_test.ts` that signs in as 3 fixture users (admin, active staff, inactive staff) and asserts:
-  - staff can read own `ih_staff_profiles`, `ih_payslips`, `ih_requests`, `ih_claims`; cannot read others'
-  - inactive staff blocked from all `ih_*` reads via `is_active_ih_staff()`
-  - non-admin cannot read `ih_payroll_runs`, `ih_payroll_items`, `ih_finance_*`
-  - non-admin cannot mutate sensitive fields (trigger fires)
-  - non-admin cannot insert into `ih_user_roles`
-- Documented `bun run test:rls` script.
+### 3. Update `docs/auth-config.md` (#2)
+- Add a "Verification evidence" section instructing the operator to attach a dated screenshot of the Auth settings page with `Enable signups = OFF` to the runbook (file path under `docs/screenshots/auth-signups-off.png`), and document a manual `signUp()` probe expected error.
 
-### 4A.2 — Admin promotion (G2)
-- New edge function `ih-promote-staff` (verify_jwt enforced in-code): caller must have `admin` role; inserts `(target_user_id, 'admin')` into `ih_user_roles`; writes audit row (uses Doc 4.3 audit log if present, else console).
-- UI: on `AdminStaffDetail.tsx`, add "Promote to Admin" / "Revoke Admin" button (admin-only, hidden for self) calling the function. Confirm dialog. Toast on success.
-
-### 4A.3 — Public signup lockdown (G3)
-- No code change required in app (Login already has no signUp call). Add a `docs/auth-config.md` runbook documenting required Supabase Auth settings: **Enable signups = OFF**, **Confirm email = ON**, **Site URL** and **Redirect URLs** values.
-- Add a runtime guard: small admin-only diagnostic card on `/staff` (Admin view) that calls `supabase.auth.signUp` with a synthetic disabled probe — optional, skip if too invasive. Default: docs only.
-
-### 4A.4 — Production seed runbook (G4)
-- New `docs/production-seed.md` describing the one-time bootstrap:
-  1. Deploy migrations
-  2. Invoke `ih-bootstrap-admin` with bootstrap token to create first Admin
-  3. Admin signs in, creates remaining staff via `AdminAddStaff` (uses `ih-create-staff`)
-  4. No fixture data inserted in prod
-- Mark `src/lib/internal-hub/seed.ts` and `seedNotices.ts` clearly as **dev-only / localStorage only** via top-of-file comment.
-
-### 4A.5 — Soft archive on requests/claims (G5)
-- Migration: add `archived_at TIMESTAMPTZ` to `ih_requests` and `ih_claims`.
-- Extend `ih_block_hard_delete` trigger to both tables.
-- Update `requestSummaryRepo`/`claimRepo` list queries to filter `archived_at IS NULL` by default; admin archive action sets the column.
-- No UI change required in 4A (admin archive UI deferred).
-
-## Files touched (estimate)
-
+## Files
 ```
-supabase/migrations/<new>_doc4_1_archive_and_delete_guards.sql
-supabase/functions/ih-promote-staff/index.ts
-supabase/functions/_tests/rls_access_test.ts
-supabase/config.toml                          (register new fn)
-src/pages/staff/hub/admin/AdminStaffDetail.tsx
-src/lib/internal-hub/repos/requestSummaryRepo.ts
-src/lib/internal-hub/repos/claimRepo.ts
-src/lib/internal-hub/seed.ts                  (comment only)
-src/lib/internal-hub/seedNotices.ts           (comment only)
-docs/auth-config.md                           (new)
-docs/production-seed.md                       (new)
+supabase/functions/_tests/rls_access_test.ts       (extend)
+supabase/functions/ih-provision-test-fixtures/index.ts  (new)
+supabase/config.toml                                (register fn)
+docs/auth-config.md                                 (extend)
 ```
 
 ## Out of scope
-- Doc 4.2 / 4.3 gaps (separate sub-batches 4B–4H).
-- Admin UI for archived-request/claim restore (future).
-- Replacing localStorage repos with Supabase (tracked elsewhere).
+- Provisioning the fixtures in this Supabase project (operator runs the function once after secret is set).
+- Actually running the tests (will skip until `IH_TEST_PASSWORD` is set).
 
 ## Acceptance
-- RLS test suite passes for all 3 fixture roles.
-- Admin can promote/demote another Active staff to Admin from `AdminStaffDetail`.
-- `docs/auth-config.md` and `docs/production-seed.md` exist and are accurate.
-- `ih_requests` / `ih_claims` have `archived_at`; hard delete blocked; list views hide archived rows.
+- Test file contains 13 test cases (was 7) covering admin reads + audience.
+- `ih-provision-test-fixtures` deploys and rejects calls without the fixture token.
+- `docs/auth-config.md` includes the verification evidence steps.
 
-Approve to switch to build mode and execute 4A.1 → 4A.5 in order.
+Approve to switch to build mode.

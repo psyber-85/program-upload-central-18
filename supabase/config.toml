@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.send-hiring-loi]
 verify_jwt = false
+
+[functions.ih-promote-staff]
+verify_jwt = false

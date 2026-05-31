@@ -14,10 +14,14 @@ export interface StaffProfile {
   businessArm: BusinessArm;
   joinDate: string; // ISO date
   status: StaffStatus;
-  // Admin-only / payroll-impacting (Doc 0.1 §12, §15)
+  // Admin-only / payroll-impacting (Doc 0.1 §12, §15 + Patch 002 §5)
   baseSalary: number;
-  epfRate: number; // percent
-  socsoRate: number; // percent
+  epfRate: number; // percent — employee EPF
+  socsoRate: number; // percent — employee SOCSO
+  eisRate: number; // percent — employee EIS (Patch 002)
+  employerEpfRate?: number; // optional defaults; falls back at calc time
+  employerSocsoRate?: number;
+  employerEisRate?: number;
   // Insurance (Doc 0.1 §13)
   insuranceCovered: boolean;
   insuranceStartDate?: string;
@@ -274,17 +278,28 @@ export interface ManualAdjustment {
   reason: string; // required
 }
 
-export type PayrollMissingField = 'baseSalary' | 'epfRate' | 'socsoRate';
+export type PayrollMissingField = 'baseSalary' | 'epfRate' | 'socsoRate' | 'eisRate';
 
 export interface PayrollItem {
   staffId: string;
   staffName: string;
   month: string; // YYYY-MM
   baseSalary: number;
+  // Employee statutory (Patch 002 §4)
   epfAmount: number;
   socsoAmount: number;
+  eisAmount: number;
+  totalEmployeeDeductions: number;
+  // Employer statutory (Patch 002 §4)
+  employerEpf: number;
+  employerSocso: number;
+  employerEis: number;
+  totalEmployerContribution: number;
+  // Additions (Patch 002 §11)
   claimsTotal: number;
   trainingClaimsTotal: number;
+  bonusTotal: number;
+  otherAdditionTotal: number;
   adjustment: ManualAdjustment | null;
   netPay: number;
   rowStatus: PayrollItemRowStatus;
@@ -333,6 +348,7 @@ export const PAYROLL_MISSING_FIELD_LABELS: Record<PayrollMissingField, string> =
   baseSalary: 'Base salary',
   epfRate: 'EPF rate',
   socsoRate: 'SOCSO rate',
+  eisRate: 'EIS rate',
 };
 
 // ============================================================
@@ -351,16 +367,27 @@ export interface Payslip {
   staffName: string;
   month: string;
   baseSalary: number;
+  // Employee statutory (Patch 002 §12)
   epf: number;
   socso: number;
+  eis: number;
+  totalEmployeeDeductions: number;
+  // Employer statutory (Patch 002 §15)
+  employerEpf: number;
+  employerSocso: number;
+  employerEis: number;
+  totalEmployerContribution: number;
+  // Additions (Patch 002 §11)
   claimsTotal: number;
   trainingClaimsTotal: number;
+  bonusTotal: number;
+  otherAdditionTotal: number;
   adjustment: ManualAdjustment | null;
   netPay: number;
   finalizedAt: string;
   availability: PayslipAvailability;
-  pdfRef?: string; // placeholder ref — real storage is Card 4
-  correctionRef?: string; // Doc 3.2 §17/§18
+  pdfRef?: string;
+  correctionRef?: string;
 }
 
 export interface PayslipDownloadLogEntry {
@@ -412,7 +439,14 @@ export interface FinanceSnapshot {
   payrollTotal: number;
   claimsTotal: number;
   trainingClaimsTotal: number;
+  /** @deprecated Patch 002 §22 — use employeeStatutoryTotal / employerStatutoryTotal instead. */
   epfSocsoTotal: number;
+  employeeStatutoryTotal: number;
+  employerStatutoryTotal: number;
+  epfTotal: number;
+  socsoTotal: number;
+  eisTotal: number;
+  bonusTotal: number;
   manualAdjustmentTotal: number;
   notes?: string;
   reviewedAt?: string;

@@ -21,6 +21,7 @@ const empty: StaffFormValues = {
   baseSalary: 0,
   epfRate: 11,
   socsoRate: 0.5,
+  eisRate: 0.2,
   insuranceCovered: false,
 };
 

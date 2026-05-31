@@ -411,10 +411,15 @@ export type Database = {
       }
       ih_finance_snapshots: {
         Row: {
+          bonus_total: number
           claims_total: number
           closing_balance: number | null
           created_at: string
+          eis_total: number
+          employee_statutory_total: number
+          employer_statutory_total: number
           epf_socso_total: number
+          epf_total: number
           id: string
           line_items: Json
           locked_at: string | null
@@ -426,15 +431,21 @@ export type Database = {
           payroll_total: number
           reviewed_at: string | null
           reviewed_by: string | null
+          socso_total: number
           status: Database["public"]["Enums"]["ih_finance_status"]
           training_claims_total: number
           updated_at: string
         }
         Insert: {
+          bonus_total?: number
           claims_total?: number
           closing_balance?: number | null
           created_at?: string
+          eis_total?: number
+          employee_statutory_total?: number
+          employer_statutory_total?: number
           epf_socso_total?: number
+          epf_total?: number
           id?: string
           line_items?: Json
           locked_at?: string | null
@@ -446,15 +457,21 @@ export type Database = {
           payroll_total?: number
           reviewed_at?: string | null
           reviewed_by?: string | null
+          socso_total?: number
           status?: Database["public"]["Enums"]["ih_finance_status"]
           training_claims_total?: number
           updated_at?: string
         }
         Update: {
+          bonus_total?: number
           claims_total?: number
           closing_balance?: number | null
           created_at?: string
+          eis_total?: number
+          employee_statutory_total?: number
+          employer_statutory_total?: number
           epf_socso_total?: number
+          epf_total?: number
           id?: string
           line_items?: Json
           locked_at?: string | null
@@ -466,6 +483,7 @@ export type Database = {
           payroll_total?: number
           reviewed_at?: string | null
           reviewed_by?: string | null
+          socso_total?: number
           status?: Database["public"]["Enums"]["ih_finance_status"]
           training_claims_total?: number
           updated_at?: string
@@ -667,9 +685,12 @@ export type Database = {
         Row: {
           adjustment: Json | null
           base_salary: number
+          bonus_total: number | null
           claims_total: number | null
           created_at: string
           days_worked: number | null
+          eis: number | null
+          employer_eis: number | null
           employer_epf: number | null
           employer_socso: number | null
           epf: number | null
@@ -679,6 +700,7 @@ export type Database = {
           missing_fields: Json
           net_pay: number
           notes: string | null
+          other_addition_total: number | null
           row_status: string
           run_id: string
           socso: number | null
@@ -686,14 +708,19 @@ export type Database = {
           staff_name: string
           total_company_cost: number
           total_days: number | null
+          total_employee_deductions: number | null
+          total_employer_contribution: number | null
           training_total: number | null
         }
         Insert: {
           adjustment?: Json | null
           base_salary?: number
+          bonus_total?: number | null
           claims_total?: number | null
           created_at?: string
           days_worked?: number | null
+          eis?: number | null
+          employer_eis?: number | null
           employer_epf?: number | null
           employer_socso?: number | null
           epf?: number | null
@@ -703,6 +730,7 @@ export type Database = {
           missing_fields?: Json
           net_pay?: number
           notes?: string | null
+          other_addition_total?: number | null
           row_status?: string
           run_id: string
           socso?: number | null
@@ -710,14 +738,19 @@ export type Database = {
           staff_name: string
           total_company_cost?: number
           total_days?: number | null
+          total_employee_deductions?: number | null
+          total_employer_contribution?: number | null
           training_total?: number | null
         }
         Update: {
           adjustment?: Json | null
           base_salary?: number
+          bonus_total?: number | null
           claims_total?: number | null
           created_at?: string
           days_worked?: number | null
+          eis?: number | null
+          employer_eis?: number | null
           employer_epf?: number | null
           employer_socso?: number | null
           epf?: number | null
@@ -727,6 +760,7 @@ export type Database = {
           missing_fields?: Json
           net_pay?: number
           notes?: string | null
+          other_addition_total?: number | null
           row_status?: string
           run_id?: string
           socso?: number | null
@@ -734,6 +768,8 @@ export type Database = {
           staff_name?: string
           total_company_cost?: number
           total_days?: number | null
+          total_employee_deductions?: number | null
+          total_employer_contribution?: number | null
           training_total?: number | null
         }
         Relationships: [
@@ -868,9 +904,12 @@ export type Database = {
           adjustment: Json | null
           availability: string
           base_salary: number
+          bonus_total: number | null
           claims_total: number | null
           correction_ref: string | null
           created_at: string
+          eis: number | null
+          employer_eis: number | null
           employer_epf: number | null
           employer_socso: number | null
           epf: number | null
@@ -878,6 +917,7 @@ export type Database = {
           id: string
           month: string
           net_pay: number
+          other_addition_total: number | null
           pdf_error: string | null
           pdf_generated_at: string | null
           pdf_path: string | null
@@ -885,15 +925,20 @@ export type Database = {
           socso: number | null
           staff_id: string
           staff_name: string | null
+          total_employee_deductions: number | null
+          total_employer_contribution: number | null
           training_total: number | null
         }
         Insert: {
           adjustment?: Json | null
           availability?: string
           base_salary?: number
+          bonus_total?: number | null
           claims_total?: number | null
           correction_ref?: string | null
           created_at?: string
+          eis?: number | null
+          employer_eis?: number | null
           employer_epf?: number | null
           employer_socso?: number | null
           epf?: number | null
@@ -901,6 +946,7 @@ export type Database = {
           id?: string
           month: string
           net_pay?: number
+          other_addition_total?: number | null
           pdf_error?: string | null
           pdf_generated_at?: string | null
           pdf_path?: string | null
@@ -908,15 +954,20 @@ export type Database = {
           socso?: number | null
           staff_id: string
           staff_name?: string | null
+          total_employee_deductions?: number | null
+          total_employer_contribution?: number | null
           training_total?: number | null
         }
         Update: {
           adjustment?: Json | null
           availability?: string
           base_salary?: number
+          bonus_total?: number | null
           claims_total?: number | null
           correction_ref?: string | null
           created_at?: string
+          eis?: number | null
+          employer_eis?: number | null
           employer_epf?: number | null
           employer_socso?: number | null
           epf?: number | null
@@ -924,6 +975,7 @@ export type Database = {
           id?: string
           month?: string
           net_pay?: number
+          other_addition_total?: number | null
           pdf_error?: string | null
           pdf_generated_at?: string | null
           pdf_path?: string | null
@@ -931,6 +983,8 @@ export type Database = {
           socso?: number | null
           staff_id?: string
           staff_name?: string | null
+          total_employee_deductions?: number | null
+          total_employer_contribution?: number | null
           training_total?: number | null
         }
         Relationships: [
@@ -1120,7 +1174,11 @@ export type Database = {
           business_arm: Database["public"]["Enums"]["ih_business_arm"] | null
           created_at: string
           deactivated_at: string | null
+          eis_rate: number | null
           email: string
+          employer_eis_rate: number | null
+          employer_epf_rate: number | null
+          employer_socso_rate: number | null
           epf_rate: number | null
           id: string
           insurance_notes: string | null
@@ -1140,7 +1198,11 @@ export type Database = {
           business_arm?: Database["public"]["Enums"]["ih_business_arm"] | null
           created_at?: string
           deactivated_at?: string | null
+          eis_rate?: number | null
           email: string
+          employer_eis_rate?: number | null
+          employer_epf_rate?: number | null
+          employer_socso_rate?: number | null
           epf_rate?: number | null
           id: string
           insurance_notes?: string | null
@@ -1160,7 +1222,11 @@ export type Database = {
           business_arm?: Database["public"]["Enums"]["ih_business_arm"] | null
           created_at?: string
           deactivated_at?: string | null
+          eis_rate?: number | null
           email?: string
+          employer_eis_rate?: number | null
+          employer_epf_rate?: number | null
+          employer_socso_rate?: number | null
           epf_rate?: number | null
           id?: string
           insurance_notes?: string | null

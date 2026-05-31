@@ -22,6 +22,10 @@ type DbRow = {
   salary_base: number | null;
   epf_rate: number | null;
   socso_rate: number | null;
+  eis_rate: number | null;
+  employer_epf_rate: number | null;
+  employer_socso_rate: number | null;
+  employer_eis_rate: number | null;
   admin_notes: string | null;
   insurance_notes: string | null;
   deactivated_at: string | null;
@@ -45,6 +49,10 @@ function mapRow(r: DbRow): StaffProfile {
     baseSalary: Number(r.salary_base ?? 0),
     epfRate: Number(r.epf_rate ?? 11),
     socsoRate: Number(r.socso_rate ?? 2),
+    eisRate: Number(r.eis_rate ?? 0.2),
+    employerEpfRate: r.employer_epf_rate == null ? undefined : Number(r.employer_epf_rate),
+    employerSocsoRate: r.employer_socso_rate == null ? undefined : Number(r.employer_socso_rate),
+    employerEisRate: r.employer_eis_rate == null ? undefined : Number(r.employer_eis_rate),
     insuranceCovered: false,
     adminNotes: r.admin_notes ?? undefined,
     createdAt: r.created_at,
@@ -117,7 +125,11 @@ export const staffRepo = {
     if (!data?.ok) throw new Error(data?.error ?? 'create_failed');
 
     // Apply payroll/insurance fields the edge function doesn't take.
-    if (input.baseSalary || input.epfRate || input.socsoRate || input.adminNotes) {
+    if (
+      input.baseSalary || input.epfRate || input.socsoRate || input.eisRate
+      || input.employerEpfRate !== undefined || input.employerSocsoRate !== undefined || input.employerEisRate !== undefined
+      || input.adminNotes
+    ) {
       await supabase
         .from('ih_staff_profiles')
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -125,6 +137,10 @@ export const staffRepo = {
           salary_base: input.baseSalary,
           epf_rate: input.epfRate,
           socso_rate: input.socsoRate,
+          eis_rate: input.eisRate,
+          employer_epf_rate: input.employerEpfRate ?? null,
+          employer_socso_rate: input.employerSocsoRate ?? null,
+          employer_eis_rate: input.employerEisRate ?? null,
           admin_notes: input.adminNotes ?? null,
         } as any)
         .eq('id', data.user_id);
@@ -155,6 +171,10 @@ export const staffRepo = {
     if (patch.baseSalary !== undefined) dbPatch.salary_base = patch.baseSalary;
     if (patch.epfRate !== undefined) dbPatch.epf_rate = patch.epfRate;
     if (patch.socsoRate !== undefined) dbPatch.socso_rate = patch.socsoRate;
+    if (patch.eisRate !== undefined) dbPatch.eis_rate = patch.eisRate;
+    if (patch.employerEpfRate !== undefined) dbPatch.employer_epf_rate = patch.employerEpfRate ?? null;
+    if (patch.employerSocsoRate !== undefined) dbPatch.employer_socso_rate = patch.employerSocsoRate ?? null;
+    if (patch.employerEisRate !== undefined) dbPatch.employer_eis_rate = patch.employerEisRate ?? null;
     if (patch.adminNotes !== undefined) dbPatch.admin_notes = patch.adminNotes;
     if (patch.status !== undefined) dbPatch.status = patch.status;
 

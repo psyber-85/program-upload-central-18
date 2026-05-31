@@ -75,7 +75,7 @@ const FinanceIndex = () => {
                       {(s.status === 'Reviewed' || s.status === 'Locked') && <Lock className="h-3.5 w-3.5 text-muted-foreground" />}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Payroll {s.payrollTotal.toFixed(2)} · EPF/SOCSO {s.epfSocsoTotal.toFixed(2)}
+                      Payroll {s.payrollTotal.toFixed(2)} · Employee statutory {s.employeeStatutoryTotal.toFixed(2)} · Employer statutory {s.employerStatutoryTotal.toFixed(2)}
                       {s.reviewedAt && ` · Reviewed ${new Date(s.reviewedAt).toLocaleDateString()}`}
                     </div>
                   </div>

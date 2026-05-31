@@ -61,7 +61,7 @@ const StaffFormFields = ({ values, onChange, showAdminFields = true }: Props) =>
       {showAdminFields && (
         <section>
           <h3 className="text-sm font-semibold text-foreground mb-3">Payroll settings (admin-only)</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="baseSalary">Base salary</Label>
               <Input id="baseSalary" type="number" value={values.baseSalary}
@@ -77,7 +77,15 @@ const StaffFormFields = ({ values, onChange, showAdminFields = true }: Props) =>
               <Input id="socsoRate" type="number" step="0.1" value={values.socsoRate}
                 onChange={(e) => onChange({ socsoRate: Number(e.target.value) })} />
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="eisRate">EIS rate (%)</Label>
+              <Input id="eisRate" type="number" step="0.1" value={values.eisRate}
+                onChange={(e) => onChange({ eisRate: Number(e.target.value) })} />
+            </div>
           </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Employer EPF / SOCSO / EIS use system defaults (13% / 1.75% / 0.2%) unless overridden per payroll row.
+          </p>
         </section>
       )}
 

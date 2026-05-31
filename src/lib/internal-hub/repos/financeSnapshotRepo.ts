@@ -8,6 +8,7 @@ import type {
   FinanceSnapshotStatus,
 } from '../types';
 import { supabase } from '@/integrations/supabase/client';
+import { logAudit } from '../audit';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;

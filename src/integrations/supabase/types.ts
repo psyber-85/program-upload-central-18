@@ -260,6 +260,65 @@ export type Database = {
           },
         ]
       }
+      ih_calendar_config: {
+        Row: {
+          calendar_id: string | null
+          enabled: boolean
+          id: number
+          updated_at: string
+        }
+        Insert: {
+          calendar_id?: string | null
+          enabled?: boolean
+          id?: number
+          updated_at?: string
+        }
+        Update: {
+          calendar_id?: string | null
+          enabled?: boolean
+          id?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ih_calendar_sync_log: {
+        Row: {
+          action: string
+          created_at: string
+          error_message: string | null
+          gcal_event_id: string | null
+          id: string
+          request_id: string | null
+          status: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          error_message?: string | null
+          gcal_event_id?: string | null
+          id?: string
+          request_id?: string | null
+          status: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          error_message?: string | null
+          gcal_event_id?: string | null
+          id?: string
+          request_id?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ih_calendar_sync_log_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "ih_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ih_email_log: {
         Row: {
           attempt_count: number
@@ -777,6 +836,8 @@ export type Database = {
           id: string
           month: string
           net_pay: number
+          pdf_error: string | null
+          pdf_generated_at: string | null
           pdf_path: string | null
           run_id: string
           socso: number | null
@@ -798,6 +859,8 @@ export type Database = {
           id?: string
           month: string
           net_pay?: number
+          pdf_error?: string | null
+          pdf_generated_at?: string | null
           pdf_path?: string | null
           run_id: string
           socso?: number | null
@@ -819,6 +882,8 @@ export type Database = {
           id?: string
           month?: string
           net_pay?: number
+          pdf_error?: string | null
+          pdf_generated_at?: string | null
           pdf_path?: string | null
           run_id?: string
           socso?: number | null
@@ -913,6 +978,9 @@ export type Database = {
           decided_at: string | null
           decided_by: string | null
           decision_note: string | null
+          gcal_event_id: string | null
+          gcal_sync_error: string | null
+          half_day_slot: string | null
           id: string
           kind: Database["public"]["Enums"]["ih_request_kind"]
           payload: Json
@@ -927,6 +995,9 @@ export type Database = {
           decided_at?: string | null
           decided_by?: string | null
           decision_note?: string | null
+          gcal_event_id?: string | null
+          gcal_sync_error?: string | null
+          half_day_slot?: string | null
           id?: string
           kind: Database["public"]["Enums"]["ih_request_kind"]
           payload?: Json
@@ -941,6 +1012,9 @@ export type Database = {
           decided_at?: string | null
           decided_by?: string | null
           decision_note?: string | null
+          gcal_event_id?: string | null
+          gcal_sync_error?: string | null
+          half_day_slot?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["ih_request_kind"]
           payload?: Json

@@ -6,7 +6,7 @@ import type {
   FinanceSnapshotStatus,
 } from '../types';
 import { nowISO, readJSON, uid, writeJSON } from '../storage';
-import { payrollRepo } from './payrollRepo';
+// payrollRepo dependency removed in Sub-batch 2D — see payrollTotalsFor TODO.
 
 const KEY = 'finance-snapshots';
 const KEY_ITEMS = 'finance-line-items';

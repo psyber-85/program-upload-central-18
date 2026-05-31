@@ -1,43 +1,91 @@
-# Sub-batch 2C — Requests, Claims & Attachments → Supabase
+# Sub-batch 2D — Payroll, Claims & Payslips → Supabase
 
-Convert the remaining request/claim repos from `localStorage` to `ih_requests` + `ih_request_attachments` (Phase 1 tables already exist with RLS).
+Final migration of the localStorage repos in the Internal Hub data layer. After this, every Card 1.x/3.x flow is RLS-enforced.
 
-## Scope
+## Schema additions (one migration)
 
-Two repos + their callsites. RequestsIndex itself is still a Card 2 stub, so the actual leave/claim creation UI is **out of scope** — we only wire the data layer + the previews that already consume it.
+Existing `ih_payroll_runs`, `ih_payroll_items`, `ih_payslips`, `ih_payslip_downloads` are close but missing several Doc 3.1/3.2 fields. Add columns (no breaking changes):
 
-### 1. `requestSummaryRepo.ts` → Supabase
-Back with `ih_requests` table.
-- `listForStaff(staffId, limit?)` → `select id, staff_id, kind, status, created_at` where `staff_id=staffId`, order desc.
-- `pendingCountForStaff(staffId)` → count where `staff_id=staffId AND status='Submitted'`.
-- `pendingApprovalCount()` → count where `status='Submitted'` (admin only; RLS returns 0 for non-admins, which is fine).
-- Map DB `kind` (`Leave|MC|Claim|Training|Benefit`) ↔ app `type` (`Leave|MC|Claim|TrainingFund|Insurance|Other`): `Training→TrainingFund`, `Benefit→Insurance`.
-- Map DB `status` (`Submitted|Approved|Rejected|NeedsCorrection|Cancelled`) ↔ app `RequestStatus` (`Pending|Approved|Rejected|Submitted`): treat `Submitted`/`NeedsCorrection` as `Pending` for display; keep `Submitted` as the canonical pending state for counts.
-- Drop `_seed`.
+```sql
+ALTER TABLE public.ih_payroll_runs
+  ADD COLUMN IF NOT EXISTS admin_notes text;
 
-### 2. `claimRepo.ts` → Supabase
-Claims live in `ih_requests` with `kind='Claim'` and a `payload` jsonb carrying `{ amount, description, type: 'Claim'|'TrainingClaim', inclusionState, includedInPayrollRunId, includedInMonth }`. (No separate `ih_claims` table exists — the spec folds them in.)
-- `list()` → all `kind='Claim'` rows, decoded.
-- `queueableForMonth(month)` → approved claims (`status='Approved'`) with `payload->>'inclusionState' != 'IncludedInPayroll'` and `decided_at < first-of-month`.
-- `markIncluded(ids, runId, month)` → update payload jsonb for those rows.
-- `setStateForRun(runId, state)` → same, filtered by `payload->>'includedInPayrollRunId'`.
-- `addManual(input)` → insert row with `kind='Claim'`, `status='Approved'`, `decided_at=now`.
-- All methods become **async**.
+ALTER TABLE public.ih_payroll_items
+  ADD COLUMN IF NOT EXISTS row_status text NOT NULL DEFAULT 'Complete',  -- 'Complete' | 'Incomplete'
+  ADD COLUMN IF NOT EXISTS missing_fields jsonb NOT NULL DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS adjustment jsonb,                              -- { amount, reason } | null
+  ADD COLUMN IF NOT EXISTS notes text,
+  ADD COLUMN IF NOT EXISTS included_claim_ids jsonb NOT NULL DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS included_training_claim_ids jsonb NOT NULL DEFAULT '[]'::jsonb;
 
-### 3. Callsite updates
-- `src/pages/staff/hub/StaffHome.tsx` — wrap `requestSummaryRepo` calls (recent list, `myPendingRequests`, `pendingApprovals`) in `useQuery`. Mirror the pattern already used for notices.
-- `src/lib/internal-hub/repos/payrollRepo.ts` — `claimRepo.queueableForMonth` (line 55) and `claimRepo.markIncluded` (line 221) become awaited calls. The functions that contain them (`previewForMonth`, `finalize`) likely already return promises; if not, promote them. Re-read first and adapt minimally.
-- `MyRecentRequestsPreview.tsx` — check whether it reads directly or via StaffHome; convert to `useQuery` if needed.
+ALTER TABLE public.ih_payslips
+  ADD COLUMN IF NOT EXISTS staff_name text,
+  ADD COLUMN IF NOT EXISTS adjustment jsonb,
+  ADD COLUMN IF NOT EXISTS finalized_at timestamptz NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS availability text NOT NULL DEFAULT 'Available',
+  ADD COLUMN IF NOT EXISTS correction_ref text;
 
-### 4. Attachments
-`ih_request_attachments` table + `request-attachments` storage bucket are already provisioned with RLS. **No repo wrapper needed yet** — no UI in Sub-batch 2C creates requests with attachments (that's Card 2). Defer to when the request-creation UI lands.
+-- Reminder log: replace localStorage idempotency with a tiny admin-only table
+CREATE TABLE IF NOT EXISTS public.ih_payroll_reminders (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  month text NOT NULL UNIQUE,
+  sent_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT, INSERT ON public.ih_payroll_reminders TO authenticated;
+GRANT ALL ON public.ih_payroll_reminders TO service_role;
+ALTER TABLE public.ih_payroll_reminders ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "ih_payroll_reminders admin only" ON public.ih_payroll_reminders
+  FOR ALL TO authenticated
+  USING (public.has_ih_role(auth.uid(),'admin'))
+  WITH CHECK (public.has_ih_role(auth.uid(),'admin'));
+```
 
-## Out of scope
-- Building the actual request submission/approval UI (Card 2).
-- Audit logging on status changes (Doc 4.3 — separate sub-batch).
-- Realtime subscriptions.
+No new tables otherwise — `ih_requests` (kind='Claim') backs claims.
+
+## Repo rewrites (all async)
+
+### 1. `claimRepo.ts`
+Backed by `ih_requests` where `kind='Claim'`. Payload stores `{ amount, description, type: 'Claim'|'TrainingClaim', inclusionState, includedInPayrollRunId, includedInMonth }`.
+- `list()`, `queueableForMonth(month)` (status='Approved' AND payload->>'inclusionState' ≠ 'IncludedInPayroll' AND decided_at < first-of-month).
+- `markIncluded(ids, runId, month)` → bulk update payload jsonb.
+- `setStateForRun(runId, state)` → filter by `payload->>'includedInPayrollRunId'`.
+- `addManual(input)` → insert row, `status='Approved'`, `decided_at=now`.
+
+### 2. `payrollRepo.ts`
+Backed by `ih_payroll_runs` + `ih_payroll_items`. All methods async:
+- `listRuns`, `getRun`, `getForMonth`, `statusFor`.
+- `getOrCreateDraft(month)` — load Active staff, queueable claims, insert run + items in one round trip.
+- `refreshRow(runId, staffId)` — rebuild a single item from current staff profile, preserve adjustment/notes.
+- `setAdjustment`, `setRunNotes`, `setRowNotes`, `markReadyForReview` — single-field updates.
+- `canFinalize` — derive from items.
+- `finalize(runId, adminId)` — transaction: set run finalized, call `claimRepo.markIncluded`, generate payslips, broadcast notices.
+- `lockRun` — set status='Locked', locked_at/by.
+- `ensureReminderForMonth(month, adminId)` — guard via `ih_payroll_reminders` upsert (ON CONFLICT DO NOTHING).
+
+### 3. `payslipRepo.ts`
+Backed by `ih_payslips` + `ih_payslip_downloads`. All async:
+- `list`, `listAll`, `listForStaff`, `getById`, `forRun`.
+- `generateForRun(run)` — insert payslips for rows with row_status='Complete'.
+- `downloadPdf(id, actorId, actorRole)` — insert download log, then generate placeholder .txt blob client-side (Doc 3.2 §7 — real PDF is Card 4 / `ih-generate-payslip-pdf`).
+- `setCorrectionRef`.
+
+### 4. `payslipSummaryRepo.ts`
+Thin wrapper over `payslipRepo.listForStaff` (used by Home preview only). Async; mapping `availability='Available' → status='Ready'`.
+
+## Callsite updates (TanStack Query)
+- `StaffHome.tsx` — `payrollRepo.statusFor`, `payslipRepo.listForStaff`, `payrollRepo.ensureReminderForMonth` → `useQuery`/effect.
+- `PayrollIndex.tsx` — listRuns + getForMonth via `useQuery`; "Prepare draft" via `useMutation` invalidating both.
+- `PayrollRunDetail.tsx` — getRun via `useQuery`; setAdjustment/setRunNotes/setRowNotes/refreshRow/markReadyForReview/finalize/lockRun via `useMutation` with invalidation. Drop `tick` state.
+- `PayslipsIndex.tsx`, `PayslipDetail.tsx`, `AdminPayslips.tsx` — async list + download mutation.
+- `MyPayslipsPreview.tsx` — already prop-driven; no change.
+
+## Out of scope (deferred)
+- Real PDF generation (`ih-generate-payslip-pdf` pdf-lib edge function) — Doc 4.2 sub-batch.
+- `ih_audit_log` writes on finalize/lock — Doc 4.3 sub-batch.
+- Card 2 request submission UI.
 
 ## Verification
 - `npm run build` clean.
-- StaffHome renders without runtime errors; recent-requests preview shows empty state (DB is empty, expected).
-- Payroll preview page still loads (claims are async now).
+- Admin: open `/staff/admin/payroll`, "Prepare draft", add adjustment, finalize → payslips appear in `/staff/payslips` for that staff user; notice broadcast.
+- Staff: payslip detail loads and download writes one `ih_payslip_downloads` row (verify via SQL).
+- No remaining `readJSON`/`writeJSON` references in `repos/payroll*`, `repos/payslip*`, `repos/claimRepo`.

@@ -156,14 +156,15 @@ serve(async (req) => {
     if (reqRow.gcal_event_id) {
       res = await fetch(
         `${GATEWAY}/calendars/${calId}/events/${encodeURIComponent(reqRow.gcal_event_id)}`,
-        { method: "PUT", headers: authHeaders, body: JSON.stringify(payload) },
+        { method: "PUT", headers: authHeaders, body: JSON.stringify(eventPayload) },
       );
     } else {
       res = await fetch(
         `${GATEWAY}/calendars/${calId}/events`,
-        { method: "POST", headers: authHeaders, body: JSON.stringify(payload) },
+        { method: "POST", headers: authHeaders, body: JSON.stringify(eventPayload) },
       );
     }
+
 
     if (!res.ok) {
       const txt = await res.text();

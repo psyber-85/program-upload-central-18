@@ -51,7 +51,7 @@ const generateEmailHtml = (data: WelcomeEmailRequest): string => {
           <!-- Content -->
           <tr>
             <td style="padding: 40px;">
-              <p style="margin: 0 0 25px 0; color: #333; font-size: 18px; font-weight: 500;">Dear ${data.recipientName},</p>
+              <p style="margin: 0 0 25px 0; color: #333; font-size: 18px; font-weight: 500;">Dear ${safeName},</p>
               
               ${customParagraphs}
               

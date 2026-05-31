@@ -7,6 +7,7 @@
 // repos that haven't been converted yet (payrollRepo, noticeRepo) keep
 // working. Components should prefer the async methods.
 import { supabase } from '@/integrations/supabase/client';
+import { logAudit } from '../audit';
 import type { StaffProfile } from '../types';
 
 type DbRow = {

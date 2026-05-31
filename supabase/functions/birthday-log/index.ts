@@ -8,6 +8,9 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return jsonError(auth.status, auth.error);
+
   try {
     const TIMEZONE = 'Asia/Kuala_Lumpur';
     const now = new Date();

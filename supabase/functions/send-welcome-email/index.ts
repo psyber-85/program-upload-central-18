@@ -19,10 +19,12 @@ interface WelcomeEmailRequest {
 
 const generateEmailHtml = (data: WelcomeEmailRequest): string => {
   const loginUrl = data.loginUrl || "https://theaihq.net/staff";
+  const safeName = escapeHtml(data.recipientName);
+  const safeSender = escapeHtml(data.senderName || 'The AI HQ Team');
   const customParagraphs = data.customMessage
     .split('\n')
     .filter(p => p.trim())
-    .map(p => `<p style="margin: 0 0 15px 0; color: #666; font-size: 14px; line-height: 1.6;">${p}</p>`)
+    .map(p => `<p style="margin: 0 0 15px 0; color: #666; font-size: 14px; line-height: 1.6;">${escapeHtml(p)}</p>`)
     .join('');
 
   return `

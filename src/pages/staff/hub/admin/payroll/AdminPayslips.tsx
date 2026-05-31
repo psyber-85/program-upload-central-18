@@ -112,25 +112,67 @@ const AdminPayslips = () => {
             <div className="py-6 text-sm text-muted-foreground text-center">No payslips.</div>
           ) : (
             <ul className="divide-y divide-border">
-              {filtered.map((p) => (
-                <li key={p.id} className="py-3 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="font-medium truncate">{p.staffName}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {p.month} · Net {p.netPay.toFixed(2)} · Finalized {new Date(p.finalizedAt).toLocaleDateString()}
+              {filtered.map((p) => {
+                const status = pdfStatus[p.id];
+                const pdfState: 'ok' | 'failed' | 'pending' = status?.error
+                  ? 'failed'
+                  : status?.path ? 'ok' : 'pending';
+                return (
+                  <li key={p.id} className="py-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{p.staffName}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {p.month} · Net {p.netPay.toFixed(2)} · Finalized {new Date(p.finalizedAt).toLocaleDateString()}
+                      </div>
+                      {pdfState === 'failed' && (
+                        <div className="text-xs text-destructive mt-1 truncate" title={status?.error ?? ''}>
+                          PDF error: {status?.error}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{p.availability}</Badge>
-                    <Button asChild size="sm" variant="outline">
-                      <Link to={`/staff/payslips/${p.id}`}>View</Link>
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => downloadMut.mutate(p.id)}>
-                      <Download className="h-3.5 w-3.5 mr-1" /> PDF
-                    </Button>
-                  </div>
-                </li>
-              ))}
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{p.availability}</Badge>
+                      {pdfState === 'ok' && (
+                        <Badge variant="outline" className="gap-1">
+                          <CheckCircle2 className="h-3 w-3 text-green-600" /> PDF
+                        </Badge>
+                      )}
+                      {pdfState === 'pending' && (
+                        <Badge variant="outline" className="gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Generating
+                        </Badge>
+                      )}
+                      {pdfState === 'failed' && (
+                        <Badge variant="destructive" className="gap-1">
+                          <AlertCircle className="h-3 w-3" /> Failed
+                        </Badge>
+                      )}
+                      <Button asChild size="sm" variant="outline">
+                        <Link to={`/staff/payslips/${p.id}`}>View</Link>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => downloadMut.mutate(p.id)}
+                        disabled={pdfState === 'pending'}
+                      >
+                        <Download className="h-3.5 w-3.5 mr-1" /> PDF
+                      </Button>
+                      {pdfState !== 'ok' && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => regenMut.mutate(p.id)}
+                          disabled={regenMut.isPending}
+                          title="Regenerate PDF"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </CardContent>

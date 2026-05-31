@@ -1,91 +1,126 @@
 
-# Patch 002 — Statutory Splits & Payslip Format
+# Patch 1.3 — Home & Operating Surface Completion
 
-Applies the `patch-workflow` skill: gap-analysis first, surgical edits, no scope creep beyond payroll/payslip/finance-snapshot.
+Pure presentation/aggregation patch. No DB schema changes, no business logic changes. All data is read from existing repos. Edits stay in `src/pages/staff/hub` and `src/components/internal-hub/home` + a small aggregator module.
 
-## Gap Analysis (what exists vs what Patch 002 requires)
+## Scope check (what stays untouched)
+- Request/leave/claim/training workflows
+- Payroll calc & finalize logic
+- Payslip format & PDF
+- RLS / backend / edge functions
+- `/staff/marketing` and all marketing components
+- Existing summary card destinations that already work
 
-| Area | Today | Required |
-|---|---|---|
-| Statutory items | EPF + SOCSO only (employee). Schema has `employer_epf`/`employer_socso` but no UI/repo use of employer side. | EPF + SOCSO + **EIS**, each split employee / employer. |
-| Staff profile rates | `epf_rate`, `socso_rate` | Add `eis_rate` (+ optional `employer_*_rate` defaults). |
-| Payroll item | `epf`, `socso`, `employer_epf`, `employer_socso`, `claims_total`, `training_total` | Add `eis`, `employer_eis`, `bonus_total`, `other_addition_total`, `total_employee_deductions`, `total_employer_contribution`. |
-| Net Pay formula | `base − epf − socso + claims + training + adj` | `base − (epf+socso+eis) + claims + training + bonus + other + adj`. Employer contributions never reduce net pay (already true). |
-| Income vs additions | "Claims/Training" displayed as +rows alongside EPF/SOCSO | Separate sections: **Income** (Basic only), **Claims/Reimb/Bonus**, **Employee Deductions**, **Net Pay**, **Employer Contributions**. |
-| Payslip UI | Flat row list incl. EPF/SOCSO/Claims/Training | Re-section per §21. |
-| Payslip PDF | Single table mixing earnings + deductions; no signature line present (good) | Rebuild rows per §25 sections; rename labels. Signature already absent — verify only. |
-| Finance Snapshot | `epf_socso_total` aggregated from `employer_epf + employer_socso` | Replace with: employee statutory total, employer statutory total, EPF/SOCSO/EIS totals, bonus total. Mark legacy `epf_socso_total` deprecated (keep column, populate as sum for back-compat). |
-| Staff "My Profile" | Already does NOT expose salary fields | OK — no change. |
+## Gap analysis vs Patch §29 acceptance
 
-Confirmed unaffected (do not touch): requests, leave/MC, claim approval, training fund, notices, resources, auth, calendar sync, AI extraction, `/staff/marketing/**`, marketing components.
+| §29 item | Current state | Action |
+| --- | --- | --- |
+| Staff My Pending Items preview | ❌ missing | build preview + full page |
+| Acknowledgment-required as pending | partial (badge only) | feed into pending aggregator |
+| Needs-Correction requests as pending | partial (in recent list) | promote to pending + visual badge |
+| Onboarding tasks as pending (staff) | ❌ | aggregate from `onboardingRepo` |
+| Payslip-ready as pending/status | partial (summary card) | add pending entry when latest unread |
+| Admin Workbench preview + page | ❌ | build both |
+| Pending approvals, MC, claims, training etc. in workbench | ❌ aggregator | aggregate from `requestSummaryRepo`/staff repos |
+| Onboarding/offboarding pending (admin) | partial (count card) | itemized in workbench |
+| Notion access eligible | ❌ | flag from `lifecycle` |
+| Payroll review/finalization reminders | partial (idempotent reminder ran) | surface in workbench |
+| System Issues for admin | route exists, not on Home | surface unresolved on Home + workbench |
+| Section cards with status | ❌ plain tiles | add lightweight status badges |
+| Coming-later/stub control | ❌ inconsistent (`Stubs.tsx`) | one `ComingLater` component + replace Approvals stub w/ workbench filter |
+| Mobile priority order | ❌ summary cards first | reorder: Pending → Quick Actions → Summary → Notices → Requests → Payslips → Sections |
+| Empty states calm copy | partial | standard empty strings |
+| Privacy boundary | already enforced by repos | verify in aggregator, no cross-staff reads for non-admin |
 
-## Plan
+## New files
 
-### 1. DB migration (additive only — no drops)
-New migration adds:
-- `ih_staff_profiles`: `eis_rate numeric DEFAULT 0.2`, optional `employer_epf_rate`, `employer_socso_rate`, `employer_eis_rate` (nullable; if null, payroll uses sensible defaults at calc time).
-- `ih_payroll_items`: `eis numeric DEFAULT 0`, `employer_eis numeric DEFAULT 0`, `bonus_total numeric DEFAULT 0`, `other_addition_total numeric DEFAULT 0`, `total_employee_deductions numeric DEFAULT 0`, `total_employer_contribution numeric DEFAULT 0`.
-- `ih_payslips`: same six columns as payroll items.
-- `ih_finance_snapshots`: `employee_statutory_total`, `employer_statutory_total`, `epf_total`, `socso_total`, `eis_total`, `bonus_total` (all numeric DEFAULT 0). Keep `epf_socso_total` (deprecated; back-fill = employer EPF+SOCSO).
-- Re-apply column-level GRANT/REVOKE for new sensitive staff columns matching existing pattern in `20260530192359_*`.
-- Update the change-detect triggers in `20260530185559_*` to also include `eis_rate` (and employer rate columns if added).
+```
+src/lib/internal-hub/workbench/
+  pendingItems.ts       // staff aggregator → PendingItem[]
+  adminWorkbench.ts     // admin aggregator → WorkbenchItem[]
+  types.ts              // PendingItem, WorkbenchItem, ActionKind
 
-### 2. Types (`src/lib/internal-hub/types.ts`)
-- `StaffProfile`: add `eisRate: number` and optional employer rate fields.
-- `PayrollItem`: add `eisAmount`, `employerEpf`, `employerSocso`, `employerEis`, `bonusTotal`, `otherAdditionTotal`, `totalEmployeeDeductions`, `totalEmployerContribution`. Add `'eisRate'` to `PayrollMissingField`.
-- `Payslip`: same new fields.
-- `FinanceSnapshot`: add new totals; keep `epfSocsoTotal` for compatibility but mark deprecated in comment.
+src/components/internal-hub/home/
+  PendingItemsPreview.tsx
+  AdminWorkbenchPreview.tsx
+  SectionTile.tsx       // (refactor of SectionsGrid tile w/ status slot)
 
-### 3. Payroll repo (`payrollRepo.ts`)
-- `missingFor`: include `eisRate`.
-- `buildItem`: compute EIS (employee + employer), employer EPF/SOCSO defaults, totals; initialise `bonusTotal=0`, `otherAdditionTotal=0` (bonus enters via Manual Adjustment until a bonus workflow exists — patch §27 forbids bonus approval workflow, so we expose a numeric field editable by admin in the row, no approval).
-- `computeNetPay`: `base − (epf+socso+eis) + claims + training + bonus + other + adj`.
-- `mapItem` / `itemToDb`: map all new columns.
-- New mutator `setBonus(runId, staffId, amount, note)` and `setOtherAddition(runId, staffId, amount, note)`. Stored in `notes`-adjacent JSON or as numeric columns directly (using new columns).
-- Recompute totals (`total_employee_deductions`, `total_employer_contribution`) on every write.
+src/components/internal-hub/ComingLater.tsx   // §22 pattern
 
-### 4. Payslip repo + PDF
-- `payslipRepo.generateForRun`: copy all six new fields from payroll item.
-- `mapRow`: read new fields.
-- `ih-generate-payslip-pdf` edge function: redesign rows into 5 sections per Patch §25:
-  1. **Income** — Basic Salary; Total Income.
-  2. **Claims / Reimbursements / Bonus** — Claim, Training Claim, Bonus, Other (skip lines that are 0); subtotal.
-  3. **Employee Deductions** — EPF, SOCSO, EIS; Total Employee Deductions.
-  4. **Net Pay** — bold line.
-  5. **Employer Contributions** — Employer EPF, Employer SOCSO, Employer EIS, Total Employer Contribution.
-  Add Manual Adjustment line near Net Pay if present. No signature line (verify still absent).
+src/pages/staff/hub/
+  MyPendingItems.tsx    // full page
+  admin/AdminWorkbench.tsx  // full page with §12 filters
+```
 
-### 5. Payslip UI (`PayslipDetail.tsx`)
-- Replace flat `Row` list with section blocks matching PDF; each section has its own header and totals row. Reuse existing `Card`/typography, no new design tokens.
+## Edited files
 
-### 6. Admin Payroll Run Detail (`PayrollRunDetail.tsx`)
-- Update formula caption to new Net Pay formula.
-- Add EIS line, employer EPF/SOCSO/EIS lines, bonus/other inputs per row.
-- Add inline numeric inputs (admin only) for: EIS override, employer overrides, bonus, other addition. Each override should accept reason via existing manual-adjustment pattern (kept simple — write `notes` augmented or store the values directly since the patch §6 only requires reason + actor + timestamp for *statutory* overrides; capture reason in `notes` field).
+- `src/pages/staff/hub/StaffHome.tsx` — reorder sections per §24/§25; insert PendingItems/Workbench previews; pass section statuses.
+- `src/components/internal-hub/home/SectionsGrid.tsx` — accept status badges (unread notices, ack count, pending requests, payroll status, onboarding pending count).
+- `src/components/internal-hub/home/MyRecentRequestsPreview.tsx` — clearer Needs Correction badge + "Fix Request" CTA (§18).
+- `src/components/internal-hub/home/MyPayslipsPreview.tsx` — show "View Payslip" CTA + latest-month caption (§19).
+- `src/pages/staff/hub/admin/Stubs.tsx` — remove `Approvals` stub; route `/staff/admin/approvals` to the new `AdminWorkbench` page with `?type=Requests` filter.
+- `src/App.tsx` — add routes `/staff/pending`, `/staff/admin/workbench`; repoint `/staff/admin/approvals` to AdminWorkbench.
 
-### 7. Finance Snapshot (`financeSnapshotRepo.ts`, `FinanceSnapshotDetail.tsx`, `FinanceIndex.tsx`)
-- Aggregate using new columns: sum EPF (employee+employer? — patch §22 says "EPF total" without specifying side; use employee + employer = total EPF outflow, document in note), SOCSO total, EIS total, employee statutory, employer statutory, bonus total.
-- Replace "EPF/SOCSO" stat with three stats: "Employee statutory", "Employer statutory", and per-fund totals (compact list). Keep snapshot non-accounting disclaimer.
+## Aggregator behavior
 
-### 8. Staff form (`StaffFormFields.tsx`)
-- Add EIS rate input (admin-only section). Optionally add employer rate fields (collapsed under "Employer defaults" section). Default values: EPF 11, SOCSO 0.5, EIS 0.2 / employer EPF 13, SOCSO 1.75, EIS 0.2 (defaults only — admin may override per payroll row).
+### `pendingItems.ts` (staff only)
+Pulls in parallel via React Query inside the page; returns prioritized list:
 
-### 9. Seed (`seed.ts`)
-- Add `eisRate: 0.2` to seeded staff.
+1. Ack-required notices not yet acknowledged → action `Acknowledge` → `/staff/notices/:id`
+2. Own requests in `NeedsCorrection` → `Fix Request` → `/staff/requests/:id`
+3. Latest payslip not yet viewed (Patch flag `lastViewedAt` already exists on payslip repo if present, else just "available") → `View Payslip`
+4. Onboarding starter tasks incomplete (own checklist) → `Complete Task` → `/staff/profile`
+5. Notion access eligible but not unlocked → `View Resource` → `/staff/resources`
+6. Approved/Rejected request outcome not yet viewed → `View Outcome`
 
-## Out of scope (per Patch §27)
-- No PCB/MTD, no statutory filing, no bank payment, no accounting ledger, no bonus approval workflow, no public-holiday automation, no signature workflow.
-- No auth, calendar, AI, marketing, notices, requests, leave changes.
+Resolution: items are derived state — when underlying repo state changes (ack, status, view), item disappears on next query.
 
-## Acceptance check (mirrors Patch §29)
-After build, verify:
-- EPF/SOCSO/EIS each with employee + employer fields exist in DB + types + payroll item + payslip.
-- Net Pay never includes employer contributions; claims/bonus don't increase Total Income.
-- Payslip UI + PDF render the 5 sections; no signature line.
-- Finance Snapshot exposes employee statutory total, employer statutory total, and per-fund totals.
-- `/staff/marketing/**` untouched.
+### `adminWorkbench.ts` (admin only)
+Combines:
+- pending approvals (`requestSummaryRepo.listPendingApprovals()` — wrap existing count call by listing if needed; if not present, reuse `requestSummaryRepo` list w/ filter)
+- staff onboarding/offboarding incomplete
+- Notion access eligible but not granted
+- payroll status: `Draft`/`Ready` for current month → `Review Payroll`
+- finalization reminder (after the 25th) — reuse `payrollRepo.ensureReminderForMonth`
+- unresolved `systemIssuesRepo.listSystemIssues({ status: 'open' })`
+- unacknowledged notice summary (existing notice repo aggregate)
 
-## Notes
-- Migration is additive; existing finalized runs / payslips retain old values (new columns default 0). No back-fill required by the patch.
-- `epf_socso_total` column kept (deprecated) to avoid touching any external readers; new code reads the new totals.
-- Default rates chosen so existing rows continue to compute identically until admin enters EIS.
+Each item: `{ id, type, title, staffName?, recordRef?, priority, createdAt, status, primaryAction, href }`.
+
+## Pages
+
+### `MyPendingItems.tsx`
+- Header + count
+- List grouped by type with primary-action buttons
+- Empty state: "You're all caught up."
+
+### `AdminWorkbench.tsx`
+- Filters (§12): item type, status, staff member, priority, source module — implemented as `Select` + chip toggles, URL-synced via `useSearchParams`
+- Table/list of items with primary actions
+- Empty state per filter
+
+## Home layout (final order)
+
+Mobile (default flex order):
+1. Pending Items / Admin Workbench preview
+2. Quick Actions
+3. Summary cards
+4. Latest Notices
+5. Recent Requests
+6. Payslips
+7. Sections
+
+Desktop (`lg:`): summary cards row across top, pending/workbench preview prominent left column, others fill — achieved via `order-*` Tailwind utilities, not duplicate trees.
+
+## Coming-later component (§22)
+`<ComingLater feature="..." purpose="..." plannedFor="..." />` — used only when the user benefits from knowing; not used to mask broken buttons. No new broken buttons are introduced.
+
+## Acceptance check after build
+Manual click-through:
+- Each summary card routes correctly
+- Pending preview "Fix Request" / "Acknowledge" / "View Payslip" all open right record
+- Admin workbench preview links to full workbench with prefilter
+- Section tiles show counts where data exists, hide silently when zero
+- Mobile viewport (462px) shows Pending block first
+
+No build, typecheck, or DB migration required.

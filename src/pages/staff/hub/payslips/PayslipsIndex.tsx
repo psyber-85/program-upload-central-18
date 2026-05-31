@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +13,18 @@ import { toast } from '@/hooks/use-toast';
 
 const PayslipsIndex = () => {
   const { currentStaff } = useHub();
+  const { data: items = [] } = useQuery({
+    queryKey: ['ih-payslips', currentStaff?.id],
+    queryFn: () => payslipRepo.listForStaff(currentStaff!.id),
+    enabled: !!currentStaff && canAccessOwnPayslips(currentStaff),
+  });
+  const downloadMut = useMutation({
+    mutationFn: (id: string) =>
+      payslipRepo.downloadPdf(id, currentStaff!.id, currentStaff!.role),
+    onError: (e: Error) =>
+      toast({ title: 'Download failed', description: e.message, variant: 'destructive' }),
+  });
+
   if (!currentStaff) return null;
   if (!canAccessOwnPayslips(currentStaff)) {
     return (
@@ -25,15 +38,6 @@ const PayslipsIndex = () => {
       </div>
     );
   }
-  const items = payslipRepo.listForStaff(currentStaff.id);
-
-  const handleDownload = (id: string) => {
-    try {
-      payslipRepo.downloadPdf(id, currentStaff.id, currentStaff.role);
-    } catch (e: any) {
-      toast({ title: 'Download failed', description: e.message, variant: 'destructive' });
-    }
-  };
 
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-6">
@@ -69,7 +73,7 @@ const PayslipsIndex = () => {
                     <Button asChild size="sm" variant="outline">
                       <Link to={`/staff/payslips/${p.id}`}>View</Link>
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleDownload(p.id)}>
+                    <Button size="sm" variant="ghost" onClick={() => downloadMut.mutate(p.id)}>
                       <Download className="h-3.5 w-3.5 mr-1" /> PDF
                     </Button>
                   </div>

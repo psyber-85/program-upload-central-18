@@ -6,7 +6,7 @@ import type {
   FinanceSnapshotStatus,
 } from '../types';
 import { nowISO, readJSON, uid, writeJSON } from '../storage';
-import { payrollRepo } from './payrollRepo';
+// payrollRepo dependency removed in Sub-batch 2D — see payrollTotalsFor TODO.
 
 const KEY = 'finance-snapshots';
 const KEY_ITEMS = 'finance-line-items';
@@ -20,36 +20,19 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/** Auto-fill payroll-linked totals from finalized payroll (Doc 3.3 §12-§16). */
-function payrollTotalsFor(month: string) {
-  const run = payrollRepo.getForMonth(month);
-  if (!run || (run.status !== 'Finalized' && run.status !== 'Locked')) {
-    return {
-      payrollTotal: 0,
-      claimsTotal: 0,
-      trainingClaimsTotal: 0,
-      epfSocsoTotal: 0,
-      manualAdjustmentTotal: 0,
-    };
-  }
-  let payrollTotal = 0;
-  let claimsTotal = 0;
-  let trainingClaimsTotal = 0;
-  let epfSocsoTotal = 0;
-  let manualAdjustmentTotal = 0;
-  run.items.forEach((i) => {
-    payrollTotal += i.netPay;
-    claimsTotal += i.claimsTotal;
-    trainingClaimsTotal += i.trainingClaimsTotal;
-    epfSocsoTotal += i.epfAmount + i.socsoAmount;
-    manualAdjustmentTotal += i.adjustment?.amount ?? 0;
-  });
+/**
+ * Auto-fill payroll-linked totals from finalized payroll (Doc 3.3 §12-§16).
+ * TODO(Sub-batch 2E): now that payrollRepo is async, re-derive these totals
+ * via a Supabase aggregate after the finance snapshot repo itself migrates.
+ * Until then we return zeros so the admin can fill the snapshot manually.
+ */
+function payrollTotalsFor(_month: string) {
   return {
-    payrollTotal: round2(payrollTotal),
-    claimsTotal: round2(claimsTotal),
-    trainingClaimsTotal: round2(trainingClaimsTotal),
-    epfSocsoTotal: round2(epfSocsoTotal),
-    manualAdjustmentTotal: round2(manualAdjustmentTotal),
+    payrollTotal: 0,
+    claimsTotal: 0,
+    trainingClaimsTotal: 0,
+    epfSocsoTotal: 0,
+    manualAdjustmentTotal: 0,
   };
 }
 

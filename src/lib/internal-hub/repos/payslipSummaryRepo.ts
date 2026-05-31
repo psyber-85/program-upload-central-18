@@ -1,22 +1,21 @@
-// Doc 1.1 §14 — preview-only. Engine owned by Card 3.
+// Doc 1.1 §14 — Home preview wrapper over Supabase-backed payslipRepo.
 import type { PayslipSummary } from '../types';
-import { readJSON, writeJSON } from '../storage';
-
-const KEY = 'payslip-summaries';
+import { payslipRepo } from './payslipRepo';
 
 export const payslipSummaryRepo = {
-  listForStaff(staffId: string, limit?: number): PayslipSummary[] {
-    const all = readJSON<PayslipSummary[]>(KEY, []);
-    const filtered = all
-      .filter((p) => p.staffId === staffId)
-      .sort((a, b) => (a.month < b.month ? 1 : -1));
-    return typeof limit === 'number' ? filtered.slice(0, limit) : filtered;
+  async listForStaff(staffId: string, limit?: number): Promise<PayslipSummary[]> {
+    const payslips = await payslipRepo.listForStaff(staffId, limit);
+    return payslips.map((p) => ({
+      id: p.id,
+      staffId: p.staffId,
+      month: p.month,
+      netPay: p.netPay,
+      status: p.availability === 'Available' || p.availability === 'Generated' ? 'Ready' : 'NotAvailable',
+      finalizedAt: p.finalizedAt,
+    }));
   },
-  latestStatusFor(staffId: string): 'Ready' | 'Not Available' {
-    const latest = this.listForStaff(staffId, 1)[0];
+  async latestStatusFor(staffId: string): Promise<'Ready' | 'Not Available'> {
+    const latest = (await this.listForStaff(staffId, 1))[0];
     return latest?.status === 'Ready' ? 'Ready' : 'Not Available';
-  },
-  _seed(data: PayslipSummary[]) {
-    writeJSON(KEY, data);
   },
 };

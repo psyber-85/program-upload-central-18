@@ -1,5 +1,6 @@
 import React from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Download, ShieldAlert } from 'lucide-react';
@@ -20,7 +21,16 @@ const PayslipDetail = () => {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const { currentStaff } = useHub();
-  const ps = payslipRepo.getById(id);
+  const { data: ps, isLoading } = useQuery({
+    queryKey: ['ih-payslip', id],
+    queryFn: () => payslipRepo.getById(id),
+    enabled: !!id,
+  });
+  const downloadMut = useMutation({
+    mutationFn: () => payslipRepo.downloadPdf(ps!.id, currentStaff!.id, currentStaff!.role),
+    onError: (e: Error) =>
+      toast({ title: 'Download failed', description: e.message, variant: 'destructive' }),
+  });
 
   if (!currentStaff) return null;
   if (!canAccessOwnPayslips(currentStaff)) {
@@ -31,21 +41,12 @@ const PayslipDetail = () => {
       </div>
     );
   }
-  if (!ps) {
-    return <div className="p-6 text-sm text-muted-foreground">Payslip not found.</div>;
-  }
+  if (isLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  if (!ps) return <div className="p-6 text-sm text-muted-foreground">Payslip not found.</div>;
   // Doc 3.2 §12 — staff sees only their own.
   if (!isAdmin(currentStaff) && ps.staffId !== currentStaff.id) {
     return <div className="p-6 text-sm text-destructive">You don't have access to this payslip.</div>;
   }
-
-  const handleDownload = () => {
-    try {
-      payslipRepo.downloadPdf(ps.id, currentStaff.id, currentStaff.role);
-    } catch (e: any) {
-      toast({ title: 'Download failed', description: e.message, variant: 'destructive' });
-    }
-  };
 
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-4">
@@ -61,7 +62,7 @@ const PayslipDetail = () => {
         <CardHeader>
           <CardTitle className="text-lg flex items-center justify-between">
             <span>Payslip · {ps.month}</span>
-            <Button size="sm" variant="outline" onClick={handleDownload}>
+            <Button size="sm" variant="outline" onClick={() => downloadMut.mutate()}>
               <Download className="h-3.5 w-3.5 mr-1" /> Download
             </Button>
           </CardTitle>

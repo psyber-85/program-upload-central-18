@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,17 +26,29 @@ const statusVariant: Record<PayrollRunStatus, 'default' | 'secondary' | 'destruc
 const PayrollIndex = () => {
   const { currentStaff } = useHub();
   const navigate = useNavigate();
-  if (!canAccessAdminArea(currentStaff)) {
+  const qc = useQueryClient();
+  const month = currentMonth();
+  const allowed = !!currentStaff && canAccessAdminArea(currentStaff);
+
+  const { data: runs = [] } = useQuery({
+    queryKey: ['ih-payroll-runs'],
+    queryFn: () => payrollRepo.listRuns(),
+    enabled: allowed,
+  });
+  const currentRun = runs.find((r) => r.month === month);
+
+  const prepareMut = useMutation({
+    mutationFn: () => payrollRepo.getOrCreateDraft(month),
+    onSuccess: (run) => {
+      qc.invalidateQueries({ queryKey: ['ih-payroll-runs'] });
+      qc.invalidateQueries({ queryKey: ['ih-payroll-status'] });
+      navigate(`/staff/admin/payroll/${run.id}`);
+    },
+  });
+
+  if (!allowed) {
     return <div className="p-6 text-sm text-muted-foreground">Admin only.</div>;
   }
-  const runs = payrollRepo.listRuns();
-  const month = currentMonth();
-  const currentRun = payrollRepo.getForMonth(month);
-
-  const handlePrepare = () => {
-    const run = payrollRepo.getOrCreateDraft(month);
-    navigate(`/staff/admin/payroll/${run.id}`);
-  };
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
@@ -47,7 +60,7 @@ const PayrollIndex = () => {
           </p>
         </div>
         {!currentRun && (
-          <Button onClick={handlePrepare}>
+          <Button onClick={() => prepareMut.mutate()} disabled={prepareMut.isPending}>
             <Plus className="h-4 w-4 mr-1" /> Prepare {month}
           </Button>
         )}

@@ -15,8 +15,8 @@ interface BuildInput {
   systemIssues: SystemIssue[];
   payrollMonth: string;
   payrollStatus: PayrollRunStatus | 'NotPrepared';
-  totalAcksRequired: number;
-  totalAcksReceived: number;
+  totalAcksRequired?: number;
+  totalAcksReceived?: number;
 }
 
 function kindToType(kind: RequestDetail['rawKind']): WorkbenchItemType {
@@ -136,19 +136,21 @@ export function buildWorkbenchItems(input: BuildInput): WorkbenchItem[] {
     }
   }
 
-  // Unacknowledged notices summary
-  const ackGap = totalAcksRequired - totalAcksReceived;
-  if (ackGap > 0) {
-    items.push({
-      id: `acks:${payrollMonth}`,
-      type: 'Notices',
-      source: 'Notices',
-      title: `${ackGap} acknowledgment${ackGap === 1 ? '' : 's'} outstanding`,
-      priority: 'normal',
-      status: `${totalAcksReceived}/${totalAcksRequired}`,
-      primaryAction: 'OpenNotice',
-      href: '/staff/notices',
-    });
+  // Unacknowledged notices summary (optional)
+  if (typeof totalAcksRequired === 'number' && typeof totalAcksReceived === 'number') {
+    const ackGap = totalAcksRequired - totalAcksReceived;
+    if (ackGap > 0) {
+      items.push({
+        id: `acks:${payrollMonth}`,
+        type: 'Notices',
+        source: 'Notices',
+        title: `${ackGap} acknowledgment${ackGap === 1 ? '' : 's'} outstanding`,
+        priority: 'normal',
+        status: `${totalAcksReceived}/${totalAcksRequired}`,
+        primaryAction: 'OpenNotice',
+        href: '/staff/notices',
+      });
+    }
   }
 
   // System Issues (unresolved)

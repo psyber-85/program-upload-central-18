@@ -130,6 +130,9 @@ const App = () => (
               <Route path="admin/settings" element={
                 <ProtectedRoute requireAdmin><SettingsAdmin /></ProtectedRoute>
               } />
+              <Route path="admin/email-log" element={
+                <ProtectedRoute requireAdmin><EmailLog /></ProtectedRoute>
+              } />
             </Route>
 
             {/* Marketing Portal routes (protected, nested under /staff/marketing) */}

@@ -181,6 +181,9 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return jsonError(auth.status, auth.error);
+
   try {
     const body: EmailRequest = await req.json();
     console.log('Request body:', body);

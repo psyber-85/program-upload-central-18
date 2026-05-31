@@ -56,6 +56,12 @@ export default function CalendarSettings() {
 
   useEffect(() => { loadConfig(); loadLogs(); }, []);
 
+  const boundCalendar = calendars.find((c) => c.id === calendarId);
+  const boundName = boundCalendar?.summary
+    ?? (calendarId === '9a7578ab724e69ac2a18fc646c33c684a7b94a2c420127f1069284936486e78c@group.calendar.google.com'
+      ? '[AIHQ] Team Calendar'
+      : null);
+
   return (
     <div className="space-y-6 p-4">
       <Card>
@@ -63,6 +69,13 @@ export default function CalendarSettings() {
           <CardTitle>Team Calendar Sync</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {calendarId && (
+            <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+              <span className="text-muted-foreground">Currently syncing to:</span>{' '}
+              <strong>{boundName ?? 'Custom calendar'}</strong>
+              <div className="text-xs text-muted-foreground break-all mt-0.5">{calendarId}</div>
+            </div>
+          )}
           <div className="flex items-center gap-3">
             <Switch checked={enabled} onCheckedChange={setEnabled} />
             <span className="text-sm">Sync approved Leave / accepted MC to the shared team calendar</span>

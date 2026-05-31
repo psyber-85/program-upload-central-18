@@ -90,13 +90,20 @@ serve(async (req) => {
     .select("*")
     .eq("id", body.request_id)
     .maybeSingle();
-  if (!reqRow) {
-    await logSync("failed", null, "request_not_found");
-    return new Response(JSON.stringify({ error: "not_found" }), { status: 404, headers: corsHeaders });
-  }
+  // Normalize: schema stores `kind` enum + dates inside `payload` jsonb.
+  // The sync builder expects flat `type`, `start_date`, `end_date`, `half_day_slot`.
+  const payload = (reqRow.payload ?? {}) as Record<string, unknown>;
+  const kindLower = String(reqRow.kind ?? "").toLowerCase();
+  const flat = {
+    ...reqRow,
+    type: kindLower,
+    start_date: (reqRow as any).start_date ?? payload.start_date ?? payload.date,
+    end_date:   (reqRow as any).end_date   ?? payload.end_date   ?? payload.date,
+    date:       (reqRow as any).date       ?? payload.date,
+    half_day_slot: reqRow.half_day_slot ?? payload.half_day_slot ?? null,
+  };
 
-  const typeLower = String(reqRow.type ?? "").toLowerCase();
-  if (!["leave", "mc"].includes(typeLower)) {
+  if (!["leave", "mc"].includes(kindLower)) {
     await logSync("skipped", reqRow.gcal_event_id, "not_leave_or_mc");
     return new Response(JSON.stringify({ skipped: true }), { headers: corsHeaders });
   }
@@ -139,23 +146,25 @@ serve(async (req) => {
     const { data: staff } = await supabase
       .from("ih_staff_profiles")
       .select("name")
-      .eq("id", reqRow.staff_id ?? reqRow.requester_id ?? reqRow.user_id)
+      .eq("id", reqRow.staff_id)
       .maybeSingle();
     const staffName = (staff as any)?.name ?? "Staff member";
-    const payload = buildEventPayload(reqRow, staffName);
+    const eventPayload = buildEventPayload(flat, staffName);
+
 
     let res: Response;
     if (reqRow.gcal_event_id) {
       res = await fetch(
         `${GATEWAY}/calendars/${calId}/events/${encodeURIComponent(reqRow.gcal_event_id)}`,
-        { method: "PUT", headers: authHeaders, body: JSON.stringify(payload) },
+        { method: "PUT", headers: authHeaders, body: JSON.stringify(eventPayload) },
       );
     } else {
       res = await fetch(
         `${GATEWAY}/calendars/${calId}/events`,
-        { method: "POST", headers: authHeaders, body: JSON.stringify(payload) },
+        { method: "POST", headers: authHeaders, body: JSON.stringify(eventPayload) },
       );
     }
+
 
     if (!res.ok) {
       const txt = await res.text();

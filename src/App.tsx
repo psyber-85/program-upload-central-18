@@ -41,6 +41,7 @@ import FinanceSnapshotDetail from "./pages/staff/hub/admin/finance/FinanceSnapsh
 import PayslipDetail from "./pages/staff/hub/payslips/PayslipDetail";
 import EmailLog from "./pages/staff/hub/admin/EmailLog";
 import CalendarSettings from "./pages/staff/hub/admin/CalendarSettings";
+import SystemIssues from "./pages/staff/hub/admin/SystemIssues";
 
 // Marketing Portal (untouched)
 import MarketingLayout from "./components/marketing/MarketingLayout";
@@ -136,6 +137,9 @@ const App = () => (
               } />
               <Route path="admin/calendar-settings" element={
                 <ProtectedRoute requireAdmin><CalendarSettings /></ProtectedRoute>
+              } />
+              <Route path="admin/system-issues" element={
+                <ProtectedRoute requireAdmin><SystemIssues /></ProtectedRoute>
               } />
             </Route>
 

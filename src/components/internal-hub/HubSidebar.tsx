@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   Home, User, Users, Megaphone, Bell, BookOpen, FileText, Receipt,
-  Banknote, ClipboardCheck, BarChart3, Settings as SettingsIcon,
+  Banknote, ClipboardCheck, BarChart3, Settings as SettingsIcon, AlertTriangle,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -45,6 +45,7 @@ const HubSidebar = () => {
     { to: '/staff/admin/payslips', label: 'All Payslips', icon: Receipt },
     { to: '/staff/admin/resources', label: 'Manage Resources', icon: BookOpen },
     { to: '/staff/admin/finance', label: 'Finance Snapshot', icon: BarChart3 },
+    { to: '/staff/admin/system-issues', label: 'System Issues', icon: AlertTriangle },
     { to: '/staff/admin/settings', label: 'Settings', icon: SettingsIcon },
   ];
 

@@ -7,6 +7,7 @@
 //    'AcknowledgmentRequired' is stored as importance='Critical' + ack_required=true.
 //  - App audience 'Admin' and 'Arm: Admin/General' fall back to 'Everyone' in DB.
 import { supabase } from '@/integrations/supabase/client';
+import { logAudit } from '../audit';
 import type {
   BroadcastLogEntry,
   Notice,
@@ -170,6 +171,15 @@ export const noticeRepo = {
     // surfaced via the admin email log and do not block notice creation).
     void this._sendBroadcastEmail(notice).catch((e) => {
       console.error('[noticeRepo.broadcast] email dispatch failed', e);
+    });
+
+    // Doc 4.3 §6 — audit broadcast send.
+    void logAudit({
+      action: 'notice.broadcast',
+      targetTable: 'ih_notices',
+      targetId: notice.id,
+      summary: `Broadcast "${notice.title}"`,
+      metadata: { audience: notice.audience, importance: notice.importance },
     });
 
     return notice;

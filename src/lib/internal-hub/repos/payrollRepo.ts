@@ -13,6 +13,7 @@ import type {
 import { supabase } from '@/integrations/supabase/client';
 import { staffRepo } from './staffRepo';
 import { claimRepo } from './claimRepo';
+import { logAudit } from '../audit';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -343,6 +344,15 @@ export const payrollRepo = {
       ),
     );
 
+    // Doc 4.3 §6 — audit payroll finalization.
+    void logAudit({
+      action: 'payroll.finalized',
+      targetTable: 'ih_payroll_runs',
+      targetId: finalized.id,
+      summary: `Payroll finalized for ${finalized.month}`,
+      metadata: { item_count: finalized.items.length, payslip_count: payslips.length },
+    });
+
     return finalized;
   },
 
@@ -359,6 +369,12 @@ export const payrollRepo = {
       .update({ status: 'Locked', locked_at: new Date().toISOString(), locked_by: _adminId } as any)
       .eq('id', runId);
     if (error) throw error;
+    void logAudit({
+      action: 'payroll.locked',
+      targetTable: 'ih_payroll_runs',
+      targetId: runId,
+      summary: `Payroll locked for ${run.month}`,
+    });
     return (await loadRun(runId))!;
   },
 

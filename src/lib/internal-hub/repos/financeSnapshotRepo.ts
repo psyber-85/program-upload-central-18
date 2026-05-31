@@ -1,172 +1,263 @@
 // Doc 3.3 — Admin-only Monthly Finance Snapshot.
+// Backed by `ih_finance_snapshots`. Line items stored inline in `line_items jsonb`.
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type {
   FinanceLineCategory,
   FinanceLineItem,
   FinanceSnapshot,
   FinanceSnapshotStatus,
 } from '../types';
-import { nowISO, readJSON, uid, writeJSON } from '../storage';
-// payrollRepo dependency removed in Sub-batch 2D — see payrollTotalsFor TODO.
-
-const KEY = 'finance-snapshots';
-const KEY_ITEMS = 'finance-line-items';
-
-const loadSnaps = (): FinanceSnapshot[] => readJSON<FinanceSnapshot[]>(KEY, []);
-const saveSnaps = (s: FinanceSnapshot[]) => writeJSON(KEY, s);
-const loadItems = (): FinanceLineItem[] => readJSON<FinanceLineItem[]>(KEY_ITEMS, []);
-const saveItems = (i: FinanceLineItem[]) => writeJSON(KEY_ITEMS, i);
+import { supabase } from '@/integrations/supabase/client';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-/**
- * Auto-fill payroll-linked totals from finalized payroll (Doc 3.3 §12-§16).
- * TODO(Sub-batch 2E): now that payrollRepo is async, re-derive these totals
- * via a Supabase aggregate after the finance snapshot repo itself migrates.
- * Until then we return zeros so the admin can fill the snapshot manually.
- */
-function payrollTotalsFor(_month: string) {
+function uid(prefix: string) {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function mapRow(r: any): FinanceSnapshot {
   return {
-    payrollTotal: 0,
-    claimsTotal: 0,
-    trainingClaimsTotal: 0,
-    epfSocsoTotal: 0,
-    manualAdjustmentTotal: 0,
+    id: r.id,
+    month: r.month,
+    status: r.status as FinanceSnapshotStatus,
+    openingBalance: r.opening_balance == null ? undefined : Number(r.opening_balance),
+    closingBalance: r.closing_balance == null ? undefined : Number(r.closing_balance),
+    payrollTotal: Number(r.payroll_total ?? 0),
+    claimsTotal: Number(r.claims_total ?? 0),
+    trainingClaimsTotal: Number(r.training_claims_total ?? 0),
+    epfSocsoTotal: Number(r.epf_socso_total ?? 0),
+    manualAdjustmentTotal: Number(r.manual_adjustment_total ?? 0),
+    notes: r.notes ?? undefined,
+    reviewedAt: r.reviewed_at ?? undefined,
+    reviewedBy: r.reviewed_by ?? undefined,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
   };
 }
 
+function mapItems(r: any): FinanceLineItem[] {
+  const arr = Array.isArray(r?.line_items) ? r.line_items : [];
+  return arr
+    .map((i: any): FinanceLineItem => ({
+      id: i.id,
+      snapshotId: r.id,
+      category: i.category,
+      amount: Number(i.amount ?? 0),
+      note: i.note ?? '',
+      link: i.link ?? undefined,
+      createdAt: i.createdAt,
+      createdBy: i.createdBy,
+      isCorrection: !!i.isCorrection,
+    }))
+    .sort((a: FinanceLineItem, b: FinanceLineItem) => (a.createdAt < b.createdAt ? 1 : -1));
+}
+
+/**
+ * Doc 3.3 §12-§16 — auto-fill payroll-linked totals from finalized/locked payroll.
+ */
+async function payrollTotalsFor(month: string) {
+  const { data, error } = await supabase
+    .from('ih_payroll_items')
+    .select('base_salary, employer_epf, employer_socso, claims_total, training_total, adjustment, ih_payroll_runs!inner(status, month)')
+    .eq('row_status', 'Complete')
+    .eq('ih_payroll_runs.month', month)
+    .in('ih_payroll_runs.status', ['Finalized', 'Locked']);
+  if (error) throw error;
+  let payroll = 0, claims = 0, training = 0, epfSocso = 0, adj = 0;
+  for (const r of (data ?? []) as any[]) {
+    const base = Number(r.base_salary ?? 0);
+    const eEpf = Number(r.employer_epf ?? 0);
+    const eSocso = Number(r.employer_socso ?? 0);
+    payroll += base + eEpf + eSocso;
+    claims += Number(r.claims_total ?? 0);
+    training += Number(r.training_total ?? 0);
+    epfSocso += eEpf + eSocso;
+    const adjAmt = r.adjustment?.amount;
+    if (typeof adjAmt === 'number') adj += adjAmt;
+  }
+  return {
+    payroll_total: round2(payroll),
+    claims_total: round2(claims),
+    training_claims_total: round2(training),
+    epf_socso_total: round2(epfSocso),
+    manual_adjustment_total: round2(adj),
+  };
+}
+
+async function fetchById(id: string) {
+  const { data, error } = await supabase
+    .from('ih_finance_snapshots')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+async function fetchForMonth(month: string) {
+  const { data, error } = await supabase
+    .from('ih_finance_snapshots')
+    .select('*')
+    .eq('month', month)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+async function patch(id: string, patchObj: Record<string, any>): Promise<FinanceSnapshot | undefined> {
+  const { data, error } = await supabase
+    .from('ih_finance_snapshots')
+    .update({ ...patchObj, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select('*')
+    .maybeSingle();
+  if (error) throw error;
+  return data ? mapRow(data) : undefined;
+}
+
 export const financeSnapshotRepo = {
-  listSnapshots(): FinanceSnapshot[] {
-    return loadSnaps().sort((a, b) => (a.month < b.month ? 1 : -1));
-  },
-  getById(id: string): FinanceSnapshot | undefined {
-    return loadSnaps().find((s) => s.id === id);
-  },
-  getForMonth(month: string): FinanceSnapshot | undefined {
-    return loadSnaps().find((s) => s.month === month);
-  },
-  statusFor(month: string): FinanceSnapshotStatus | 'NotStarted' {
-    return this.getForMonth(month)?.status ?? 'NotStarted';
+  async listSnapshots(): Promise<FinanceSnapshot[]> {
+    const { data, error } = await supabase
+      .from('ih_finance_snapshots')
+      .select('*')
+      .order('month', { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map(mapRow);
   },
 
-  getOrCreateForMonth(month: string): FinanceSnapshot {
-    const existing = this.getForMonth(month);
+  async getById(id: string): Promise<FinanceSnapshot | undefined> {
+    const row = await fetchById(id);
+    return row ? mapRow(row) : undefined;
+  },
+
+  async getForMonth(month: string): Promise<FinanceSnapshot | undefined> {
+    const row = await fetchForMonth(month);
+    return row ? mapRow(row) : undefined;
+  },
+
+  async statusFor(month: string): Promise<FinanceSnapshotStatus | 'NotStarted'> {
+    const row = await fetchForMonth(month);
+    return (row?.status as FinanceSnapshotStatus) ?? 'NotStarted';
+  },
+
+  async getOrCreateForMonth(month: string): Promise<FinanceSnapshot> {
+    const existing = await fetchForMonth(month);
+    const totals = await payrollTotalsFor(month);
     if (existing) {
-      // Refresh auto-fill if still editable.
       if (existing.status === 'Draft') {
-        const totals = payrollTotalsFor(month);
-        const next = { ...existing, ...totals, updatedAt: nowISO() };
-        saveSnaps(loadSnaps().map((s) => (s.id === existing.id ? next : s)));
-        return next;
+        const updated = await patch(existing.id, totals);
+        return updated ?? mapRow(existing);
       }
-      return existing;
+      return mapRow(existing);
     }
-    const totals = payrollTotalsFor(month);
-    const now = nowISO();
-    const snap: FinanceSnapshot = {
-      id: uid('fs'),
-      month,
-      status: 'Draft',
-      ...totals,
-      createdAt: now,
-      updatedAt: now,
-    };
-    saveSnaps([...loadSnaps(), snap]);
-    return snap;
+    const { data, error } = await supabase
+      .from('ih_finance_snapshots')
+      .insert({
+        month,
+        status: 'Draft',
+        line_items: [],
+        ...totals,
+      })
+      .select('*')
+      .single();
+    if (error) throw error;
+    return mapRow(data);
   },
 
-  setOpeningBalance(id: string, value: number | undefined): FinanceSnapshot | undefined {
-    return this._patch(id, { openingBalance: value });
+  async setOpeningBalance(id: string, value: number | undefined) {
+    return patch(id, { opening_balance: value ?? null });
   },
-  setClosingBalance(id: string, value: number | undefined): FinanceSnapshot | undefined {
-    return this._patch(id, { closingBalance: value });
+  async setClosingBalance(id: string, value: number | undefined) {
+    return patch(id, { closing_balance: value ?? null });
   },
-  setNotes(id: string, notes: string): FinanceSnapshot | undefined {
-    return this._patch(id, { notes });
+  async setNotes(id: string, notes: string) {
+    return patch(id, { notes });
   },
 
-  // ---- Line items ----
-  lineItemsFor(snapshotId: string): FinanceLineItem[] {
-    return loadItems()
-      .filter((i) => i.snapshotId === snapshotId)
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  // ---- Line items (stored inline in `line_items jsonb`) ----
+  async lineItemsFor(snapshotId: string): Promise<FinanceLineItem[]> {
+    const row = await fetchById(snapshotId);
+    if (!row) return [];
+    return mapItems(row);
   },
-  addLineItem(
+
+  async addLineItem(
     snapshotId: string,
     input: { category: FinanceLineCategory; amount: number; note: string; link?: string; createdBy: string },
-  ): FinanceLineItem {
-    const snap = this.getById(snapshotId);
-    if (!snap) throw new Error('Snapshot not found.');
-    if (snap.status !== 'Draft') {
+  ): Promise<FinanceLineItem> {
+    const row = await fetchById(snapshotId);
+    if (!row) throw new Error('Snapshot not found.');
+    if (row.status !== 'Draft') {
       throw new Error('Snapshot is locked — use Add Correction instead (Doc 3.3 §21).');
     }
-    return this._appendItem(snapshotId, { ...input, isCorrection: false });
+    return this._appendItem(row, { ...input, isCorrection: false });
   },
+
   /** Doc 3.3 §21 — correction is always allowed, including after lock. */
-  addCorrectionLineItem(
+  async addCorrectionLineItem(
     snapshotId: string,
     input: { category: FinanceLineCategory; amount: number; note: string; link?: string; createdBy: string },
-  ): FinanceLineItem {
-    const snap = this.getById(snapshotId);
-    if (!snap) throw new Error('Snapshot not found.');
-    return this._appendItem(snapshotId, { ...input, isCorrection: true });
+  ): Promise<FinanceLineItem> {
+    const row = await fetchById(snapshotId);
+    if (!row) throw new Error('Snapshot not found.');
+    return this._appendItem(row, { ...input, isCorrection: true });
   },
-  removeLineItem(itemId: string) {
-    const items = loadItems();
-    const item = items.find((i) => i.id === itemId);
-    if (!item) return;
-    const snap = this.getById(item.snapshotId);
-    if (!snap) return;
-    if (snap.status !== 'Draft') return; // never remove after lock
-    saveItems(items.filter((i) => i.id !== itemId));
-    this._touch(snap.id);
+
+  async removeLineItem(snapshotId: string, itemId: string) {
+    const row = await fetchById(snapshotId);
+    if (!row) return;
+    if (row.status !== 'Draft') return;
+    const next = ((row.line_items ?? []) as any[]).filter((i: any) => i.id !== itemId);
+    await patch(row.id, { line_items: next });
   },
 
   /** Doc 3.3 §19-§20 — Mark Month Reviewed (never "Finalize Accounts"). */
-  markReviewed(id: string, adminId: string): FinanceSnapshot | undefined {
-    return this._patch(id, {
+  async markReviewed(id: string, adminId: string) {
+    return patch(id, {
       status: 'Reviewed',
-      reviewedAt: nowISO(),
-      reviewedBy: adminId,
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: adminId,
     });
   },
 
   /** Optional terminal lock after Reviewed grace window (mirrors payroll lockRun). */
-  lockSnapshot(id: string): FinanceSnapshot | undefined {
-    const snap = this.getById(id);
-    if (!snap) return;
-    if (snap.status === 'Locked') return snap;
-    if (snap.status !== 'Reviewed') {
+  async lockSnapshot(id: string, adminId: string) {
+    const row = await fetchById(id);
+    if (!row) return;
+    if (row.status === 'Locked') return mapRow(row);
+    if (row.status !== 'Reviewed') {
       throw new Error('Only a reviewed snapshot can be locked.');
     }
-    return this._patch(id, { status: 'Locked' });
+    return patch(id, {
+      status: 'Locked',
+      locked_at: new Date().toISOString(),
+      locked_by: adminId,
+    });
   },
 
-  _appendItem(snapshotId: string, input: Omit<FinanceLineItem, 'id' | 'snapshotId' | 'createdAt'>): FinanceLineItem {
+  async _appendItem(row: any, input: Omit<FinanceLineItem, 'id' | 'snapshotId' | 'createdAt'>): Promise<FinanceLineItem> {
     const next: FinanceLineItem = {
       id: uid('fli'),
-      snapshotId,
-      createdAt: nowISO(),
+      snapshotId: row.id,
+      createdAt: new Date().toISOString(),
       ...input,
     };
-    saveItems([next, ...loadItems()]);
-    this._touch(snapshotId);
+    const nextItems = [
+      {
+        id: next.id,
+        category: next.category,
+        amount: next.amount,
+        note: next.note,
+        link: next.link,
+        createdAt: next.createdAt,
+        createdBy: next.createdBy,
+        isCorrection: next.isCorrection,
+      },
+      ...((row.line_items ?? []) as any[]),
+    ];
+    await patch(row.id, { line_items: nextItems });
     return next;
-  },
-  _patch(id: string, patch: Partial<FinanceSnapshot>): FinanceSnapshot | undefined {
-    const all = loadSnaps();
-    let updated: FinanceSnapshot | undefined;
-    const next = all.map((s) => {
-      if (s.id !== id) return s;
-      updated = { ...s, ...patch, updatedAt: nowISO() };
-      return updated;
-    });
-    saveSnaps(next);
-    return updated;
-  },
-  _touch(id: string) {
-    const all = loadSnaps();
-    saveSnaps(all.map((s) => (s.id === id ? { ...s, updatedAt: nowISO() } : s)));
   },
 };

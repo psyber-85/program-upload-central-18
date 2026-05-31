@@ -262,39 +262,63 @@ export type Database = {
       }
       ih_finance_snapshots: {
         Row: {
+          claims_total: number
+          closing_balance: number | null
           created_at: string
+          epf_socso_total: number
           id: string
           line_items: Json
           locked_at: string | null
           locked_by: string | null
+          manual_adjustment_total: number
           month: string
+          notes: string | null
+          opening_balance: number | null
+          payroll_total: number
           reviewed_at: string | null
           reviewed_by: string | null
           status: Database["public"]["Enums"]["ih_finance_status"]
+          training_claims_total: number
           updated_at: string
         }
         Insert: {
+          claims_total?: number
+          closing_balance?: number | null
           created_at?: string
+          epf_socso_total?: number
           id?: string
           line_items?: Json
           locked_at?: string | null
           locked_by?: string | null
+          manual_adjustment_total?: number
           month: string
+          notes?: string | null
+          opening_balance?: number | null
+          payroll_total?: number
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["ih_finance_status"]
+          training_claims_total?: number
           updated_at?: string
         }
         Update: {
+          claims_total?: number
+          closing_balance?: number | null
           created_at?: string
+          epf_socso_total?: number
           id?: string
           line_items?: Json
           locked_at?: string | null
           locked_by?: string | null
+          manual_adjustment_total?: number
           month?: string
+          notes?: string | null
+          opening_balance?: number | null
+          payroll_total?: number
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: Database["public"]["Enums"]["ih_finance_status"]
+          training_claims_total?: number
           updated_at?: string
         }
         Relationships: []

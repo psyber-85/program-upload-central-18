@@ -260,6 +260,60 @@ export type Database = {
           },
         ]
       }
+      ih_email_log: {
+        Row: {
+          attempt_count: number
+          cc_addresses: string[]
+          created_at: string
+          error_message: string | null
+          event_type: string
+          id: string
+          idempotency_key: string | null
+          provider_message_id: string | null
+          related_id: string | null
+          related_table: string | null
+          sent_at: string | null
+          status: string
+          subject: string
+          to_addresses: string[]
+          updated_at: string
+        }
+        Insert: {
+          attempt_count?: number
+          cc_addresses?: string[]
+          created_at?: string
+          error_message?: string | null
+          event_type: string
+          id?: string
+          idempotency_key?: string | null
+          provider_message_id?: string | null
+          related_id?: string | null
+          related_table?: string | null
+          sent_at?: string | null
+          status?: string
+          subject: string
+          to_addresses: string[]
+          updated_at?: string
+        }
+        Update: {
+          attempt_count?: number
+          cc_addresses?: string[]
+          created_at?: string
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          idempotency_key?: string | null
+          provider_message_id?: string | null
+          related_id?: string | null
+          related_table?: string | null
+          sent_at?: string | null
+          status?: string
+          subject?: string
+          to_addresses?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       ih_finance_snapshots: {
         Row: {
           claims_total: number

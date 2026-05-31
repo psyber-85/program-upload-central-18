@@ -260,6 +260,42 @@ export type Database = {
           },
         ]
       }
+      ih_audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_role: string | null
+          created_at: string
+          id: string
+          metadata: Json
+          summary: string
+          target_id: string | null
+          target_table: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_role?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          summary: string
+          target_id?: string | null
+          target_table?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_role?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          summary?: string
+          target_id?: string | null
+          target_table?: string | null
+        }
+        Relationships: []
+      }
       ih_calendar_config: {
         Row: {
           calendar_id: string | null
@@ -2489,6 +2525,16 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      ih_log_audit: {
+        Args: {
+          _action: string
+          _metadata?: Json
+          _summary: string
+          _target_id: string
+          _target_table: string
+        }
+        Returns: string
       }
       is_active_ih_staff: { Args: { _user_id: string }; Returns: boolean }
     }

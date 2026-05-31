@@ -65,17 +65,27 @@ const StaffHome = () => {
     queryFn: () => requestSummaryRepo.pendingApprovalCount(),
     enabled: isAdmin,
   });
-  const payslips = useMemo(
-    () => (currentStaff ? payslipRepo.listForStaff(currentStaff.id, 2) : []),
-    [currentStaff?.id, tick],
-  );
+  const { data: payslips = [] } = useQuery({
+    queryKey: ['ih-payslips-recent', currentStaff?.id],
+    queryFn: () => payslipRepo.listForStaff(currentStaff!.id, 2),
+    enabled: !!currentStaff,
+  });
+  const { data: payrollStatusRaw = 'NotPrepared' } = useQuery({
+    queryKey: ['ih-payroll-status', /* month */ undefined],
+    queryFn: () => {
+      const d = new Date();
+      const m = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+      return payrollRepo.statusFor(m);
+    },
+    enabled: !!currentStaff,
+  });
 
   // Doc 3.1 §7 — idempotent payroll reminder (admin, after the 25th).
   useEffect(() => {
     if (!currentStaff || !isAdmin) return;
     const d = new Date();
     const m = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-    payrollRepo.ensureReminderForMonth(m, currentStaff.id);
+    void payrollRepo.ensureReminderForMonth(m, currentStaff.id);
   }, [currentStaff?.id, isAdmin]);
 
   if (!currentStaff) return null;

@@ -344,6 +344,15 @@ export const payrollRepo = {
       ),
     );
 
+    // Doc 4.3 §6 — audit payroll finalization.
+    void logAudit({
+      action: 'payroll.finalized',
+      targetTable: 'ih_payroll_runs',
+      targetId: finalized.id,
+      summary: `Payroll finalized for ${finalized.month}`,
+      metadata: { item_count: finalized.items.length, payslip_count: payslips.length },
+    });
+
     return finalized;
   },
 

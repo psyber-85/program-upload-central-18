@@ -160,6 +160,13 @@ export const requestRepo = {
       await supabase.storage.from('request-attachments').remove([path]);
       throw error;
     }
+    void requestEventsRepo.add({
+      requestId: input.requestId,
+      eventType: 'AttachmentAdded',
+      actorId: input.staffId,
+      note: input.file.name,
+      metadata: { size: input.file.size, mime: input.file.type },
+    });
     return data as RequestAttachment;
   },
 

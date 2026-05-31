@@ -216,11 +216,18 @@ export const financeSnapshotRepo = {
 
   /** Doc 3.3 §19-§20 — Mark Month Reviewed (never "Finalize Accounts"). */
   async markReviewed(id: string, adminId: string) {
-    return patch(id, {
+    const result = await patch(id, {
       status: 'Reviewed',
       reviewed_at: new Date().toISOString(),
       reviewed_by: adminId,
     });
+    void logAudit({
+      action: 'finance.snapshot_reviewed',
+      targetTable: 'ih_finance_snapshots',
+      targetId: id,
+      summary: 'Finance snapshot marked Reviewed',
+    });
+    return result;
   },
 
   /** Optional terminal lock after Reviewed grace window (mirrors payroll lockRun). */

@@ -29,6 +29,12 @@ function mapRow(r: any): FinanceSnapshot {
     claimsTotal: Number(r.claims_total ?? 0),
     trainingClaimsTotal: Number(r.training_claims_total ?? 0),
     epfSocsoTotal: Number(r.epf_socso_total ?? 0),
+    employeeStatutoryTotal: Number(r.employee_statutory_total ?? 0),
+    employerStatutoryTotal: Number(r.employer_statutory_total ?? 0),
+    epfTotal: Number(r.epf_total ?? 0),
+    socsoTotal: Number(r.socso_total ?? 0),
+    eisTotal: Number(r.eis_total ?? 0),
+    bonusTotal: Number(r.bonus_total ?? 0),
     manualAdjustmentTotal: Number(r.manual_adjustment_total ?? 0),
     notes: r.notes ?? undefined,
     reviewedAt: r.reviewed_at ?? undefined,
@@ -56,25 +62,38 @@ function mapItems(r: any): FinanceLineItem[] {
 }
 
 /**
- * Doc 3.3 §12-§16 — auto-fill payroll-linked totals from finalized/locked payroll.
+ * Doc 3.3 §12-§16 + Patch 002 §22 — auto-fill payroll-linked totals from finalized/locked payroll.
  */
 async function payrollTotalsFor(month: string) {
   const { data, error } = await supabase
     .from('ih_payroll_items')
-    .select('base_salary, employer_epf, employer_socso, claims_total, training_total, adjustment, ih_payroll_runs!inner(status, month)')
+    .select('base_salary, epf, socso, eis, employer_epf, employer_socso, employer_eis, total_employee_deductions, total_employer_contribution, claims_total, training_total, bonus_total, adjustment, ih_payroll_runs!inner(status, month)')
     .eq('row_status', 'Complete')
     .eq('ih_payroll_runs.month', month)
     .in('ih_payroll_runs.status', ['Finalized', 'Locked']);
   if (error) throw error;
-  let payroll = 0, claims = 0, training = 0, epfSocso = 0, adj = 0;
+  let payroll = 0, claims = 0, training = 0, adj = 0, bonus = 0;
+  let employeeStat = 0, employerStat = 0;
+  let epfTot = 0, socsoTot = 0, eisTot = 0;
   for (const r of (data ?? []) as any[]) {
     const base = Number(r.base_salary ?? 0);
+    const epf = Number(r.epf ?? 0);
+    const socso = Number(r.socso ?? 0);
+    const eis = Number(r.eis ?? 0);
     const eEpf = Number(r.employer_epf ?? 0);
     const eSocso = Number(r.employer_socso ?? 0);
-    payroll += base + eEpf + eSocso;
+    const eEis = Number(r.employer_eis ?? 0);
+    const empDed = Number(r.total_employee_deductions ?? 0) || (epf + socso + eis);
+    const empCon = Number(r.total_employer_contribution ?? 0) || (eEpf + eSocso + eEis);
+    payroll += base + empCon;
     claims += Number(r.claims_total ?? 0);
     training += Number(r.training_total ?? 0);
-    epfSocso += eEpf + eSocso;
+    bonus += Number(r.bonus_total ?? 0);
+    employeeStat += empDed;
+    employerStat += empCon;
+    epfTot += epf + eEpf;
+    socsoTot += socso + eSocso;
+    eisTot += eis + eEis;
     const adjAmt = r.adjustment?.amount;
     if (typeof adjAmt === 'number') adj += adjAmt;
   }
@@ -82,7 +101,13 @@ async function payrollTotalsFor(month: string) {
     payroll_total: round2(payroll),
     claims_total: round2(claims),
     training_claims_total: round2(training),
-    epf_socso_total: round2(epfSocso),
+    epf_socso_total: round2(employerStat), // deprecated; preserved for back-compat readers
+    employee_statutory_total: round2(employeeStat),
+    employer_statutory_total: round2(employerStat),
+    epf_total: round2(epfTot),
+    socso_total: round2(socsoTot),
+    eis_total: round2(eisTot),
+    bonus_total: round2(bonus),
     manual_adjustment_total: round2(adj),
   };
 }

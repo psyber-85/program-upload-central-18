@@ -13,6 +13,12 @@ import type {
 import { CONFIDENTIAL_PAYSLIP_LABEL } from '../types';
 
 function mapRow(r: any): Payslip {
+  const epf = Number(r.epf ?? 0);
+  const socso = Number(r.socso ?? 0);
+  const eis = Number(r.eis ?? 0);
+  const erEpf = Number(r.employer_epf ?? 0);
+  const erSocso = Number(r.employer_socso ?? 0);
+  const erEis = Number(r.employer_eis ?? 0);
   return {
     id: r.id,
     payrollRunId: r.run_id,
@@ -20,10 +26,18 @@ function mapRow(r: any): Payslip {
     staffName: r.staff_name ?? '',
     month: r.month,
     baseSalary: Number(r.base_salary ?? 0),
-    epf: Number(r.epf ?? 0),
-    socso: Number(r.socso ?? 0),
+    epf,
+    socso,
+    eis,
+    totalEmployeeDeductions: Number(r.total_employee_deductions ?? 0) || (epf + socso + eis),
+    employerEpf: erEpf,
+    employerSocso: erSocso,
+    employerEis: erEis,
+    totalEmployerContribution: Number(r.total_employer_contribution ?? 0) || (erEpf + erSocso + erEis),
     claimsTotal: Number(r.claims_total ?? 0),
     trainingClaimsTotal: Number(r.training_total ?? 0),
+    bonusTotal: Number(r.bonus_total ?? 0),
+    otherAdditionTotal: Number(r.other_addition_total ?? 0),
     adjustment: (r.adjustment as ManualAdjustment | null) ?? null,
     netPay: Number(r.net_pay ?? 0),
     finalizedAt: r.finalized_at ?? r.created_at,
@@ -110,8 +124,16 @@ export const payslipRepo = {
         base_salary: i.baseSalary,
         epf: i.epfAmount,
         socso: i.socsoAmount,
+        eis: i.eisAmount,
+        total_employee_deductions: i.totalEmployeeDeductions,
+        employer_epf: i.employerEpf,
+        employer_socso: i.employerSocso,
+        employer_eis: i.employerEis,
+        total_employer_contribution: i.totalEmployerContribution,
         claims_total: i.claimsTotal,
         training_total: i.trainingClaimsTotal,
+        bonus_total: i.bonusTotal,
+        other_addition_total: i.otherAdditionTotal,
         net_pay: i.netPay,
         adjustment: i.adjustment,
         finalized_at: now,

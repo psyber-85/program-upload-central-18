@@ -127,6 +127,9 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return jsonError(auth.status, auth.error);
+
   try {
     if (!SENDGRID_API_KEY) {
       console.error("SENDGRID_API_KEY not configured");

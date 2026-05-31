@@ -33,3 +33,15 @@ verify_jwt = false
 
 [functions.ih-send-email]
 verify_jwt = true
+
+[functions.ih-generate-payslip-pdf]
+verify_jwt = true
+
+[functions.ih-scheduled-reminders]
+verify_jwt = false
+
+[functions.ih-calendar-sync]
+verify_jwt = true
+
+[functions.ih-calendar-list]
+verify_jwt = true

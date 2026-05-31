@@ -132,7 +132,30 @@ const AdminStaffDetail = () => {
     }
   };
 
+  const isSelf = currentStaff?.id === staff.id;
+  const targetIsAdmin = staff.role === 'Admin';
+  const canTogglePromotion = viewerIsAdmin && !isSelf && staff.status === 'Active';
+
+  const handlePromotion = async (action: 'promote' | 'revoke') => {
+    try {
+      const { data, error } = await supabase.functions.invoke('ih-promote-staff', {
+        body: { target_user_id: staff.id, action },
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.error ?? 'Unknown error');
+      toast({ title: action === 'promote' ? 'Promoted to Admin' : 'Admin revoked' });
+      invalidate();
+    } catch (e) {
+      toast({
+        title: action === 'promote' ? 'Promotion failed' : 'Revoke failed',
+        description: String((e as Error).message),
+        variant: 'destructive',
+      });
+    }
+  };
+
   const notionTool = tools.find((t) => t.tool === 'Notion');
+
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-4">

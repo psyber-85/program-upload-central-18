@@ -138,6 +138,9 @@ const App = () => (
               <Route path="admin/calendar-settings" element={
                 <ProtectedRoute requireAdmin><CalendarSettings /></ProtectedRoute>
               } />
+              <Route path="admin/system-issues" element={
+                <ProtectedRoute requireAdmin><SystemIssues /></ProtectedRoute>
+              } />
             </Route>
 
             {/* Marketing Portal routes (protected, nested under /staff/marketing) */}

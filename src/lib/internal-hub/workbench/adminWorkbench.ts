@@ -27,7 +27,7 @@ function kindToType(kind: RequestDetail['rawKind']): WorkbenchItemType {
 }
 
 export function buildWorkbenchItems(input: BuildInput): WorkbenchItem[] {
-  const { pendingApprovals, staff, notices, systemIssues, payrollMonth, payrollStatus, totalAcksRequired, totalAcksReceived } = input;
+  const { pendingApprovals, staff, systemIssues, payrollMonth, payrollStatus, totalAcksRequired, totalAcksReceived } = input;
   const items: WorkbenchItem[] = [];
   const staffById = new Map(staff.map((s) => [s.id, s]));
 

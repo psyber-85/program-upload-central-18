@@ -144,6 +144,7 @@ const StaffHome = () => {
     { label: 'Finance Snapshot', icon: BarChart3, to: '/staff/admin/finance' },
     { label: 'Manage Resources', icon: BookOpen, to: '/staff/admin/resources' },
     { label: 'Email Delivery', icon: Mail, to: '/staff/admin/email-log' },
+    { label: 'Calendar Settings', icon: Mail, to: '/staff/admin/calendar-settings' },
   ];
 
   return (

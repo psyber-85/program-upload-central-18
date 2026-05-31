@@ -124,6 +124,18 @@ export const payslipRepo = {
     if (error) throw error;
     const generated = (data ?? []).map(mapRow);
 
+    // Doc 4.2 §32 — generate per-staff PDFs (fire-and-forget; failure must not
+    // block payroll finalization). PDF errors land in ih_payslips.pdf_error.
+    void (async () => {
+      for (const ps of generated) {
+        try {
+          await supabase.functions.invoke('ih-generate-payslip-pdf', { body: { payslip_id: ps.id } });
+        } catch (e) {
+          console.error('[payslipRepo] pdf gen failed', ps.id, e);
+        }
+      }
+    })();
+
     // Doc 4.2 §10 — payslip-ready email (link only, no PDF attachment).
     void (async () => {
       try {
@@ -151,40 +163,61 @@ export const payslipRepo = {
     return generated;
   },
 
-  /** Doc 3.2 §19/§20 — log + client-side placeholder PDF. */
+  /** Doc 4.2 §33 — admin can retry PDF generation on failed payslips. */
+  async regeneratePdf(id: string): Promise<void> {
+    await supabase.from('ih_payslips').update({ pdf_error: null } as any).eq('id', id);
+    const { error } = await supabase.functions.invoke('ih-generate-payslip-pdf', { body: { payslip_id: id } });
+    if (error) throw error;
+  },
+
+  /** Returns a short-lived signed URL for the PDF, or null if not yet generated. */
+  async getPdfSignedUrl(id: string): Promise<string | null> {
+    const { data: row } = await supabase
+      .from('ih_payslips')
+      .select('pdf_path')
+      .eq('id', id)
+      .maybeSingle();
+    const path = (row as any)?.pdf_path;
+    if (!path) return null;
+    const { data } = await supabase.storage.from('payslips').createSignedUrl(path, 60);
+    return data?.signedUrl ?? null;
+  },
+
+  /** Doc 3.2 §19/§20 + Doc 4.2 §32 — log + download (real PDF when available). */
   async downloadPdf(id: string, actorId: string, _actorRole: HubRole): Promise<void> {
     const ps = await this.getById(id);
     if (!ps) throw new Error('Payslip not found.');
     if (ps.availability !== 'Available' && ps.availability !== 'Generated') {
       throw new Error('Payslip not available.');
     }
-    // Best-effort log (RLS will reject if actorId !== auth.uid()).
     await supabase
       .from('ih_payslip_downloads')
       .insert({ payslip_id: id, staff_id: actorId } as any);
 
     if (typeof window === 'undefined') return;
+
+    const signed = await this.getPdfSignedUrl(id);
+    if (signed) {
+      const a = document.createElement('a');
+      a.href = signed;
+      a.download = `payslip-${ps.month}-${ps.staffName.replace(/\s+/g, '_')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      return;
+    }
+
+    // Text fallback while PDF is still generating.
     const lines = [
-      `AIHQ — Payslip`,
-      `${CONFIDENTIAL_PAYSLIP_LABEL}`,
-      ``,
-      `Staff:            ${ps.staffName}`,
-      `Payroll Month:    ${ps.month}`,
-      `Finalized:        ${new Date(ps.finalizedAt).toLocaleDateString()}`,
-      ``,
-      `Base Salary:      ${ps.baseSalary.toFixed(2)}`,
-      `EPF:             -${ps.epf.toFixed(2)}`,
-      `SOCSO:           -${ps.socso.toFixed(2)}`,
-      `Claims:           ${ps.claimsTotal.toFixed(2)}`,
-      `Training Claims:  ${ps.trainingClaimsTotal.toFixed(2)}`,
-      `Manual Adj.:      ${(ps.adjustment?.amount ?? 0).toFixed(2)}${ps.adjustment ? `  (${ps.adjustment.reason})` : ''}`,
-      `------------------------------------`,
-      `Net Pay:          ${ps.netPay.toFixed(2)}`,
-      ``,
-      ps.correctionRef ? `Correction reference: ${ps.correctionRef}` : '',
-      ``,
-      `Internal document — placeholder format. Real PDF rendering is owned by Card 4.`,
-    ].filter(Boolean);
+      'AIHQ — Payslip',
+      CONFIDENTIAL_PAYSLIP_LABEL,
+      '',
+      `Staff:         ${ps.staffName}`,
+      `Payroll Month: ${ps.month}`,
+      `Net Pay:       ${ps.netPay.toFixed(2)}`,
+      '',
+      '(PDF is still generating — please try again shortly.)',
+    ];
     const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

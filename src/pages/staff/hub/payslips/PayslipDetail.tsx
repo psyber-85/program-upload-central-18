@@ -62,8 +62,15 @@ const PayslipDetail = () => {
         <CardHeader>
           <CardTitle className="text-lg flex items-center justify-between">
             <span>Payslip · {ps.month}</span>
-            <Button size="sm" variant="outline" onClick={() => downloadMut.mutate()}>
-              <Download className="h-3.5 w-3.5 mr-1" /> Download
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => downloadMut.mutate()}
+              disabled={downloadMut.isPending}
+              title={ps.pdfRef ? 'Download PDF' : 'PDF is still generating'}
+            >
+              <Download className="h-3.5 w-3.5 mr-1" />
+              {ps.pdfRef ? 'Download PDF' : 'Download'}
             </Button>
           </CardTitle>
         </CardHeader>

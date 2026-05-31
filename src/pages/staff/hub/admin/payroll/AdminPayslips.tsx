@@ -1,19 +1,21 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Download, ShieldAlert } from 'lucide-react';
+import { Download, ShieldAlert, RefreshCw, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { useHub } from '@/lib/internal-hub/HubContext';
 import { canAccessAdminArea } from '@/lib/internal-hub/access';
 import { payslipRepo } from '@/lib/internal-hub';
 import { CONFIDENTIAL_PAYSLIP_LABEL } from '@/lib/internal-hub/types';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const AdminPayslips = () => {
   const { currentStaff } = useHub();
+  const qc = useQueryClient();
   const [q, setQ] = useState('');
   const [month, setMonth] = useState('');
 
@@ -22,11 +24,38 @@ const AdminPayslips = () => {
     queryFn: () => payslipRepo.listAll(),
     enabled: !!currentStaff && canAccessAdminArea(currentStaff),
   });
+
+  // Doc 4.2 §33 — admin-visible PDF status (raw row read for pdf_error/pdf_path).
+  const { data: pdfStatus = {} } = useQuery({
+    queryKey: ['ih-payslips-pdf-status'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('ih_payslips')
+        .select('id, pdf_path, pdf_error, pdf_generated_at');
+      const map: Record<string, { path: string | null; error: string | null; generatedAt: string | null }> = {};
+      (data ?? []).forEach((r: any) => {
+        map[r.id] = { path: r.pdf_path, error: r.pdf_error, generatedAt: r.pdf_generated_at };
+      });
+      return map;
+    },
+    enabled: !!currentStaff && canAccessAdminArea(currentStaff),
+    refetchInterval: 15000,
+  });
+
   const downloadMut = useMutation({
     mutationFn: (id: string) =>
       payslipRepo.downloadPdf(id, currentStaff!.id, currentStaff!.role),
     onError: (e: Error) =>
       toast({ title: 'Download failed', description: e.message, variant: 'destructive' }),
+  });
+  const regenMut = useMutation({
+    mutationFn: (id: string) => payslipRepo.regeneratePdf(id),
+    onSuccess: () => {
+      toast({ title: 'PDF regeneration triggered' });
+      qc.invalidateQueries({ queryKey: ['ih-payslips-pdf-status'] });
+    },
+    onError: (e: Error) =>
+      toast({ title: 'Regenerate failed', description: e.message, variant: 'destructive' }),
   });
 
   const filtered = useMemo(() => {
@@ -83,25 +112,67 @@ const AdminPayslips = () => {
             <div className="py-6 text-sm text-muted-foreground text-center">No payslips.</div>
           ) : (
             <ul className="divide-y divide-border">
-              {filtered.map((p) => (
-                <li key={p.id} className="py-3 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="font-medium truncate">{p.staffName}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {p.month} · Net {p.netPay.toFixed(2)} · Finalized {new Date(p.finalizedAt).toLocaleDateString()}
+              {filtered.map((p) => {
+                const status = pdfStatus[p.id];
+                const pdfState: 'ok' | 'failed' | 'pending' = status?.error
+                  ? 'failed'
+                  : status?.path ? 'ok' : 'pending';
+                return (
+                  <li key={p.id} className="py-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{p.staffName}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {p.month} · Net {p.netPay.toFixed(2)} · Finalized {new Date(p.finalizedAt).toLocaleDateString()}
+                      </div>
+                      {pdfState === 'failed' && (
+                        <div className="text-xs text-destructive mt-1 truncate" title={status?.error ?? ''}>
+                          PDF error: {status?.error}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{p.availability}</Badge>
-                    <Button asChild size="sm" variant="outline">
-                      <Link to={`/staff/payslips/${p.id}`}>View</Link>
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => downloadMut.mutate(p.id)}>
-                      <Download className="h-3.5 w-3.5 mr-1" /> PDF
-                    </Button>
-                  </div>
-                </li>
-              ))}
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{p.availability}</Badge>
+                      {pdfState === 'ok' && (
+                        <Badge variant="outline" className="gap-1">
+                          <CheckCircle2 className="h-3 w-3 text-green-600" /> PDF
+                        </Badge>
+                      )}
+                      {pdfState === 'pending' && (
+                        <Badge variant="outline" className="gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Generating
+                        </Badge>
+                      )}
+                      {pdfState === 'failed' && (
+                        <Badge variant="destructive" className="gap-1">
+                          <AlertCircle className="h-3 w-3" /> Failed
+                        </Badge>
+                      )}
+                      <Button asChild size="sm" variant="outline">
+                        <Link to={`/staff/payslips/${p.id}`}>View</Link>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => downloadMut.mutate(p.id)}
+                        disabled={pdfState === 'pending'}
+                      >
+                        <Download className="h-3.5 w-3.5 mr-1" /> PDF
+                      </Button>
+                      {pdfState !== 'ok' && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => regenMut.mutate(p.id)}
+                          disabled={regenMut.isPending}
+                          title="Regenerate PDF"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </CardContent>

@@ -130,9 +130,9 @@ export const payslipRepo = {
         const { payslipReadyEmail } = await import('../email/dispatcher');
         const { data: staffRows } = await supabase
           .from('ih_staff_profiles')
-          .select('id, email, full_name')
+          .select('id, email, name')
           .in('id', generated.map((p) => p.staffId));
-        const emailById = new Map((staffRows ?? []).map((s: any) => [s.id, { email: s.email, name: s.full_name }]));
+        const emailById = new Map((staffRows ?? []).map((s: any) => [s.id, { email: s.email, name: s.name }]));
         for (const ps of generated) {
           const meta = emailById.get(ps.staffId);
           if (!meta?.email) continue;

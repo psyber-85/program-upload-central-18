@@ -21,7 +21,7 @@ async function dispatchWelcome(staffId: string, opts: { force?: boolean } = {}) 
   try {
     const { data: row, error } = await supabase
       .from('ih_staff_profiles')
-      .select('id, email, full_name, join_date')
+      .select('id, email, name, join_date')
       .eq('id', staffId)
       .maybeSingle();
     if (error || !row?.email) {
@@ -33,7 +33,7 @@ async function dispatchWelcome(staffId: string, opts: { force?: boolean } = {}) 
     const result = await welcomeEmail({
       id: row.id,
       email: row.email as string,
-      fullName: (row.full_name as string) ?? '',
+      fullName: (row.name as string) ?? '',
       joinDate: row.join_date as string | undefined,
     });
     const store = load();

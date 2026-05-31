@@ -1,126 +1,141 @@
+## Patch 1.4 — Request Flow Completion (Plan)
 
-# Patch 1.3 — Home & Operating Surface Completion
+Surgical completion of the request layer. No DB policy changes (entitlements, thresholds, payroll formula, payslip layout, storage strategy, RLS all untouched per §3 and §31). DB schema already supports `Training`, `Benefit`, `NeedsCorrection`, and `archived_at`, so the bulk of work is frontend + a small repo expansion + one additive migration for activity events.
 
-Pure presentation/aggregation patch. No DB schema changes, no business logic changes. All data is read from existing repos. Edits stay in `src/pages/staff/hub` and `src/components/internal-hub/home` + a small aggregator module.
+### Current vs target (gap summary)
 
-## Scope check (what stays untouched)
-- Request/leave/claim/training workflows
-- Payroll calc & finalize logic
-- Payslip format & PDF
-- RLS / backend / edge functions
-- `/staff/marketing` and all marketing components
-- Existing summary card destinations that already work
+| Area | Current | Patch 1.4 target |
+|---|---|---|
+| Request types in UI | Leave / MC / Claim only (one shared modal) | Leave / MC / Claim / Training / Benefit / Other, each with its own form |
+| New Request entry | Single dialog inside `RequestsIndex` | Type selector → per-type form; Quick Actions deep-link |
+| Detail page | None | `/staff/requests/:id` with all §6 fields + timeline + next action |
+| Activity timeline | Not implemented | New `ih_request_events` table + timeline UI (§7 event labels) |
+| Needs Correction loop | Status exists, no UI flow | Admin marks w/ required comment, staff edits same record, resubmits |
+| Admin queue | One flat "pending" tab | Grouped tabs: Leave/MC, Claims, Training, Benefits/Other + filters (status, staff, type, date) |
+| Staff list next action | Single "View" implicit | Status badge + per-row next action (Fix / View Outcome / Upload Proof / Mark Completed / Submit Training Claim / View Payroll Inclusion) |
+| MC labelling | "Approved/Rejected" | "Accepted / Recorded" UI label, internally still Completed/Approved |
+| Training Fund | Single generic flow | Application → Completion → Claim (linked records) |
+| Benefit | Not in UI selector | Suggested-topics form |
+| Other Request | Missing | Guardrail form (categories, no IT/PM dumping ground) |
+| Attachment honesty | Real upload to bucket (good) | Keep production storage. Where used as placeholder metadata, show clear "metadata only" badge — but since storage is already live we keep real upload as primary |
+| Home/Pending integration | NeedsCorrection wired (Patch 1.3) | Add: training proof pending, payroll-inclusion outcomes; admin workbench gets grouped pending |
 
-## Gap analysis vs Patch §29 acceptance
+### Files to create
 
-| §29 item | Current state | Action |
-| --- | --- | --- |
-| Staff My Pending Items preview | ❌ missing | build preview + full page |
-| Acknowledgment-required as pending | partial (badge only) | feed into pending aggregator |
-| Needs-Correction requests as pending | partial (in recent list) | promote to pending + visual badge |
-| Onboarding tasks as pending (staff) | ❌ | aggregate from `onboardingRepo` |
-| Payslip-ready as pending/status | partial (summary card) | add pending entry when latest unread |
-| Admin Workbench preview + page | ❌ | build both |
-| Pending approvals, MC, claims, training etc. in workbench | ❌ aggregator | aggregate from `requestSummaryRepo`/staff repos |
-| Onboarding/offboarding pending (admin) | partial (count card) | itemized in workbench |
-| Notion access eligible | ❌ | flag from `lifecycle` |
-| Payroll review/finalization reminders | partial (idempotent reminder ran) | surface in workbench |
-| System Issues for admin | route exists, not on Home | surface unresolved on Home + workbench |
-| Section cards with status | ❌ plain tiles | add lightweight status badges |
-| Coming-later/stub control | ❌ inconsistent (`Stubs.tsx`) | one `ComingLater` component + replace Approvals stub w/ workbench filter |
-| Mobile priority order | ❌ summary cards first | reorder: Pending → Quick Actions → Summary → Notices → Requests → Payslips → Sections |
-| Empty states calm copy | partial | standard empty strings |
-| Privacy boundary | already enforced by repos | verify in aggregator, no cross-staff reads for non-admin |
+**Pages / routes**
+- `src/pages/staff/hub/requests/RequestDetail.tsx` — §6 detail layout, timeline, next action
+- `src/pages/staff/hub/requests/NewRequest.tsx` — type-selector landing + supports `?type=Leave|MC|Claim|Training|Benefit|Other` deep link from Quick Actions
+- `src/pages/staff/hub/requests/forms/LeaveForm.tsx`
+- `src/pages/staff/hub/requests/forms/McForm.tsx`
+- `src/pages/staff/hub/requests/forms/ClaimForm.tsx`
+- `src/pages/staff/hub/requests/forms/TrainingApplicationForm.tsx`
+- `src/pages/staff/hub/requests/forms/TrainingCompletionForm.tsx` (mounted from detail page)
+- `src/pages/staff/hub/requests/forms/TrainingClaimForm.tsx` (mounted from detail page)
+- `src/pages/staff/hub/requests/forms/BenefitForm.tsx`
+- `src/pages/staff/hub/requests/forms/OtherRequestForm.tsx`
+- `src/pages/staff/hub/admin/requests/AdminRequestsQueue.tsx` — grouped tabs + filters (replaces admin tab inside RequestsIndex)
 
-## New files
+**Components**
+- `src/components/internal-hub/requests/RequestStatusBadge.tsx` — MC label override
+- `src/components/internal-hub/requests/RequestTimeline.tsx`
+- `src/components/internal-hub/requests/NextActionButton.tsx` — derives action from `(kind, status, subState)`
+- `src/components/internal-hub/requests/CorrectionPanel.tsx` — appears when status=NeedsCorrection
+- `src/components/internal-hub/requests/AttachmentList.tsx` (extract from current RequestsIndex)
+- `src/components/internal-hub/requests/ProofWaiverDialog.tsx` (admin)
 
+**Repos / logic**
+- `src/lib/internal-hub/repos/requestEventsRepo.ts` — list/insert events
+- Extend `requestRepo.ts`: `get(id)`, `update(id, payload)`, `markNeedsCorrection({id,note,adminId})`, `resubmit(id)`, `waiveProof({id,reason,adminId})`, `markCompleted({id, kind})`, `linkTrainingClaim({applicationId, claimId})`. Each writes a row to `ih_request_events`.
+
+### Files to edit
+
+- `src/App.tsx` — add `/staff/requests/new`, `/staff/requests/:id` routes; route `/staff/admin/requests` to `AdminRequestsQueue`.
+- `src/pages/staff/hub/requests/RequestsIndex.tsx` — replace embedded modal with link to `/staff/requests/new`; rebuild list rows to show status badge + NextAction; keep staff-only view (admin moves to AdminRequestsQueue).
+- `src/components/internal-hub/home/QuickActionsCard.tsx` (or wherever Quick Actions live) — deep-link to `/staff/requests/new?type=…`.
+- `src/lib/internal-hub/workbench/pendingItems.ts` — add: Training-completion-pending, payroll-inclusion outcomes (best-effort, only when useful per §28).
+- `src/lib/internal-hub/workbench/adminWorkbench.ts` — already pulls pending approvals; add training-application vs training-claim distinction.
+
+### Files explicitly NOT touched
+
+- All payroll, payslip, finance-snapshot code (Patches 1.5/1.6 territory).
+- Marketing surfaces (`/staff/marketing`).
+- RLS / storage policies / GRANTs (no schema-change on existing tables).
+- Entitlement/threshold logic in `claimRepo`, `payrollRepo`, leave balance calc.
+- `requestSummaryRepo` (already Patch 1.3-correct).
+
+### Migration (additive only)
+
+```sql
+-- ih_request_events: append-only activity timeline.
+CREATE TABLE public.ih_request_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id uuid NOT NULL REFERENCES public.ih_requests(id) ON DELETE CASCADE,
+  event_type text NOT NULL,        -- 'Submitted'|'AdminReviewed'|'NeedsCorrection'|'Resubmitted'|'Approved'|'Rejected'|'Completed'|'IncludedInPayroll'|'AttachmentAdded'|'ProofWaived'|'TrainingCompleted'|'AutoApproved'
+  actor_id uuid,                   -- nullable for system events
+  note text,
+  metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT SELECT, INSERT ON public.ih_request_events TO authenticated;
+GRANT ALL ON public.ih_request_events TO service_role;
+ALTER TABLE public.ih_request_events ENABLE ROW LEVEL SECURITY;
+
+-- Read: requester or admin can read events for their request.
+CREATE POLICY "ih_request_events_read"
+ON public.ih_request_events FOR SELECT TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.ih_requests r
+    WHERE r.id = request_id
+      AND (r.staff_id = auth.uid() OR public.has_ih_role(auth.uid(), 'admin'::ih_app_role))
+  )
+);
+
+-- Insert: requester (for their request) or admin.
+CREATE POLICY "ih_request_events_insert"
+ON public.ih_request_events FOR INSERT TO authenticated
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.ih_requests r
+    WHERE r.id = request_id
+      AND (r.staff_id = auth.uid() OR public.has_ih_role(auth.uid(), 'admin'::ih_app_role))
+  )
+);
+
+-- Immutable: no UPDATE/DELETE policies. Hard-delete blocked via trigger reuse:
+CREATE TRIGGER ih_request_events_no_delete
+BEFORE DELETE ON public.ih_request_events
+FOR EACH ROW EXECUTE FUNCTION public.ih_block_hard_delete();
 ```
-src/lib/internal-hub/workbench/
-  pendingItems.ts       // staff aggregator → PendingItem[]
-  adminWorkbench.ts     // admin aggregator → WorkbenchItem[]
-  types.ts              // PendingItem, WorkbenchItem, ActionKind
 
-src/components/internal-hub/home/
-  PendingItemsPreview.tsx
-  AdminWorkbenchPreview.tsx
-  SectionTile.tsx       // (refactor of SectionsGrid tile w/ status slot)
+Also adds two nullable cols to `ih_requests` for Training linkage and sub-state (no defaults that change existing rows):
 
-src/components/internal-hub/ComingLater.tsx   // §22 pattern
-
-src/pages/staff/hub/
-  MyPendingItems.tsx    // full page
-  admin/AdminWorkbench.tsx  // full page with §12 filters
+```sql
+ALTER TABLE public.ih_requests
+  ADD COLUMN IF NOT EXISTS training_application_id uuid REFERENCES public.ih_requests(id),
+  ADD COLUMN IF NOT EXISTS sub_state text;   -- e.g. 'ApplicationApproved','TrainingCompleted','ClaimSubmitted'
 ```
 
-## Edited files
+### Acceptance mapping (§32)
 
-- `src/pages/staff/hub/StaffHome.tsx` — reorder sections per §24/§25; insert PendingItems/Workbench previews; pass section statuses.
-- `src/components/internal-hub/home/SectionsGrid.tsx` — accept status badges (unread notices, ack count, pending requests, payroll status, onboarding pending count).
-- `src/components/internal-hub/home/MyRecentRequestsPreview.tsx` — clearer Needs Correction badge + "Fix Request" CTA (§18).
-- `src/components/internal-hub/home/MyPayslipsPreview.tsx` — show "View Payslip" CTA + latest-month caption (§19).
-- `src/pages/staff/hub/admin/Stubs.tsx` — remove `Approvals` stub; route `/staff/admin/approvals` to the new `AdminWorkbench` page with `?type=Requests` filter.
-- `src/App.tsx` — add routes `/staff/pending`, `/staff/admin/workbench`; repoint `/staff/admin/approvals` to AdminWorkbench.
+- Request forms ✅ per-type files + selector + Quick Action deep-link + Other-as-fallback + Benefit topics.
+- Request detail ✅ `RequestDetail.tsx` renders all §6 fields + timeline + next action.
+- Correction loop ✅ admin comment required (form validation), same record edited via `update`+`resubmit`, events logged.
+- Admin queue ✅ grouped tabs + filters (status / staff / type / date).
+- Staff list ✅ badges + NextActionButton per row.
+- Attachment ✅ keep existing real upload, no fake placeholders.
+- Scope control ✅ no edits to entitlement / formula / payslip / RLS-on-existing-tables.
 
-## Aggregator behavior
+### Order of execution after approval
 
-### `pendingItems.ts` (staff only)
-Pulls in parallel via React Query inside the page; returns prioritized list:
+1. Migration (additive only) — wait for approval.
+2. Repo extensions (`requestRepo`, new `requestEventsRepo`).
+3. New Request page + per-type form components.
+4. Request Detail page + Timeline + CorrectionPanel + NextActionButton.
+5. Admin grouped queue.
+6. Wire Quick Action deep-links.
+7. Extend workbench aggregators.
+8. Update `RequestsIndex` to use new list rows and remove embedded modal.
+9. Verify build, smoke-test routes.
 
-1. Ack-required notices not yet acknowledged → action `Acknowledge` → `/staff/notices/:id`
-2. Own requests in `NeedsCorrection` → `Fix Request` → `/staff/requests/:id`
-3. Latest payslip not yet viewed (Patch flag `lastViewedAt` already exists on payslip repo if present, else just "available") → `View Payslip`
-4. Onboarding starter tasks incomplete (own checklist) → `Complete Task` → `/staff/profile`
-5. Notion access eligible but not unlocked → `View Resource` → `/staff/resources`
-6. Approved/Rejected request outcome not yet viewed → `View Outcome`
-
-Resolution: items are derived state — when underlying repo state changes (ack, status, view), item disappears on next query.
-
-### `adminWorkbench.ts` (admin only)
-Combines:
-- pending approvals (`requestSummaryRepo.listPendingApprovals()` — wrap existing count call by listing if needed; if not present, reuse `requestSummaryRepo` list w/ filter)
-- staff onboarding/offboarding incomplete
-- Notion access eligible but not granted
-- payroll status: `Draft`/`Ready` for current month → `Review Payroll`
-- finalization reminder (after the 25th) — reuse `payrollRepo.ensureReminderForMonth`
-- unresolved `systemIssuesRepo.listSystemIssues({ status: 'open' })`
-- unacknowledged notice summary (existing notice repo aggregate)
-
-Each item: `{ id, type, title, staffName?, recordRef?, priority, createdAt, status, primaryAction, href }`.
-
-## Pages
-
-### `MyPendingItems.tsx`
-- Header + count
-- List grouped by type with primary-action buttons
-- Empty state: "You're all caught up."
-
-### `AdminWorkbench.tsx`
-- Filters (§12): item type, status, staff member, priority, source module — implemented as `Select` + chip toggles, URL-synced via `useSearchParams`
-- Table/list of items with primary actions
-- Empty state per filter
-
-## Home layout (final order)
-
-Mobile (default flex order):
-1. Pending Items / Admin Workbench preview
-2. Quick Actions
-3. Summary cards
-4. Latest Notices
-5. Recent Requests
-6. Payslips
-7. Sections
-
-Desktop (`lg:`): summary cards row across top, pending/workbench preview prominent left column, others fill — achieved via `order-*` Tailwind utilities, not duplicate trees.
-
-## Coming-later component (§22)
-`<ComingLater feature="..." purpose="..." plannedFor="..." />` — used only when the user benefits from knowing; not used to mask broken buttons. No new broken buttons are introduced.
-
-## Acceptance check after build
-Manual click-through:
-- Each summary card routes correctly
-- Pending preview "Fix Request" / "Acknowledge" / "View Payslip" all open right record
-- Admin workbench preview links to full workbench with prefilter
-- Section tiles show counts where data exists, hide silently when zero
-- Mobile viewport (462px) shows Pending block first
-
-No build, typecheck, or DB migration required.
+No memory updates required (Patch 1.4 is workflow completion, not new doctrine). Memory note added after implementation listing the request-flow patch as authority.

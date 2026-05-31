@@ -13,6 +13,7 @@ import type {
 import { supabase } from '@/integrations/supabase/client';
 import { staffRepo } from './staffRepo';
 import { claimRepo } from './claimRepo';
+import { logAudit } from '../audit';
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;

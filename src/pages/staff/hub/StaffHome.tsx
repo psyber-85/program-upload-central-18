@@ -34,10 +34,22 @@ const StaffHome = () => {
     queryFn: () => staffRepo.list(),
     enabled: isAdmin,
   });
-  const notices = useMemo(
-    () => (currentStaff ? noticeRepo.visibleFor(currentStaff).slice(0, 3) : []),
-    [currentStaff?.id, tick],
-  );
+  const { data: noticesAll = [] } = useQuery({
+    queryKey: ['ih-notices', { includeArchived: false }],
+    queryFn: () => noticeRepo.list(false),
+    enabled: !!currentStaff,
+  });
+  const notices = useMemo(() => noticesAll.slice(0, 3), [noticesAll]);
+  const { data: readSet = new Set<string>() } = useQuery({
+    queryKey: ['ih-notice-reads', currentStaff?.id],
+    queryFn: () => noticeRepo.listReadsForStaff(currentStaff!.id),
+    enabled: !!currentStaff,
+  });
+  const { data: ackMap = new Map<string, unknown>() } = useQuery({
+    queryKey: ['ih-notice-acks', currentStaff?.id],
+    queryFn: () => noticeRepo.listAcksForStaff(currentStaff!.id),
+    enabled: !!currentStaff,
+  });
   const requests = useMemo(
     () => (currentStaff ? requestSummaryRepo.listForStaff(currentStaff.id, 3) : []),
     [currentStaff?.id, tick],

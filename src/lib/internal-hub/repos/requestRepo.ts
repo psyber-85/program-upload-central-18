@@ -275,6 +275,22 @@ export const requestRepo = {
       metadata: { note: input.note ?? null, kind: row.kind },
     });
 
+    // Patch 1.4 §7 — timeline event for staff visibility.
+    void requestEventsRepo.add({
+      requestId: row.id,
+      eventType: input.decision === 'Approved' ? 'Approved' : 'Rejected',
+      actorId: input.adminId,
+      note: input.note ?? null,
+    });
+
+    // Patch 1.4 §22 — Training Application approved unlocks completion step.
+    if (input.decision === 'Approved' && row.kind === 'Training' && !row.training_application_id) {
+      await supabase
+        .from('ih_requests')
+        .update({ sub_state: 'ApplicationApproved' })
+        .eq('id', row.id);
+    }
+
     return row;
   },
 
@@ -298,4 +314,172 @@ export const requestRepo = {
       adminEmails: emails,
     });
   },
+
+  // ---- Patch 1.4 additions ----
+
+  /** Staff edits a request currently in Submitted or NeedsCorrection. */
+  async updatePayload(input: {
+    requestId: string;
+    staffId: string;
+    payload: RequestPayload;
+    halfDaySlot?: HalfDaySlot;
+  }): Promise<RequestRow> {
+    const { data, error } = await supabase
+      .from('ih_requests')
+      .update({
+        payload: input.payload as never,
+        half_day_slot: input.halfDaySlot ?? null,
+      })
+      .eq('id', input.requestId)
+      .select('*')
+      .single();
+    if (error) throw error;
+    return data as RequestRow;
+  },
+
+  /** Admin marks a request as Needs Correction. Comment is required. */
+  async markNeedsCorrection(input: {
+    requestId: string;
+    note: string;
+    adminId: string;
+  }): Promise<RequestRow> {
+    if (!input.note || !input.note.trim()) {
+      throw new Error('Admin comment is required when marking a request as Needs Correction.');
+    }
+    const { data, error } = await supabase
+      .from('ih_requests')
+      .update({
+        status: 'NeedsCorrection',
+        decision_note: input.note,
+        decided_by: input.adminId,
+        decided_at: new Date().toISOString(),
+      })
+      .eq('id', input.requestId)
+      .select('*')
+      .single();
+    if (error) throw error;
+    const row = data as RequestRow;
+    void requestEventsRepo.add({
+      requestId: row.id,
+      eventType: 'NeedsCorrection',
+      actorId: input.adminId,
+      note: input.note,
+    });
+    void logAudit({
+      action: 'request.needs_correction',
+      targetTable: 'ih_requests',
+      targetId: row.id,
+      summary: `${row.kind} request marked Needs Correction`,
+      metadata: { note: input.note },
+    });
+    return row;
+  },
+
+  /** Staff resubmits a NeedsCorrection request back to Submitted. */
+  async resubmit(input: { requestId: string; staffId: string; note?: string }): Promise<RequestRow> {
+    const { data, error } = await supabase
+      .from('ih_requests')
+      .update({
+        status: 'Submitted',
+        decision_note: null,
+      })
+      .eq('id', input.requestId)
+      .select('*')
+      .single();
+    if (error) throw error;
+    const row = data as RequestRow;
+    void requestEventsRepo.add({
+      requestId: row.id,
+      eventType: 'Resubmitted',
+      actorId: input.staffId,
+      note: input.note ?? null,
+    });
+    return row;
+  },
+
+  /** Admin waives proof requirement. Reason required. */
+  async waiveProof(input: {
+    requestId: string;
+    reason: string;
+    adminId: string;
+  }): Promise<RequestRow> {
+    if (!input.reason || !input.reason.trim()) {
+      throw new Error('Reason is required to waive proof.');
+    }
+    const existing = await this.get(input.requestId);
+    if (!existing) throw new Error('Request not found');
+    const newPayload: RequestPayload = {
+      ...existing.payload,
+      proof_waived: true,
+      proof_waived_reason: input.reason,
+      proof_waived_by: input.adminId,
+    };
+    const { data, error } = await supabase
+      .from('ih_requests')
+      .update({ payload: newPayload as never })
+      .eq('id', input.requestId)
+      .select('*')
+      .single();
+    if (error) throw error;
+    void requestEventsRepo.add({
+      requestId: input.requestId,
+      eventType: 'ProofWaived',
+      actorId: input.adminId,
+      note: input.reason,
+    });
+    return data as RequestRow;
+  },
+
+  /** Staff marks Training Application as Completed (unlocks claim submission). */
+  async markTrainingCompleted(input: {
+    requestId: string;
+    staffId: string;
+    completionDate: string;
+    note?: string;
+  }): Promise<RequestRow> {
+    const existing = await this.get(input.requestId);
+    if (!existing) throw new Error('Request not found');
+    const newPayload: RequestPayload = {
+      ...existing.payload,
+      completion_date: input.completionDate,
+      completion_note: input.note,
+    };
+    const { data, error } = await supabase
+      .from('ih_requests')
+      .update({
+        payload: newPayload as never,
+        sub_state: 'TrainingCompleted',
+      })
+      .eq('id', input.requestId)
+      .select('*')
+      .single();
+    if (error) throw error;
+    void requestEventsRepo.add({
+      requestId: input.requestId,
+      eventType: 'TrainingCompleted',
+      actorId: input.staffId,
+      note: input.note ?? null,
+      metadata: { completion_date: input.completionDate },
+    });
+    return data as RequestRow;
+  },
+
+  /** List all Training Application records for a staff (Approved + sub_state ApplicationApproved/TrainingCompleted). */
+  async listApprovedTrainingApplicationsForStaff(staffId: string): Promise<RequestRow[]> {
+    const { data, error } = await supabase
+      .from('ih_requests')
+      .select('*')
+      .eq('staff_id', staffId)
+      .eq('kind', 'Training')
+      .eq('status', 'Approved')
+      .is('training_application_id', null)
+      .is('archived_at', null)
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('[listApprovedTrainingApplicationsForStaff]', error);
+      return [];
+    }
+    return (data ?? []) as RequestRow[];
+  },
 };
+

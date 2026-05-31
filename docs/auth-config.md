@@ -45,3 +45,27 @@ console.log(error?.message); // expect: "Signups not allowed for this instance"
 
 If the response is anything other than an explicit "Signups not allowed" error,
 revisit the settings above.
+
+## Verification evidence
+
+To satisfy Doc 4.1 §7 we keep dated evidence that signups are off:
+
+1. In the Supabase Dashboard, take a screenshot of **Authentication →
+   Providers → Email** with **Enable signups = OFF** clearly visible and the
+   current date in frame (OS clock or browser UI).
+2. Save it as `docs/screenshots/auth-signups-off-YYYY-MM-DD.png`.
+3. Re-take and replace whenever Auth settings are touched.
+
+### Runtime probe (optional)
+
+```js
+// Run in an incognito browser console on the app origin.
+const { error } = await window.supabase.auth.signUp({
+  email: `probe+${Date.now()}@example.com`,
+  password: 'whatever-1234',
+});
+console.log(error?.message);
+// Expected: "Signups not allowed for this instance"
+```
+
+Anything other than that exact error class means signups are still open.

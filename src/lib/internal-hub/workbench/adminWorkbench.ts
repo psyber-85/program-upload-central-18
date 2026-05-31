@@ -1,5 +1,5 @@
 // Patch 1.3 §9–§12 — Admin Workbench aggregator.
-import type { Notice, NoticeAck, StaffProfile, PayrollRunStatus } from '../types';
+import type { StaffProfile, PayrollRunStatus } from '../types';
 import type { RequestDetail } from '../repos/requestSummaryRepo';
 import type { SystemIssue } from '../repos/systemIssuesRepo';
 import { onboardingRepo } from '../repos/onboardingRepo';
@@ -11,7 +11,6 @@ import type { WorkbenchItem, WorkbenchItemType } from './types';
 interface BuildInput {
   pendingApprovals: RequestDetail[];
   staff: StaffProfile[];
-  notices: Notice[];
   systemIssues: SystemIssue[];
   payrollMonth: string;
   payrollStatus: PayrollRunStatus | 'NotPrepared';

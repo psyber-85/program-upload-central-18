@@ -1,16 +1,17 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Download, ShieldAlert } from 'lucide-react';
+import { Download, ShieldAlert, RefreshCw, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { useHub } from '@/lib/internal-hub/HubContext';
 import { canAccessAdminArea } from '@/lib/internal-hub/access';
 import { payslipRepo } from '@/lib/internal-hub';
 import { CONFIDENTIAL_PAYSLIP_LABEL } from '@/lib/internal-hub/types';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const AdminPayslips = () => {
   const { currentStaff } = useHub();

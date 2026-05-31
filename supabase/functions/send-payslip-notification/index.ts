@@ -27,6 +27,9 @@ const formatCurrency = (amount: number): string => {
 
 const generateEmailHtml = (data: PayslipNotificationRequest): string => {
   const additions = data.claimsTotal + data.trainingClaimsTotal;
+  const safeMonth = escapeHtml(data.month);
+  const safeName = escapeHtml(data.recipientName);
+
   
   return `
 <!DOCTYPE html>

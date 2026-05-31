@@ -55,42 +55,89 @@ serve(async (req) => {
     };
 
     let y = 800;
-    draw("AIHQ — Payslip", 40, y, { size: 20, bold: true }); y -= 22;
-    draw("CONFIDENTIAL — Internal Use Only", 40, y, { size: 9, color: [0.6, 0, 0] }); y -= 28;
+    draw("AIHQ", 40, y, { size: 14, bold: true }); y -= 18;
+    draw(`Salary Statement for ${String(ps.month ?? '')}`, 40, y, { size: 18, bold: true }); y -= 20;
+    draw("CONFIDENTIAL — Internal Use Only", 40, y, { size: 9, color: [0.6, 0, 0] }); y -= 24;
 
-    draw(`Staff:`, 40, y, { bold: true }); draw(String(ps.staff_name ?? ''), 140, y); y -= 16;
-    draw(`Period:`, 40, y, { bold: true }); draw(String(ps.month ?? ''), 140, y); y -= 16;
-    draw(`Finalized:`, 40, y, { bold: true });
-    draw(new Date(ps.finalized_at ?? ps.created_at ?? Date.now()).toLocaleDateString('en-MY'), 140, y);
-    y -= 30;
+    // Staff Info
+    draw("Staff Info", 40, y, { bold: true, size: 11 }); y -= 14;
+    draw(`Name:`, 40, y); draw(String(ps.staff_name ?? ''), 160, y); y -= 14;
+    draw(`Payroll Month:`, 40, y); draw(String(ps.month ?? ''), 160, y); y -= 14;
+    draw(`Finalized:`, 40, y);
+    draw(new Date(ps.finalized_at ?? ps.created_at ?? Date.now()).toLocaleDateString('en-MY'), 160, y);
+    y -= 22;
 
-    // Earnings / deductions table
-    draw("Description", 40, y, { bold: true });
-    draw("Amount (MYR)", 420, y, { bold: true });
-    y -= 6;
-    page.drawLine({ start: { x: 40, y }, end: { x: 555, y }, thickness: 0.5, color: rgb(0.7, 0.7, 0.7) });
-    y -= 16;
+    const hr = () => {
+      page.drawLine({ start: { x: 40, y }, end: { x: 555, y }, thickness: 0.5, color: rgb(0.75, 0.75, 0.75) });
+      y -= 14;
+    };
+    const section = (title: string) => {
+      y -= 4;
+      draw(title, 40, y, { bold: true, size: 11 }); y -= 6; hr();
+    };
+    const line = (label: string, amt: number, opts?: { bold?: boolean }) => {
+      draw(label, 40, y, { bold: !!opts?.bold });
+      draw(amt.toFixed(2), 460, y, { bold: !!opts?.bold });
+      y -= 14;
+    };
 
-    const rows: Array<[string, number]> = [
-      ["Base Salary", Number(ps.base_salary ?? 0)],
-      ["Claims", Number(ps.claims_total ?? 0)],
-      ["Training Claims", Number(ps.training_total ?? 0)],
-      ["EPF (deduction)", -Number(ps.epf ?? 0)],
-      ["SOCSO (deduction)", -Number(ps.socso ?? 0)],
-    ];
-    const adj = ps.adjustment as { amount?: number; reason?: string } | null;
-    if (adj?.amount) rows.push([`Adjustment (${adj.reason ?? ''})`, Number(adj.amount)]);
+    const n = (v: unknown) => Number(v ?? 0);
+    const basic = n(ps.base_salary);
+    const claims = n(ps.claims_total);
+    const training = n(ps.training_total);
+    const bonus = n(ps.bonus_total);
+    const other = n(ps.other_addition_total);
+    const epf = n(ps.epf), socso = n(ps.socso), eis = n(ps.eis);
+    const empDed = n(ps.total_employee_deductions) || (epf + socso + eis);
+    const erEpf = n(ps.employer_epf), erSocso = n(ps.employer_socso), erEis = n(ps.employer_eis);
+    const empCon = n(ps.total_employer_contribution) || (erEpf + erSocso + erEis);
+    const additions = claims + training + bonus + other;
+    const adj = (ps.adjustment as { amount?: number; reason?: string } | null);
 
-    for (const [label, amt] of rows) {
-      draw(label, 40, y);
-      draw(amt.toFixed(2), 420, y);
-      y -= 16;
+    // Income
+    section("Income");
+    line("Basic Salary", basic);
+    line("Total Income", basic, { bold: true });
+
+    // Claims / Reimbursements / Bonus
+    if (additions > 0) {
+      section("Claims / Reimbursements / Bonus");
+      if (claims > 0) line("Claim", claims);
+      if (training > 0) line("Training Claim", training);
+      if (bonus > 0) line("Bonus", bonus);
+      if (other > 0) line("Other Reimbursement / Addition", other);
+      line("Subtotal", additions, { bold: true });
     }
+
+    // Employee Deductions
+    section("Employee Deductions");
+    line("EPF", -epf);
+    line("SOCSO", -socso);
+    line("EIS", -eis);
+    line("Total Employee Deductions", -empDed, { bold: true });
+
+    if (adj?.amount) {
+      section("Manual Adjustment");
+      line(`Adjustment (${adj.reason ?? ''})`, Number(adj.amount));
+    }
+
+    // Net Pay
     y -= 6;
-    page.drawLine({ start: { x: 40, y }, end: { x: 555, y }, thickness: 0.5, color: rgb(0.7, 0.7, 0.7) });
-    y -= 18;
+    page.drawLine({ start: { x: 40, y }, end: { x: 555, y }, thickness: 1, color: rgb(0.2, 0.2, 0.2) });
+    y -= 16;
     draw("Net Pay", 40, y, { bold: true, size: 13 });
-    draw(Number(ps.net_pay ?? 0).toFixed(2), 420, y, { bold: true, size: 13 });
+    draw(Number(ps.net_pay ?? 0).toFixed(2), 460, y, { bold: true, size: 13 });
+    y -= 22;
+
+    // Employer Contributions
+    section("Employer Contributions");
+    line("Employer EPF", erEpf);
+    line("Employer SOCSO", erSocso);
+    line("Employer EIS", erEis);
+    line("Total Employer Contribution", empCon, { bold: true });
+    y -= 4;
+    draw("Employer contributions are shown for transparency and do not reduce Net Pay.",
+      40, y, { size: 8, color: [0.45, 0.45, 0.45] });
 
     draw(`Generated ${new Date().toISOString()}`, 40, 40, { size: 8, color: [0.5, 0.5, 0.5] });
     draw(`AIHQ Staff Portal — system@theaihq.net`, 40, 28, { size: 8, color: [0.5, 0.5, 0.5] });

@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   Home, User, Users, Megaphone, Bell, BookOpen, FileText, Receipt,
-  Banknote, ClipboardCheck, BarChart3, Settings as SettingsIcon,
+  Banknote, ClipboardCheck, BarChart3, Settings as SettingsIcon, AlertTriangle,
 } from 'lucide-react';
 import {
   Sidebar,

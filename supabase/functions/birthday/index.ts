@@ -67,6 +67,10 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const gate = requireCronOrService(req);
+  if (!gate.ok) return jsonError(gate.status, gate.error);
+
+
   try {
     const TIMEZONE = 'Asia/Kuala_Lumpur';
     const now = new Date();

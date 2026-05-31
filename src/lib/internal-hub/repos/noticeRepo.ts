@@ -99,6 +99,27 @@ export interface BroadcastInput {
   links?: NoticeLink[];
   createdBy: string;
 }
+async function resolveBroadcastRecipients(notice: Notice): Promise<string[]> {
+  // Active staff filtered by audience. Mirrors `audienceMatches` logic.
+  const { data, error } = await supabase
+    .from('ih_staff_profiles')
+    .select('email, role, business_arm, id')
+    .eq('status', 'Active');
+  if (error || !data) return [];
+  const arm = notice.audience.kind === 'Arm' ? notice.audience.arm : null;
+  const staffId = notice.audience.kind === 'Individual' ? notice.audience.staffId : null;
+  return data
+    .filter((s) => {
+      if (notice.audience.kind === 'Everyone') return true;
+      if (notice.audience.kind === 'Admin') return s.role === 'admin';
+      if (notice.audience.kind === 'Arm') return s.business_arm === arm;
+      if (notice.audience.kind === 'Individual') return s.id === staffId;
+      return false;
+    })
+    .map((s) => s.email)
+    .filter((e): e is string => !!e);
+}
+
 
 export const noticeRepo = {
   async list(includeArchived = false): Promise<Notice[]> {
@@ -124,7 +145,7 @@ export const noticeRepo = {
     return this.list(opts.includeArchived);
   },
 
-  /** Doc 1.2 §12 — Admin broadcast = in-app + emailRequired. */
+  /** Doc 1.2 §12 + Doc 4.2 §7 — Admin broadcast = in-app + email always. */
   async broadcast(input: BroadcastInput): Promise<Notice> {
     const aud = audienceToDb(input.audience);
     const imp = importanceToDb(input.importance);
@@ -143,7 +164,28 @@ export const noticeRepo = {
       .select('*')
       .single();
     if (error) throw error;
-    return mapRow(data as DbNotice);
+    const notice = mapRow(data as DbNotice);
+
+    // Doc 4.2 §7 — send broadcast email (fire-and-forget; failures are
+    // surfaced via the admin email log and do not block notice creation).
+    void this._sendBroadcastEmail(notice).catch((e) => {
+      console.error('[noticeRepo.broadcast] email dispatch failed', e);
+    });
+
+    return notice;
+  },
+
+  async _sendBroadcastEmail(notice: Notice): Promise<void> {
+    const { broadcastEmail } = await import('../email/dispatcher');
+    const recipients = await resolveBroadcastRecipients(notice);
+    if (recipients.length === 0) return;
+    await broadcastEmail({
+      id: notice.id,
+      title: notice.title,
+      message: notice.message,
+      recipients,
+      ackRequired: notice.importance === 'AcknowledgmentRequired',
+    });
   },
 
   // Broadcast log table not implemented in Phase 2 — return empty.

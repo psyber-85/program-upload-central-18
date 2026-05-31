@@ -122,7 +122,33 @@ export const payslipRepo = {
       .insert(rows as any)
       .select('*');
     if (error) throw error;
-    return (data ?? []).map(mapRow);
+    const generated = (data ?? []).map(mapRow);
+
+    // Doc 4.2 §10 — payslip-ready email (link only, no PDF attachment).
+    void (async () => {
+      try {
+        const { payslipReadyEmail } = await import('../email/dispatcher');
+        const { data: staffRows } = await supabase
+          .from('ih_staff_profiles')
+          .select('id, email, name')
+          .in('id', generated.map((p) => p.staffId));
+        const emailById = new Map((staffRows ?? []).map((s: any) => [s.id, { email: s.email, name: s.name }]));
+        for (const ps of generated) {
+          const meta = emailById.get(ps.staffId);
+          if (!meta?.email) continue;
+          await payslipReadyEmail({
+            payslipId: ps.id,
+            recipientEmail: meta.email,
+            recipientName: meta.name ?? ps.staffName,
+            month: ps.month,
+          });
+        }
+      } catch (e) {
+        console.error('[payslipRepo.generateForRun] email dispatch failed', e);
+      }
+    })();
+
+    return generated;
   },
 
   /** Doc 3.2 §19/§20 — log + client-side placeholder PDF. */

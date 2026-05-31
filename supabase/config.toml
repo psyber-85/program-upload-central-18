@@ -30,3 +30,6 @@ verify_jwt = false
 [functions.ih-provision-test-fixtures]
 verify_jwt = false
 
+
+[functions.ih-send-email]
+verify_jwt = true

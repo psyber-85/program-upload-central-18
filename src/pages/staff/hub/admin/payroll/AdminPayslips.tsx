@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 const AdminPayslips = () => {
   const { currentStaff } = useHub();
+  const qc = useQueryClient();
   const [q, setQ] = useState('');
   const [month, setMonth] = useState('');
 
@@ -23,11 +24,38 @@ const AdminPayslips = () => {
     queryFn: () => payslipRepo.listAll(),
     enabled: !!currentStaff && canAccessAdminArea(currentStaff),
   });
+
+  // Doc 4.2 §33 — admin-visible PDF status (raw row read for pdf_error/pdf_path).
+  const { data: pdfStatus = {} } = useQuery({
+    queryKey: ['ih-payslips-pdf-status'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('ih_payslips')
+        .select('id, pdf_path, pdf_error, pdf_generated_at');
+      const map: Record<string, { path: string | null; error: string | null; generatedAt: string | null }> = {};
+      (data ?? []).forEach((r: any) => {
+        map[r.id] = { path: r.pdf_path, error: r.pdf_error, generatedAt: r.pdf_generated_at };
+      });
+      return map;
+    },
+    enabled: !!currentStaff && canAccessAdminArea(currentStaff),
+    refetchInterval: 15000,
+  });
+
   const downloadMut = useMutation({
     mutationFn: (id: string) =>
       payslipRepo.downloadPdf(id, currentStaff!.id, currentStaff!.role),
     onError: (e: Error) =>
       toast({ title: 'Download failed', description: e.message, variant: 'destructive' }),
+  });
+  const regenMut = useMutation({
+    mutationFn: (id: string) => payslipRepo.regeneratePdf(id),
+    onSuccess: () => {
+      toast({ title: 'PDF regeneration triggered' });
+      qc.invalidateQueries({ queryKey: ['ih-payslips-pdf-status'] });
+    },
+    onError: (e: Error) =>
+      toast({ title: 'Regenerate failed', description: e.message, variant: 'destructive' }),
   });
 
   const filtered = useMemo(() => {

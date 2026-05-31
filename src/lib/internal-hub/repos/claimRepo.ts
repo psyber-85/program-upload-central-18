@@ -1,92 +1,137 @@
-// Doc 3.1 §16-§20 — claims that feed payroll. Card 2 owns approval workflow;
-// here we just consume Approved state and track payroll inclusion.
+// Doc 3.1 §16-§20 — claims that feed payroll.
+// Backed by `ih_requests` where kind='Claim'. Payload jsonb holds the claim-
+// specific shape since the spec folds claims into the unified requests table.
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { supabase } from '@/integrations/supabase/client';
 import type { ApprovedClaim, ClaimInclusionState, ClaimType } from '../types';
-import { nowISO, readJSON, uid, writeJSON } from '../storage';
 
-const KEY = 'approved-claims';
+interface ClaimPayload {
+  type: ClaimType;
+  amount: number;
+  description?: string;
+  inclusionState: ClaimInclusionState;
+  includedInPayrollRunId?: string;
+  includedInMonth?: string;
+}
 
-function ensureSeed(): ApprovedClaim[] {
-  const existing = readJSON<ApprovedClaim[] | null>(KEY, null);
-  if (existing) return existing;
-  // Default seed — a couple of approved items so payroll preview has inputs.
-  const seed: ApprovedClaim[] = [
-    {
-      id: uid('clm'),
-      staffId: 'stf_train01',
-      type: 'Claim',
-      amount: 120,
-      description: 'Client lunch',
-      approvedAt: '2026-04-18T00:00:00.000Z',
-      inclusionState: 'QueuedForPayroll',
-    },
-    {
-      id: uid('clm'),
-      staffId: 'stf_sol01',
-      type: 'TrainingClaim',
-      amount: 350,
-      description: 'AI workshop fee',
-      approvedAt: '2026-04-22T00:00:00.000Z',
-      inclusionState: 'QueuedForPayroll',
-    },
-  ];
-  writeJSON(KEY, seed);
-  return seed;
+function mapRow(r: any): ApprovedClaim {
+  const p: ClaimPayload = (r.payload as ClaimPayload) ?? ({} as ClaimPayload);
+  return {
+    id: r.id,
+    staffId: r.staff_id,
+    type: p.type ?? 'Claim',
+    amount: Number(p.amount ?? 0),
+    description: p.description,
+    approvedAt: r.decided_at ?? r.created_at,
+    inclusionState: p.inclusionState ?? 'QueuedForPayroll',
+    includedInPayrollRunId: p.includedInPayrollRunId,
+    includedInMonth: p.includedInMonth,
+  };
 }
 
 export const claimRepo = {
-  list(): ApprovedClaim[] {
-    return ensureSeed();
+  async list(): Promise<ApprovedClaim[]> {
+    const { data, error } = await supabase
+      .from('ih_requests')
+      .select('id, staff_id, status, payload, decided_at, created_at')
+      .eq('kind', 'Claim');
+    if (error) {
+      console.error('[claimRepo.list]', error);
+      return [];
+    }
+    return (data ?? []).map(mapRow);
   },
+
   /**
-   * Approved claims that are not yet included in any finalized payroll and
-   * whose approvedAt date is on/before the cut-off (Doc 3.1 §16-§18).
-   * The "next payroll" rule means: a claim approved in May goes into June.
+   * Approved claims not yet included in any finalized payroll and approved
+   * before the target month's first day (Doc 3.1 §16-§18).
    */
-  queueableForMonth(targetMonth: string): ApprovedClaim[] {
-    const cutoff = `${targetMonth}-01`; // first day of target month
-    return ensureSeed().filter(
-      (c) =>
-        c.inclusionState !== 'IncludedInPayroll' &&
-        c.approvedAt.slice(0, 10) < cutoff,
-    );
+  async queueableForMonth(targetMonth: string): Promise<ApprovedClaim[]> {
+    const cutoff = `${targetMonth}-01`;
+    const { data, error } = await supabase
+      .from('ih_requests')
+      .select('id, staff_id, status, payload, decided_at, created_at')
+      .eq('kind', 'Claim')
+      .eq('status', 'Approved')
+      .lt('decided_at', cutoff);
+    if (error) {
+      console.error('[claimRepo.queueableForMonth]', error);
+      return [];
+    }
+    return (data ?? [])
+      .map(mapRow)
+      .filter((c) => c.inclusionState !== 'IncludedInPayroll');
   },
+
   ofType(type: ClaimType, claims: ApprovedClaim[]): ApprovedClaim[] {
     return claims.filter((c) => c.type === type);
   },
-  markIncluded(ids: string[], runId: string, month: string) {
-    const all = ensureSeed();
-    writeJSON(
-      KEY,
-      all.map((c) =>
-        ids.includes(c.id)
-          ? {
-              ...c,
+
+  async markIncluded(ids: string[], runId: string, month: string): Promise<void> {
+    if (ids.length === 0) return;
+    const { data, error } = await supabase
+      .from('ih_requests')
+      .select('id, payload')
+      .in('id', ids);
+    if (error) throw error;
+    await Promise.all(
+      (data ?? []).map((row: any) =>
+        supabase
+          .from('ih_requests')
+          .update({
+            payload: {
+              ...((row.payload as ClaimPayload) ?? {}),
               inclusionState: 'IncludedInPayroll' as ClaimInclusionState,
               includedInPayrollRunId: runId,
               includedInMonth: month,
-            }
-          : c,
+            },
+          } as any)
+          .eq('id', row.id),
       ),
     );
   },
-  setStateForRun(runId: string, newState: ClaimInclusionState) {
-    const all = ensureSeed();
-    writeJSON(
-      KEY,
-      all.map((c) =>
-        c.includedInPayrollRunId === runId ? { ...c, inclusionState: newState } : c,
+
+  async setStateForRun(runId: string, newState: ClaimInclusionState): Promise<void> {
+    const { data, error } = await supabase
+      .from('ih_requests')
+      .select('id, payload')
+      .eq('kind', 'Claim')
+      .contains('payload', { includedInPayrollRunId: runId } as any);
+    if (error) throw error;
+    await Promise.all(
+      (data ?? []).map((row: any) =>
+        supabase
+          .from('ih_requests')
+          .update({
+            payload: { ...((row.payload as ClaimPayload) ?? {}), inclusionState: newState },
+          } as any)
+          .eq('id', row.id),
       ),
     );
   },
-  addManual(input: Omit<ApprovedClaim, 'id' | 'inclusionState' | 'approvedAt'> & { approvedAt?: string }): ApprovedClaim {
-    const all = ensureSeed();
-    const next: ApprovedClaim = {
-      ...input,
-      id: uid('clm'),
-      approvedAt: input.approvedAt ?? nowISO(),
+
+  async addManual(
+    input: Omit<ApprovedClaim, 'id' | 'inclusionState' | 'approvedAt'> & { approvedAt?: string },
+  ): Promise<ApprovedClaim> {
+    const now = input.approvedAt ?? new Date().toISOString();
+    const payload: ClaimPayload = {
+      type: input.type,
+      amount: input.amount,
+      description: input.description,
       inclusionState: 'QueuedForPayroll',
     };
-    writeJSON(KEY, [...all, next]);
-    return next;
+    const { data, error } = await (supabase
+      .from('ih_requests')
+      .insert({
+        staff_id: input.staffId,
+        kind: 'Claim',
+        status: 'Approved',
+        decided_at: now,
+        payload,
+      } as any)
+      .select('id, staff_id, status, payload, decided_at, created_at')
+      .single() as any);
+    if (error) throw error;
+    return mapRow(data);
   },
 };

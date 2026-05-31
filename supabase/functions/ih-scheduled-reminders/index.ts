@@ -9,6 +9,7 @@
 //   - Day 26 daily      → payroll draft prep (insert Draft run if missing)
 //   - Day 29 daily      → payroll finalization reminder if not Finalized/Locked
 //   - Daily             → Notion readiness reminder (Patch 001 §12)
+//   - Jan 1             → carry-forward AL rollover from prior year (Patch 001 §13)
 //   - Daily             → carry-forward AL expiry (Patch 001 §13)
 //   - Weekly (Mon UTC)  → ack-required notice digest to admins (Patch 001 §14)
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";

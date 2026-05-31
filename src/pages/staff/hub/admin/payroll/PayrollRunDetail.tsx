@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +13,7 @@ import {
 import { ArrowLeft, Lock, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { useHub } from '@/lib/internal-hub/HubContext';
 import { canAccessAdminArea } from '@/lib/internal-hub/access';
-import { payrollRepo, staffRepo } from '@/lib/internal-hub';
+import { payrollRepo } from '@/lib/internal-hub';
 import {
   PAYROLL_STATUS_LABELS,
   PAYROLL_MISSING_FIELD_LABELS,
@@ -24,45 +25,79 @@ const PayrollRunDetail = () => {
   const { runId = '' } = useParams();
   const navigate = useNavigate();
   const { currentStaff } = useHub();
-  const [tick, setTick] = useState(0);
-  const refresh = () => setTick((t) => t + 1);
+  const qc = useQueryClient();
 
-  const run = useMemo(() => payrollRepo.getRun(runId), [runId, tick]);
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['ih-payroll-run', runId] });
+    qc.invalidateQueries({ queryKey: ['ih-payroll-runs'] });
+    qc.invalidateQueries({ queryKey: ['ih-payroll-finalize-check', runId] });
+  };
+
+  const { data: run, isLoading } = useQuery({
+    queryKey: ['ih-payroll-run', runId],
+    queryFn: () => payrollRepo.getRun(runId),
+    enabled: !!runId,
+  });
+  const { data: canFinalize = { ok: false } } = useQuery({
+    queryKey: ['ih-payroll-finalize-check', runId],
+    queryFn: () => payrollRepo.canFinalize(runId),
+    enabled: !!runId,
+  });
+
+  const readyMut = useMutation({
+    mutationFn: () => payrollRepo.markReadyForReview(runId),
+    onSuccess: invalidate,
+    onError: (e: Error) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
+  });
+  const finalizeMut = useMutation({
+    mutationFn: () => payrollRepo.finalize(runId, currentStaff!.id),
+    onSuccess: () => {
+      toast({ title: 'Payroll finalized', description: 'Payslips generated and notifications sent.' });
+      invalidate();
+    },
+    onError: (e: Error) =>
+      toast({ title: 'Cannot finalize', description: e.message, variant: 'destructive' }),
+  });
+  const lockMut = useMutation({
+    mutationFn: () => payrollRepo.lockRun(runId, currentStaff!.id),
+    onSuccess: () => {
+      toast({ title: 'Payroll locked' });
+      invalidate();
+    },
+    onError: (e: Error) => toast({ title: 'Cannot lock', description: e.message, variant: 'destructive' }),
+  });
+  const adjMut = useMutation({
+    mutationFn: ({ staffId, adjustment }: { staffId: string; adjustment: { amount: number; reason: string } | null }) =>
+      payrollRepo.setAdjustment(runId, staffId, adjustment),
+    onSuccess: invalidate,
+    onError: (e: Error) => toast({ title: 'Cannot save', description: e.message, variant: 'destructive' }),
+  });
+  const runNotesMut = useMutation({
+    mutationFn: (notes: string) => payrollRepo.setRunNotes(runId, notes),
+    onSuccess: invalidate,
+  });
+  const rowNotesMut = useMutation({
+    mutationFn: ({ staffId, notes }: { staffId: string; notes: string }) =>
+      payrollRepo.setRowNotes(runId, staffId, notes),
+    onSuccess: invalidate,
+  });
+  const refreshRowMut = useMutation({
+    mutationFn: (staffId: string) => payrollRepo.refreshRow(runId, staffId),
+    onSuccess: invalidate,
+  });
+
   if (!canAccessAdminArea(currentStaff)) {
     return <div className="p-6 text-sm text-muted-foreground">Admin only.</div>;
+  }
+  if (isLoading) {
+    return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   }
   if (!run) {
     return <div className="p-6 text-sm text-muted-foreground">Payroll run not found.</div>;
   }
   const locked = run.status === 'Finalized' || run.status === 'Locked';
   const isFinalized = run.status === 'Finalized';
-  const isLocked = run.status === 'Locked';
   const incomplete = run.items.filter((i) => i.rowStatus === 'Incomplete');
-  const canFinalize = payrollRepo.canFinalize(runId);
-
-  const handleReady = () => {
-    payrollRepo.markReadyForReview(runId);
-    refresh();
-  };
-  const handleFinalize = () => {
-    try {
-      payrollRepo.finalize(runId, currentStaff!.id);
-      toast({ title: 'Payroll finalized', description: 'Payslips generated and notifications sent.' });
-      refresh();
-    } catch (e: any) {
-      toast({ title: 'Cannot finalize', description: e.message, variant: 'destructive' });
-    }
-  };
-  const handleLock = () => {
-    if (!confirm('Lock this payroll run? Locking prevents future status changes. Corrections must use a future-payroll adjustment.')) return;
-    try {
-      payrollRepo.lockRun(runId, currentStaff!.id);
-      toast({ title: 'Payroll locked' });
-      refresh();
-    } catch (e: any) {
-      toast({ title: 'Cannot lock', description: e.message, variant: 'destructive' });
-    }
-  };
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-6">
@@ -86,15 +121,21 @@ const PayrollRunDetail = () => {
         </div>
         <div className="flex gap-2 flex-wrap">
           {!locked && run.status === 'Draft' && (
-            <Button variant="outline" onClick={handleReady}>Mark Ready for Review</Button>
+            <Button variant="outline" onClick={() => readyMut.mutate()}>Mark Ready for Review</Button>
           )}
           {!locked && (
-            <Button onClick={handleFinalize} disabled={!canFinalize.ok} title={canFinalize.reason}>
+            <Button onClick={() => finalizeMut.mutate()} disabled={!canFinalize.ok} title={canFinalize.reason}>
               Finalize Payroll
             </Button>
           )}
           {isFinalized && (
-            <Button variant="outline" onClick={handleLock}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (!confirm('Lock this payroll run? Locking prevents future status changes. Corrections must use a future-payroll adjustment.')) return;
+                lockMut.mutate();
+              }}
+            >
               <Lock className="h-4 w-4 mr-1" /> Lock Run
             </Button>
           )}
@@ -130,9 +171,10 @@ const PayrollRunDetail = () => {
             <PayrollRow
               key={item.staffId}
               item={item}
-              runId={run.id}
               locked={locked}
-              onChange={refresh}
+              onAdjustment={(staffId, adjustment) => adjMut.mutate({ staffId, adjustment })}
+              onRowNotes={(staffId, notes) => rowNotesMut.mutate({ staffId, notes })}
+              onRefreshRow={(staffId) => refreshRowMut.mutate(staffId)}
             />
           ))}
         </CardContent>
@@ -144,11 +186,8 @@ const PayrollRunDetail = () => {
         </CardHeader>
         <CardContent>
           <Textarea
-            value={run.adminNotes ?? ''}
-            onChange={(e) => {
-              payrollRepo.setRunNotes(run.id, e.target.value);
-              refresh();
-            }}
+            defaultValue={run.adminNotes ?? ''}
+            onBlur={(e) => runNotesMut.mutate(e.target.value)}
             disabled={locked}
             placeholder="Payroll context, review notes, correction explanations…"
             rows={4}
@@ -160,12 +199,13 @@ const PayrollRunDetail = () => {
 };
 
 const PayrollRow = ({
-  item, runId, locked, onChange,
+  item, locked, onAdjustment, onRowNotes, onRefreshRow,
 }: {
   item: PayrollItem;
-  runId: string;
   locked: boolean;
-  onChange: () => void;
+  onAdjustment: (staffId: string, adjustment: { amount: number; reason: string } | null) => void;
+  onRowNotes: (staffId: string, notes: string) => void;
+  onRefreshRow: (staffId: string) => void;
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [adjOpen, setAdjOpen] = useState(false);
@@ -178,22 +218,12 @@ const PayrollRow = ({
       toast({ title: 'Invalid amount', variant: 'destructive' });
       return;
     }
-    try {
-      if (num === 0 && !reason.trim()) {
-        payrollRepo.setAdjustment(runId, item.staffId, null);
-      } else {
-        payrollRepo.setAdjustment(runId, item.staffId, { amount: num, reason });
-      }
-      setAdjOpen(false);
-      onChange();
-    } catch (e: any) {
-      toast({ title: 'Cannot save', description: e.message, variant: 'destructive' });
+    if (num === 0 && !reason.trim()) {
+      onAdjustment(item.staffId, null);
+    } else {
+      onAdjustment(item.staffId, { amount: num, reason });
     }
-  };
-
-  const handleRefreshFromProfile = () => {
-    payrollRepo.refreshRow(runId, item.staffId);
-    onChange();
+    setAdjOpen(false);
   };
 
   return (
@@ -237,7 +267,7 @@ const PayrollRow = ({
           <Link to={`/staff/admin/staff/${item.staffId}`} className="underline">
             Fix on profile
           </Link>
-          <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={handleRefreshFromProfile}>
+          <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={() => onRefreshRow(item.staffId)}>
             Re-pull from profile
           </Button>
         </div>
@@ -297,12 +327,9 @@ const PayrollRow = ({
             <Textarea
               id={`notes-${item.staffId}`}
               rows={2}
-              value={item.notes ?? ''}
+              defaultValue={item.notes ?? ''}
               disabled={locked}
-              onChange={(e) => {
-                payrollRepo.setRowNotes(runId, item.staffId, e.target.value);
-                onChange();
-              }}
+              onBlur={(e) => onRowNotes(item.staffId, e.target.value)}
             />
           </div>
         </div>

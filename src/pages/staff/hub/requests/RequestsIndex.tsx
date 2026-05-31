@@ -49,6 +49,7 @@ const NewRequestDialog: React.FC<{ staffId: string; onCreated: () => void }> = (
       }
     } else {
       if (!startDate) { toast.error('Start date is required.'); return; }
+      if (endDate && endDate < startDate) { toast.error('End date cannot be before start date.'); return; }
     }
     setSubmitting(true);
     try {

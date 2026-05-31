@@ -486,6 +486,7 @@ export type Database = {
       }
       ih_payroll_items: {
         Row: {
+          adjustment: Json | null
           base_salary: number
           claims_total: number | null
           created_at: string
@@ -494,7 +495,12 @@ export type Database = {
           employer_socso: number | null
           epf: number | null
           id: string
+          included_claim_ids: Json
+          included_training_claim_ids: Json
+          missing_fields: Json
           net_pay: number
+          notes: string | null
+          row_status: string
           run_id: string
           socso: number | null
           staff_id: string
@@ -504,6 +510,7 @@ export type Database = {
           training_total: number | null
         }
         Insert: {
+          adjustment?: Json | null
           base_salary?: number
           claims_total?: number | null
           created_at?: string
@@ -512,7 +519,12 @@ export type Database = {
           employer_socso?: number | null
           epf?: number | null
           id?: string
+          included_claim_ids?: Json
+          included_training_claim_ids?: Json
+          missing_fields?: Json
           net_pay?: number
+          notes?: string | null
+          row_status?: string
           run_id: string
           socso?: number | null
           staff_id: string
@@ -522,6 +534,7 @@ export type Database = {
           training_total?: number | null
         }
         Update: {
+          adjustment?: Json | null
           base_salary?: number
           claims_total?: number | null
           created_at?: string
@@ -530,7 +543,12 @@ export type Database = {
           employer_socso?: number | null
           epf?: number | null
           id?: string
+          included_claim_ids?: Json
+          included_training_claim_ids?: Json
+          missing_fields?: Json
           net_pay?: number
+          notes?: string | null
+          row_status?: string
           run_id?: string
           socso?: number | null
           staff_id?: string
@@ -563,8 +581,27 @@ export type Database = {
           },
         ]
       }
+      ih_payroll_reminders: {
+        Row: {
+          id: string
+          month: string
+          sent_at: string
+        }
+        Insert: {
+          id?: string
+          month: string
+          sent_at?: string
+        }
+        Update: {
+          id?: string
+          month?: string
+          sent_at?: string
+        }
+        Relationships: []
+      }
       ih_payroll_runs: {
         Row: {
+          admin_notes: string | null
           created_at: string
           finalized_at: string | null
           finalized_by: string | null
@@ -577,6 +614,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          admin_notes?: string | null
           created_at?: string
           finalized_at?: string | null
           finalized_by?: string | null
@@ -589,6 +627,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          admin_notes?: string | null
           created_at?: string
           finalized_at?: string | null
           finalized_by?: string | null
@@ -647,12 +686,16 @@ export type Database = {
       }
       ih_payslips: {
         Row: {
+          adjustment: Json | null
+          availability: string
           base_salary: number
           claims_total: number | null
+          correction_ref: string | null
           created_at: string
           employer_epf: number | null
           employer_socso: number | null
           epf: number | null
+          finalized_at: string
           id: string
           month: string
           net_pay: number
@@ -660,15 +703,20 @@ export type Database = {
           run_id: string
           socso: number | null
           staff_id: string
+          staff_name: string | null
           training_total: number | null
         }
         Insert: {
+          adjustment?: Json | null
+          availability?: string
           base_salary?: number
           claims_total?: number | null
+          correction_ref?: string | null
           created_at?: string
           employer_epf?: number | null
           employer_socso?: number | null
           epf?: number | null
+          finalized_at?: string
           id?: string
           month: string
           net_pay?: number
@@ -676,15 +724,20 @@ export type Database = {
           run_id: string
           socso?: number | null
           staff_id: string
+          staff_name?: string | null
           training_total?: number | null
         }
         Update: {
+          adjustment?: Json | null
+          availability?: string
           base_salary?: number
           claims_total?: number | null
+          correction_ref?: string | null
           created_at?: string
           employer_epf?: number | null
           employer_socso?: number | null
           epf?: number | null
+          finalized_at?: string
           id?: string
           month?: string
           net_pay?: number
@@ -692,6 +745,7 @@ export type Database = {
           run_id?: string
           socso?: number | null
           staff_id?: string
+          staff_name?: string | null
           training_total?: number | null
         }
         Relationships: [

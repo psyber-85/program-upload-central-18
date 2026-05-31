@@ -1,4 +1,4 @@
-import { assertEquals, assert } from "https://deno.land/std@0.190.0/assert/mod.ts";
+import { assertEquals, assert } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { buildEventPayload, buildSummary } from "./index.ts";
 
 Deno.test("summary uses staff name and type label only", () => {

@@ -83,6 +83,8 @@ export const requestRepo = {
     kind: RequestKind;
     payload: RequestPayload;
     halfDaySlot?: HalfDaySlot;
+    trainingApplicationId?: string | null;
+    subState?: RequestSubState;
   }): Promise<RequestRow> {
     const { data, error } = await supabase
       .from('ih_requests')
@@ -92,12 +94,34 @@ export const requestRepo = {
         status: 'Submitted',
         payload: input.payload as never,
         half_day_slot: input.halfDaySlot ?? null,
+        training_application_id: input.trainingApplicationId ?? null,
+        sub_state: input.subState ?? null,
       })
       .select('*')
       .single();
 
     if (error) throw error;
-    return data as RequestRow;
+    const row = data as RequestRow;
+    void requestEventsRepo.add({
+      requestId: row.id,
+      eventType: 'Submitted',
+      actorId: input.staffId,
+      note: typeof input.payload?.reason === 'string' ? input.payload.reason : null,
+    });
+    return row;
+  },
+
+  async get(id: string): Promise<RequestRow | null> {
+    const { data, error } = await supabase
+      .from('ih_requests')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) {
+      console.error('[requestRepo.get]', error);
+      return null;
+    }
+    return (data as RequestRow | null) ?? null;
   },
 
   async uploadAttachment(input: {

@@ -10,12 +10,23 @@ import { CONFIDENTIAL_PAYSLIP_LABEL, IT_SUPPORT_EMAIL } from '@/lib/internal-hub
 import { isAdmin, canAccessOwnPayslips } from '@/lib/internal-hub/access';
 import { toast } from '@/hooks/use-toast';
 
-const Row = ({ label, value, neg = false }: { label: string; value: string; neg?: boolean }) => (
-  <div className="flex justify-between py-1.5 text-sm border-b border-border last:border-0">
-    <span className="text-muted-foreground">{label}</span>
-    <span className={neg ? 'text-destructive' : 'text-foreground'}>{value}</span>
+// Patch 002 §21 — payslip section structure.
+const SectionTitle = ({ children }: { children: React.ReactNode }) => (
+  <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase pt-3 pb-1 border-b border-border">
+    {children}
   </div>
 );
+
+const Row = ({ label, value, muted = false, bold = false }: {
+  label: string; value: string; muted?: boolean; bold?: boolean;
+}) => (
+  <div className={`flex justify-between py-1.5 text-sm ${bold ? 'font-semibold text-foreground' : ''}`}>
+    <span className={muted ? 'text-muted-foreground' : ''}>{label}</span>
+    <span>{value}</span>
+  </div>
+);
+
+const fmt = (n: number) => n.toFixed(2);
 
 const PayslipDetail = () => {
   const { id = '' } = useParams();
@@ -43,10 +54,13 @@ const PayslipDetail = () => {
   }
   if (isLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   if (!ps) return <div className="p-6 text-sm text-muted-foreground">Payslip not found.</div>;
-  // Doc 3.2 §12 — staff sees only their own.
   if (!isAdmin(currentStaff) && ps.staffId !== currentStaff.id) {
     return <div className="p-6 text-sm text-destructive">You don't have access to this payslip.</div>;
   }
+
+  const totalIncome = ps.baseSalary;
+  const additionsTotal = ps.claimsTotal + ps.trainingClaimsTotal + ps.bonusTotal + ps.otherAdditionTotal;
+  const showAdditions = additionsTotal > 0;
 
   return (
     <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-4">
@@ -61,7 +75,7 @@ const PayslipDetail = () => {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center justify-between">
-            <span>Payslip · {ps.month}</span>
+            <span>Salary Statement for {ps.month}</span>
             <Button
               size="sm"
               variant="outline"
@@ -75,25 +89,59 @@ const PayslipDetail = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-1">
-          <Row label="Staff" value={ps.staffName} />
-          <Row label="Payroll Month" value={ps.month} />
-          <Row label="Finalized" value={new Date(ps.finalizedAt).toLocaleDateString()} />
-          <div className="h-2" />
-          <Row label="Base Salary" value={ps.baseSalary.toFixed(2)} />
-          <Row label="EPF" value={`-${ps.epf.toFixed(2)}`} neg />
-          <Row label="SOCSO" value={`-${ps.socso.toFixed(2)}`} neg />
-          <Row label="Claims" value={`+${ps.claimsTotal.toFixed(2)}`} />
-          <Row label="Training Claims" value={`+${ps.trainingClaimsTotal.toFixed(2)}`} />
-          {ps.adjustment && (
+          {/* Staff Info */}
+          <SectionTitle>Staff Info</SectionTitle>
+          <Row label="Name" value={ps.staffName} muted />
+          <Row label="Payroll month" value={ps.month} muted />
+          <Row label="Finalized" value={new Date(ps.finalizedAt).toLocaleDateString()} muted />
+
+          {/* Income */}
+          <SectionTitle>Income</SectionTitle>
+          <Row label="Basic Salary" value={fmt(ps.baseSalary)} />
+          <Row label="Total Income" value={fmt(totalIncome)} bold />
+
+          {/* Claims / Reimbursements / Bonus */}
+          {showAdditions && (
             <>
-              <Row label="Manual Adjustment" value={ps.adjustment.amount.toFixed(2)} />
-              <div className="text-xs text-muted-foreground pl-1">Reason: {ps.adjustment.reason}</div>
+              <SectionTitle>Claims / Reimbursements / Bonus</SectionTitle>
+              {ps.claimsTotal > 0 && <Row label="Claim" value={`+${fmt(ps.claimsTotal)}`} />}
+              {ps.trainingClaimsTotal > 0 && <Row label="Training Claim" value={`+${fmt(ps.trainingClaimsTotal)}`} />}
+              {ps.bonusTotal > 0 && <Row label="Bonus" value={`+${fmt(ps.bonusTotal)}`} />}
+              {ps.otherAdditionTotal > 0 && <Row label="Other Reimbursement / Addition" value={`+${fmt(ps.otherAdditionTotal)}`} />}
+              <Row label="Subtotal" value={`+${fmt(additionsTotal)}`} bold />
             </>
           )}
-          <div className="flex justify-between py-2 text-base font-semibold border-t border-border mt-2">
+
+          {/* Employee Deductions */}
+          <SectionTitle>Employee Deductions</SectionTitle>
+          <Row label="EPF" value={`-${fmt(ps.epf)}`} />
+          <Row label="SOCSO" value={`-${fmt(ps.socso)}`} />
+          <Row label="EIS" value={`-${fmt(ps.eis)}`} />
+          <Row label="Total Employee Deductions" value={`-${fmt(ps.totalEmployeeDeductions)}`} bold />
+
+          {ps.adjustment && (
+            <>
+              <SectionTitle>Manual Adjustment</SectionTitle>
+              <Row label={`Adjustment (${ps.adjustment.reason})`} value={fmt(ps.adjustment.amount)} />
+            </>
+          )}
+
+          {/* Net Pay */}
+          <div className="flex justify-between py-3 mt-2 text-base font-semibold border-t-2 border-foreground">
             <span>Net Pay</span>
-            <span>{ps.netPay.toFixed(2)}</span>
+            <span>{fmt(ps.netPay)}</span>
           </div>
+
+          {/* Employer Contributions */}
+          <SectionTitle>Employer Contributions</SectionTitle>
+          <Row label="Employer EPF" value={fmt(ps.employerEpf)} muted />
+          <Row label="Employer SOCSO" value={fmt(ps.employerSocso)} muted />
+          <Row label="Employer EIS" value={fmt(ps.employerEis)} muted />
+          <Row label="Total Employer Contribution" value={fmt(ps.totalEmployerContribution)} bold />
+          <p className="text-[11px] text-muted-foreground pt-1">
+            Employer contributions are shown for transparency. They do not reduce your Net Pay.
+          </p>
+
           {ps.correctionRef && (
             <div className="text-xs text-muted-foreground pt-2">
               Correction reference: {ps.correctionRef}

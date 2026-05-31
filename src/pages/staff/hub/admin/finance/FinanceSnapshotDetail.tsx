@@ -176,17 +176,31 @@ const FinanceSnapshotDetail = () => {
         </CardContent>
       </Card>
 
-      {/* Auto-filled payroll totals */}
+      {/* Auto-filled payroll totals (Patch 002 §22) */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">From finalized payroll</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-sm">
-          <Stat label="Payroll total" value={snap.payrollTotal} />
-          <Stat label="Claims" value={snap.claimsTotal} />
-          <Stat label="Training" value={snap.trainingClaimsTotal} />
-          <Stat label="EPF/SOCSO" value={snap.epfSocsoTotal} />
-          <Stat label="Manual adj." value={snap.manualAdjustmentTotal} />
+        <CardContent className="space-y-4 text-sm">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Stat label="Payroll total" value={snap.payrollTotal} />
+            <Stat label="Claims" value={snap.claimsTotal} />
+            <Stat label="Training" value={snap.trainingClaimsTotal} />
+            <Stat label="Bonus" value={snap.bonusTotal} />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <Stat label="Employee statutory" value={snap.employeeStatutoryTotal} />
+            <Stat label="Employer statutory" value={snap.employerStatutoryTotal} />
+            <Stat label="Manual adj." value={snap.manualAdjustmentTotal} />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <Stat label="EPF total" value={snap.epfTotal} />
+            <Stat label="SOCSO total" value={snap.socsoTotal} />
+            <Stat label="EIS total" value={snap.eisTotal} />
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Statutory totals combine employee and employer portions where labelled "total". Internal reference only — not accounting.
+          </p>
         </CardContent>
       </Card>
 

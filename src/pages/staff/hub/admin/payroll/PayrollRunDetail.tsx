@@ -72,6 +72,18 @@ const PayrollRunDetail = () => {
     onSuccess: invalidate,
     onError: (e: Error) => toast({ title: 'Cannot save', description: e.message, variant: 'destructive' }),
   });
+  const bonusMut = useMutation({
+    mutationFn: ({ staffId, amount }: { staffId: string; amount: number }) =>
+      payrollRepo.setBonus(runId, staffId, amount),
+    onSuccess: invalidate,
+    onError: (e: Error) => toast({ title: 'Cannot save', description: e.message, variant: 'destructive' }),
+  });
+  const otherMut = useMutation({
+    mutationFn: ({ staffId, amount }: { staffId: string; amount: number }) =>
+      payrollRepo.setOtherAddition(runId, staffId, amount),
+    onSuccess: invalidate,
+    onError: (e: Error) => toast({ title: 'Cannot save', description: e.message, variant: 'destructive' }),
+  });
   const runNotesMut = useMutation({
     mutationFn: (notes: string) => payrollRepo.setRunNotes(runId, notes),
     onSuccess: invalidate,
@@ -159,7 +171,8 @@ const PayrollRunDetail = () => {
       )}
 
       <div className="text-xs text-muted-foreground bg-muted/40 rounded p-2">
-        Net Pay = Base − EPF − SOCSO + Claims + Training Claims + Manual Adjustments
+        Net Pay = Basic Salary − (EPF + SOCSO + EIS) + Claims + Training + Bonus + Other ± Manual Adjustment.
+        Employer contributions are shown for transparency and do not affect Net Pay.
       </div>
 
       <Card>
@@ -173,6 +186,8 @@ const PayrollRunDetail = () => {
               item={item}
               locked={locked}
               onAdjustment={(staffId, adjustment) => adjMut.mutate({ staffId, adjustment })}
+              onBonus={(staffId, amount) => bonusMut.mutate({ staffId, amount })}
+              onOther={(staffId, amount) => otherMut.mutate({ staffId, amount })}
               onRowNotes={(staffId, notes) => rowNotesMut.mutate({ staffId, notes })}
               onRefreshRow={(staffId) => refreshRowMut.mutate(staffId)}
             />
@@ -199,11 +214,13 @@ const PayrollRunDetail = () => {
 };
 
 const PayrollRow = ({
-  item, locked, onAdjustment, onRowNotes, onRefreshRow,
+  item, locked, onAdjustment, onBonus, onOther, onRowNotes, onRefreshRow,
 }: {
   item: PayrollItem;
   locked: boolean;
   onAdjustment: (staffId: string, adjustment: { amount: number; reason: string } | null) => void;
+  onBonus: (staffId: string, amount: number) => void;
+  onOther: (staffId: string, amount: number) => void;
   onRowNotes: (staffId: string, notes: string) => void;
   onRefreshRow: (staffId: string) => void;
 }) => {
@@ -238,9 +255,9 @@ const PayrollRow = ({
           <div className="min-w-0">
             <div className="font-medium truncate">{item.staffName}</div>
             <div className="text-xs text-muted-foreground">
-              Base {item.baseSalary.toFixed(2)} · EPF {item.epfAmount.toFixed(2)} · SOCSO {item.socsoAmount.toFixed(2)}
+              Basic {item.baseSalary.toFixed(2)} · Emp.Ded -{item.totalEmployeeDeductions.toFixed(2)} · Emp.Con {item.totalEmployerContribution.toFixed(2)}
               {item.claimsTotal > 0 && ` · Claims ${item.claimsTotal.toFixed(2)}`}
-              {item.trainingClaimsTotal > 0 && ` · Training ${item.trainingClaimsTotal.toFixed(2)}`}
+              {item.bonusTotal > 0 && ` · Bonus ${item.bonusTotal.toFixed(2)}`}
               {item.adjustment && ` · Adj ${item.adjustment.amount.toFixed(2)}`}
             </div>
           </div>
@@ -274,22 +291,82 @@ const PayrollRow = ({
       )}
 
       {expanded && (
-        <div className="px-3 pb-3 border-t border-border pt-3 space-y-2 text-sm">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-            <div><span className="text-muted-foreground">Base:</span> {item.baseSalary.toFixed(2)}</div>
-            <div><span className="text-muted-foreground">EPF:</span> -{item.epfAmount.toFixed(2)}</div>
-            <div><span className="text-muted-foreground">SOCSO:</span> -{item.socsoAmount.toFixed(2)}</div>
-            <div><span className="text-muted-foreground">Claims:</span> +{item.claimsTotal.toFixed(2)}</div>
-            <div><span className="text-muted-foreground">Training:</span> +{item.trainingClaimsTotal.toFixed(2)}</div>
-            <div><span className="text-muted-foreground">Adj:</span> {(item.adjustment?.amount ?? 0).toFixed(2)}</div>
-            <div className="col-span-2 sm:col-span-4 pt-1 border-t border-border">
-              <span className="text-muted-foreground">Net Pay:</span> <span className="font-medium">{item.netPay.toFixed(2)}</span>
+        <div className="px-3 pb-3 border-t border-border pt-3 space-y-3 text-sm">
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Income</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div><span className="text-muted-foreground">Basic:</span> {item.baseSalary.toFixed(2)}</div>
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Claims / Reimbursements / Bonus</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div><span className="text-muted-foreground">Claims:</span> +{item.claimsTotal.toFixed(2)}</div>
+              <div><span className="text-muted-foreground">Training:</span> +{item.trainingClaimsTotal.toFixed(2)}</div>
+              <div><span className="text-muted-foreground">Bonus:</span> +{item.bonusTotal.toFixed(2)}</div>
+              <div><span className="text-muted-foreground">Other:</span> +{item.otherAdditionTotal.toFixed(2)}</div>
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Employee Deductions</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div><span className="text-muted-foreground">EPF:</span> -{item.epfAmount.toFixed(2)}</div>
+              <div><span className="text-muted-foreground">SOCSO:</span> -{item.socsoAmount.toFixed(2)}</div>
+              <div><span className="text-muted-foreground">EIS:</span> -{item.eisAmount.toFixed(2)}</div>
+              <div><span className="text-muted-foreground">Total:</span> -{item.totalEmployeeDeductions.toFixed(2)}</div>
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Employer Contributions (informational)</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div><span className="text-muted-foreground">EPF:</span> {item.employerEpf.toFixed(2)}</div>
+              <div><span className="text-muted-foreground">SOCSO:</span> {item.employerSocso.toFixed(2)}</div>
+              <div><span className="text-muted-foreground">EIS:</span> {item.employerEis.toFixed(2)}</div>
+              <div><span className="text-muted-foreground">Total:</span> {item.totalEmployerContribution.toFixed(2)}</div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-2 border-t border-border">
+            <div><span className="text-muted-foreground">Adjustment:</span> {(item.adjustment?.amount ?? 0).toFixed(2)}</div>
+            <div className="col-span-2 sm:col-span-3 text-right">
+              <span className="text-muted-foreground">Net Pay:</span>{' '}
+              <span className="font-semibold text-foreground">{item.netPay.toFixed(2)}</span>
             </div>
           </div>
 
           {item.adjustment && (
             <div className="text-xs">
               <span className="text-muted-foreground">Adjustment reason:</span> {item.adjustment.reason}
+            </div>
+          )}
+
+          {!locked && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <div className="space-y-1">
+                <Label htmlFor={`bonus-${item.staffId}`} className="text-xs">Bonus</Label>
+                <Input
+                  id={`bonus-${item.staffId}`}
+                  type="number"
+                  step="0.01"
+                  defaultValue={item.bonusTotal}
+                  onBlur={(e) => {
+                    const n = parseFloat(e.target.value);
+                    if (!Number.isNaN(n) && n !== item.bonusTotal) onBonus(item.staffId, n);
+                  }}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor={`other-${item.staffId}`} className="text-xs">Other reimbursement / addition</Label>
+                <Input
+                  id={`other-${item.staffId}`}
+                  type="number"
+                  step="0.01"
+                  defaultValue={item.otherAdditionTotal}
+                  onBlur={(e) => {
+                    const n = parseFloat(e.target.value);
+                    if (!Number.isNaN(n) && n !== item.otherAdditionTotal) onOther(item.staffId, n);
+                  }}
+                />
+              </div>
             </div>
           )}
 

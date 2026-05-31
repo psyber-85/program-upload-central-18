@@ -82,10 +82,8 @@ const StaffHome = () => {
 
   const unread = noticesAll.filter((n) => !readSet.has(n.id)).length;
   const ackPending = noticesAll.filter((n) => n.importance === 'AcknowledgmentRequired' && !ackMap.has(n.id)).length;
-  const myPendingRequests = requestSummaryRepo.pendingCountForStaff(currentStaff.id);
 
   // Admin metrics
-  const pendingApprovals = requestSummaryRepo.pendingApprovalCount();
   const inProgressOnboardings = isAdmin
     ? allStaff.filter((s) => {
         const c = onboardingRepo.get(s.id);

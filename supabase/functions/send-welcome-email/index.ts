@@ -72,7 +72,7 @@ const generateEmailHtml = (data: WelcomeEmailRequest): string => {
               
               <p style="margin: 30px 0 0 0; color: #666; font-size: 14px;">
                 Best regards,<br>
-                <strong>${data.senderName || 'The AI HQ Team'}</strong>
+                <strong>${safeSender}</strong>
               </p>
             </td>
           </tr>

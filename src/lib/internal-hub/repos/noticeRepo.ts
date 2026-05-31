@@ -111,7 +111,7 @@ async function resolveBroadcastRecipients(notice: Notice): Promise<string[]> {
   return data
     .filter((s) => {
       if (notice.audience.kind === 'Everyone') return true;
-      if (notice.audience.kind === 'Admin') return s.role === 'Admin';
+      if (notice.audience.kind === 'Admin') return s.role === 'admin';
       if (notice.audience.kind === 'Arm') return s.business_arm === arm;
       if (notice.audience.kind === 'Individual') return s.id === staffId;
       return false;

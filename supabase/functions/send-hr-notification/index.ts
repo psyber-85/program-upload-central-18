@@ -102,11 +102,11 @@ const generateEmailTemplate = async (hrName: string, staffName: string, courseNa
 
   const htmlTemplate = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-      <p>Dear ${hrName},</p>
+      <p>Dear ${safeHrName},</p>
       
       <p>I hope this message finds you well.</p>
       
-      <p>I am writing to facilitate the registration of <strong>${staffName}</strong> from your organization for the upcoming training program, <strong>${courseName}</strong>, conducted by AIHQ.</p>
+      <p>I am writing to facilitate the registration of <strong>${safeStaffName}</strong> from your organization for the upcoming training program, <strong>${safeCourseName}</strong>, conducted by AIHQ.</p>
       
       <p>Attached are the following documents for your review:</p>
       
@@ -127,7 +127,7 @@ const generateEmailTemplate = async (hrName: string, staffName: string, courseNa
       
       <p>Should you have any questions or need further assistance, please feel free to contact me directly.</p>
       
-      <p>Thank you for your attention and support. We look forward to welcoming <strong>${staffName}</strong> to the program.</p>
+      <p>Thank you for your attention and support. We look forward to welcoming <strong>${safeStaffName}</strong> to the program.</p>
       
       <p>Warm regards,<br>
       Vino<br>

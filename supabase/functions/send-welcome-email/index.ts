@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { requireAdmin, escapeHtml, jsonError } from "../_shared/auth.ts";
 
 const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "noreply@theaihq.net";

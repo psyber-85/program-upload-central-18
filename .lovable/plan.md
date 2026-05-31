@@ -1,75 +1,75 @@
-# Sub-batch 2E — Finance Snapshot → Supabase
+# Doc 4.1 — Fix Plan (Sub-batch 4A)
 
-Final repo to migrate off `localStorage`. After this, every Doc 3.x flow is RLS-enforced.
+Targets the 4 remaining gaps from the 78% audit. Mirrors the 2A–2F sub-batch pattern.
 
-## Schema additions (one migration)
+## Scope
 
-`ih_finance_snapshots` already exists with `month`, `status` (enum: Draft/Reviewed/Locked), `line_items jsonb`, `locked_*`, `reviewed_*`. Missing the typed totals and balances Doc 3.3 needs. Add columns (non-breaking):
+| # | Gap | Spec ref | Severity |
+|---|-----|----------|----------|
+| G1 | No RLS / access test suite | Doc 4.1 §17 | High |
+| G2 | No Admin-promotion path (UI + edge fn) | Doc 4.1 §5 | Medium |
+| G3 | Public signup not verifiably disabled | Doc 4.1 §2 | Medium |
+| G4 | No production Supabase seed runbook | Doc 4.1 §17-seed | Medium |
+| G5 | Requests/claims lack `archived_at` (soft delete) | Doc 4.1 §11 | Low |
 
-```sql
-ALTER TABLE public.ih_finance_snapshots
-  ADD COLUMN IF NOT EXISTS opening_balance         numeric,
-  ADD COLUMN IF NOT EXISTS closing_balance         numeric,
-  ADD COLUMN IF NOT EXISTS payroll_total           numeric NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS claims_total            numeric NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS training_claims_total   numeric NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS epf_socso_total         numeric NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS manual_adjustment_total numeric NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS notes                   text;
+## Deliverables
+
+### 4A.1 — RLS test suite (G1)
+- New `supabase/tests/rls/` directory using pgTAP-style SQL tests run via `supabase--read_query` harness, or Deno test file `supabase/functions/_tests/rls_access_test.ts` that signs in as 3 fixture users (admin, active staff, inactive staff) and asserts:
+  - staff can read own `ih_staff_profiles`, `ih_payslips`, `ih_requests`, `ih_claims`; cannot read others'
+  - inactive staff blocked from all `ih_*` reads via `is_active_ih_staff()`
+  - non-admin cannot read `ih_payroll_runs`, `ih_payroll_items`, `ih_finance_*`
+  - non-admin cannot mutate sensitive fields (trigger fires)
+  - non-admin cannot insert into `ih_user_roles`
+- Documented `bun run test:rls` script.
+
+### 4A.2 — Admin promotion (G2)
+- New edge function `ih-promote-staff` (verify_jwt enforced in-code): caller must have `admin` role; inserts `(target_user_id, 'admin')` into `ih_user_roles`; writes audit row (uses Doc 4.3 audit log if present, else console).
+- UI: on `AdminStaffDetail.tsx`, add "Promote to Admin" / "Revoke Admin" button (admin-only, hidden for self) calling the function. Confirm dialog. Toast on success.
+
+### 4A.3 — Public signup lockdown (G3)
+- No code change required in app (Login already has no signUp call). Add a `docs/auth-config.md` runbook documenting required Supabase Auth settings: **Enable signups = OFF**, **Confirm email = ON**, **Site URL** and **Redirect URLs** values.
+- Add a runtime guard: small admin-only diagnostic card on `/staff` (Admin view) that calls `supabase.auth.signUp` with a synthetic disabled probe — optional, skip if too invasive. Default: docs only.
+
+### 4A.4 — Production seed runbook (G4)
+- New `docs/production-seed.md` describing the one-time bootstrap:
+  1. Deploy migrations
+  2. Invoke `ih-bootstrap-admin` with bootstrap token to create first Admin
+  3. Admin signs in, creates remaining staff via `AdminAddStaff` (uses `ih-create-staff`)
+  4. No fixture data inserted in prod
+- Mark `src/lib/internal-hub/seed.ts` and `seedNotices.ts` clearly as **dev-only / localStorage only** via top-of-file comment.
+
+### 4A.5 — Soft archive on requests/claims (G5)
+- Migration: add `archived_at TIMESTAMPTZ` to `ih_requests` and `ih_claims`.
+- Extend `ih_block_hard_delete` trigger to both tables.
+- Update `requestSummaryRepo`/`claimRepo` list queries to filter `archived_at IS NULL` by default; admin archive action sets the column.
+- No UI change required in 4A (admin archive UI deferred).
+
+## Files touched (estimate)
+
+```
+supabase/migrations/<new>_doc4_1_archive_and_delete_guards.sql
+supabase/functions/ih-promote-staff/index.ts
+supabase/functions/_tests/rls_access_test.ts
+supabase/config.toml                          (register new fn)
+src/pages/staff/hub/admin/AdminStaffDetail.tsx
+src/lib/internal-hub/repos/requestSummaryRepo.ts
+src/lib/internal-hub/repos/claimRepo.ts
+src/lib/internal-hub/seed.ts                  (comment only)
+src/lib/internal-hub/seedNotices.ts           (comment only)
+docs/auth-config.md                           (new)
+docs/production-seed.md                       (new)
 ```
 
-Line items stay inline in `line_items jsonb` (array of `{id, category, amount, note, link?, createdBy, createdAt, isCorrection}`) — matches existing column and avoids a second table for an admin-only feature.
+## Out of scope
+- Doc 4.2 / 4.3 gaps (separate sub-batches 4B–4H).
+- Admin UI for archived-request/claim restore (future).
+- Replacing localStorage repos with Supabase (tracked elsewhere).
 
-No RLS/GRANT change needed (table already admin-only).
+## Acceptance
+- RLS test suite passes for all 3 fixture roles.
+- Admin can promote/demote another Active staff to Admin from `AdminStaffDetail`.
+- `docs/auth-config.md` and `docs/production-seed.md` exist and are accurate.
+- `ih_requests` / `ih_claims` have `archived_at`; hard delete blocked; list views hide archived rows.
 
-## Repo rewrite — `financeSnapshotRepo.ts` (all async)
-
-Backed by `ih_finance_snapshots`. Mapping helpers convert row ↔ `FinanceSnapshot` (snake/camel + `lineItems` extracted to `lineItemsFor()` view).
-
-- `listSnapshots()` — order by `month desc`.
-- `getById(id)`, `getForMonth(month)`, `statusFor(month)` (returns `'NotStarted'` when absent).
-- `getOrCreateForMonth(month, adminId)` — select-or-insert. If existing & `status='Draft'`, refresh payroll-linked totals via `payrollTotalsFor(month)` and patch. Otherwise insert with `status='Draft'` + initial totals.
-- `setOpeningBalance / setClosingBalance / setNotes` — single-column updates (Draft only enforced in mutation guards).
-- `lineItemsFor(snapshotId)` — read row, return `line_items` array sorted by `createdAt desc`.
-- `addLineItem` — guard `status='Draft'`, append non-correction item to `line_items`.
-- `addCorrectionLineItem` — append `isCorrection:true` regardless of status (Doc 3.3 §21).
-- `removeLineItem(snapshotId, itemId)` — Draft only, filter from jsonb.
-- `markReviewed(id, adminId)` — set status, `reviewed_at`, `reviewed_by`.
-- `lockSnapshot(id, adminId)` — guard `status='Reviewed'`, set status + `locked_at/by`.
-
-### `payrollTotalsFor(month)` — Supabase aggregate
-
-Replaces the Sub-batch 2D zero-stub. One query:
-
-```ts
-supabase
-  .from('ih_payroll_items')
-  .select('base_salary, employer_epf, employer_socso, claims_total, training_total, adjustment, ih_payroll_runs!inner(status, month)')
-  .eq('ih_payroll_runs.month', month)
-  .in('ih_payroll_runs.status', ['Finalized', 'Locked'])
-  .eq('row_status', 'Complete');
-```
-
-Sum client-side into `{ payrollTotal: Σ(base + employer_epf + employer_socso), claimsTotal: Σclaims, trainingClaimsTotal: Σtraining, epfSocsoTotal: Σ(employer_epf+employer_socso), manualAdjustmentTotal: Σ(adjustment.amount ?? 0) }`. All rounded to 2dp.
-
-## Callsite updates (TanStack Query)
-
-- `StaffHome.tsx` — `financeSnapshotRepo.statusFor(month)` → `useQuery(['ih','finance','status',month])`. Already admin-only branch; on staff role the query is skipped via `enabled`.
-- `FinanceIndex.tsx` — `listSnapshots()` → `useQuery`; "Open this month" → `useMutation(getOrCreateForMonth)` with invalidation + navigation.
-- `FinanceSnapshotDetail.tsx` — replace `tick`/`useMemo` pattern:
-  - `useQuery(['ih','finance','snapshot',id])` for snapshot row.
-  - `useQuery(['ih','finance','items',id])` for line items (derived from same row; pull from snapshot data — drop second query, use `snapshot?.lineItems`).
-  - `useMutation` for setOpeningBalance, setClosingBalance, setNotes (debounced text), addLineItem, addCorrectionLineItem, removeLineItem, markReviewed, lockSnapshot — each invalidates the snapshot query.
-
-## Out of scope (deferred)
-- Edge-function-side aggregation / materialized totals — not needed at current volume.
-- Real PDF export of monthly snapshot.
-- `ih_audit_log` writes — Doc 4.3.
-
-## Verification
-- `npm run build` clean.
-- Admin: `/staff/admin/finance` → "Open this month" creates snapshot; payroll-linked totals populate from latest finalized run (verify against `/staff/admin/payroll`).
-- Add line item, add correction line item (still works after marking reviewed), remove line item (blocked after review).
-- Mark Reviewed → status flips; Lock → terminal.
-- Refresh page — all values persist (no localStorage).
-- Grep clean: no `readJSON`/`writeJSON` in `repos/financeSnapshotRepo.ts`; the file becomes the last localStorage-free repo.
+Approve to switch to build mode and execute 4A.1 → 4A.5 in order.

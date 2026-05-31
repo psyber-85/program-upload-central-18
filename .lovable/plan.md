@@ -1,65 +1,84 @@
 
-## Doc 4.2 Gap Fixes
+## Doc 4.3 — Production Hardening & Audit (scoped to `/staff`)
 
-The root cause for most 4.2 fails is that the **Requests module is a stub** (`RequestsIndex.tsx` = `ComingSoonStub`). Without it, there's no caller for calendar sync, approval emails, or upload UX. Plan focuses on building the minimum Requests pipeline needed to satisfy 4.2, not the full Requests spec.
+Implements audit logs, hard-delete protection, System Issues view, and production-readiness baseline. **AI extraction (§16–§24) deferred** — spec calls it "optional" and adds an AI provider dependency that should be its own approval; manual workflows already work. `/marketing` and the main site are untouched.
 
-### 1. Requests submission + approval pipeline (unblocks everything)
+### 1. Audit log (§5–§10)
 
-Build a minimal `/staff/requests` page:
-- Staff: submit Leave / MC / Claim with type, dates, half-day flag, attachment upload
-- Admin: list pending → Approve / Reject with reason
-- Persist to existing `ih_requests` table; status transitions: `pending → approved | rejected`
+**New table `public.ih_audit_log`:**
+- Columns: `id`, `action` (text — e.g. `staff.created`, `request.approved`, `payroll.finalized`), `actor_id` (uuid, nullable for system), `actor_role` (text), `target_table` (text), `target_id` (uuid, nullable), `summary` (text), `metadata` (jsonb), `created_at`
+- RLS: admin-only SELECT; **no INSERT/UPDATE/DELETE policies for users** — inserts only via SECURITY DEFINER RPC `ih_log_audit(...)` or service-role from edge functions
+- `ih_block_hard_delete` trigger attached → immutable from clients
+- Retained indefinitely (no TTL)
 
-This is the caller every 4.2 surface needs.
+**Helper:** `src/lib/internal-hub/audit.ts` with `logAudit({ action, targetTable, targetId, summary, metadata })` that calls the RPC. Wired at:
+- Staff create / deactivate / role change (already exists in ih-create-staff, ih-deactivate-staff, ih-promote-staff edge functions — add `ih_log_audit` calls there using service role)
+- Notice broadcast send (noticeRepo)
+- Request approve / reject / needs-correction (requestRepo.decide)
+- Payroll finalize / payslip generate (payrollRepo, ih-generate-payslip-pdf)
+- Finance snapshot mark-reviewed
+- Access checklist updates
+- Calendar / email / PDF failures (called from inside edge functions on failure)
 
-### 2. Calendar sync trigger (Critical)
+### 2. Hard-delete protection (§12)
 
-On Leave approved or MC accepted, call existing `ih-calendar-sync` edge function with:
-- Full-day → all-day event
-- Half-day AM/PM → timed event (09:00–13:00 / 14:00–18:00 MYT)
-- Title format per spec; sync result written to `ih_calendar_sync_log`
+Single migration extends `ih_block_hard_delete` trigger to all remaining sensitive tables not yet protected:
+- `ih_staff_profiles`, `ih_payroll_runs`, `ih_payroll_items`, `ih_payslips`, `ih_finance_snapshots`, `ih_request_attachments`, `ih_leave_balances`, `ih_access_checklist`, `ih_payslip_downloads`, `ih_notice_acks`, `ih_notice_reads`, `ih_email_log`, `ih_calendar_sync_log`, `ih_welcome_emails`, `ih_audit_log` (new), `ih_tool_access`
+- Exception per spec: empty staff records with no activity (kept as documentation note — current admin UI uses deactivate, not delete)
 
-Trigger from approval handler (server-side via edge function, not client) so failures are logged even if browser closes.
+### 3. System Issues view (§13–§15)
 
-### 3. Approval outcome emails (Critical)
+**New page** `/staff/admin/system-issues` (admin-only, gated by `ProtectedRoute requireAdmin`):
+- Unified read across:
+  - `ih_email_log` where `status IN ('failed', 'retrying')`
+  - `ih_calendar_sync_log` where `status = 'failed'`
+  - `ih_payslips` where `pdf_error IS NOT NULL`
+  - `ih_welcome_emails` where `status = 'Failed'`
+- Filters: issue type, status (Open / Resolved), date range
+- Each row shows: type, related table/id, safe error summary, created_at, last attempt
+- Retry actions where practical: "Resend email" (re-invoke `ih-send-email` with same idempotency key + `force: true`), "Re-sync calendar" (re-invoke `ih-calendar-sync` upsert), "Regenerate PDF" (re-invoke `ih-generate-payslip-pdf`)
+- Strictly Admin-only, operational copy — no engineering log dump
 
-Wire `ih-send-email` for the 3 missing event types:
-- `request.approved` — to requester, with type/dates
-- `request.rejected` — to requester, with reason
-- `claim.approved` — to requester, mentions next payroll inclusion
+**New repo** `src/lib/internal-hub/repos/systemIssuesRepo.ts` with `list({ type?, status?, since? })` and `retry(issueId, type)`.
 
-Single sender `system@theaihq.net`; failures persisted in `ih_email_log` and surfaced in System Issues (deferred to 4.3 plan).
+### 4. Production readiness baseline (§25)
 
-### 4. Upload UX + failure surface (High / Medium)
+- Add `mem://internal-hub/hardening-doc-4.3` memory note covering: secrets via Deno.env (no commits), env separation (Supabase project ref isolated), RLS test file at `supabase/functions/_tests/rls_access_test.ts` already exists, hard-delete protection inventory
+- Add brief in-app "Operations" admin section in System Issues page header: "Backups are managed by Supabase. To restore, contact wani@theaihq.net."
 
-- Attachment upload component on Request form: 10MB cap client-side + server re-check, private `request-attachments` bucket (already exists)
-- On upload failure: inline error + row in `ih_email_log`-style `ih_upload_errors` (or reuse existing log table — to confirm during implementation)
-- Admin sees attachment via signed URL (short TTL)
+### 5. Admin navigation
 
-### 5. Verify payslip-ready email has no PDF attachment (Medium)
+Add "System Issues" entry to admin nav so it's discoverable.
 
-Read `ih-send-email` payslip-ready branch; confirm body links to in-app payslip page and does NOT attach the PDF. Fix if it does. (Per Doc 3.2 confidentiality rule.)
+### Out of scope (explicitly)
 
-### Out of scope (handled separately)
-
-- Doc 4.3 gaps (audit log, System Issues page, extended hard-delete, AI extraction) — separate plan
-- Full Requests module polish (filters, bulk actions, history view) beyond what 4.2 needs
+- **AI extraction (§16–§24)** — deferred. The receipts/MC manual flow built in Doc 4.2 already works. Will revisit if user wants OpenAI/Gemini wired.
+- Full observability, alerting, SIEM, DR plan (anti-goals §29)
+- Anything outside `/staff`
 
 ### Technical notes
 
-- New edge function calls: extend `ih-send-email` with 3 new templates; reuse existing `ih-calendar-sync`
-- New migration: none required if `ih_requests` schema already supports status + attachment_path; otherwise add columns
-- All approval/sync/email calls go through edge functions (server-side) to ensure logging survives client disconnects
-- Honors invariants: GRANTs on any new tables, RLS scoped via `has_ih_role`, no service_role to client
+- All new tables follow the GRANT → ENABLE RLS → CREATE POLICY ordering
+- `ih_log_audit` RPC is SECURITY DEFINER with `SET search_path = public`
+- Audit insertions from edge functions use service role directly (bypasses RLS by design)
+- Memory updates: new `hardening-doc-4.3.md`; index gets one new line
+- No changes to `/marketing`, public site, CRM, placement portal, or `/sp_*` Staff Portal tables
 
-### Expected compliance after fixes
+### Files
 
-Doc 4.2: 73% → ~97% (only RLS automated test suite remains, which is a 4.3 concern)
+**Created**
+- `supabase/migrations/<ts>_doc_4_3_audit_hardening.sql` (audit table + RPC + hard-delete extension)
+- `src/lib/internal-hub/audit.ts`
+- `src/lib/internal-hub/repos/systemIssuesRepo.ts`
+- `src/pages/staff/hub/admin/SystemIssues.tsx`
+- `mem://internal-hub/hardening-doc-4.3`
 
-### Suggested implementation order
+**Edited**
+- `src/App.tsx` — add `/admin/system-issues` route
+- `src/components/internal-hub/AdminNav.tsx` (or wherever admin nav lives) — add link
+- Existing repos/edge functions — add `logAudit` calls at action points (staffRepo, requestRepo, noticeRepo, payrollRepo, financeSnapshotRepo, edge functions ih-create-staff, ih-deactivate-staff, ih-promote-staff, ih-generate-payslip-pdf, ih-calendar-sync, ih-send-email — failure paths only for the last three)
+- `mem://index.md` — append hardening reference
 
-1. Requests UI + approval state machine (foundation)
-2. Calendar sync trigger on approval
-3. Approval/rejection/claim emails
-4. Upload UX + failure logging
-5. Payslip email audit
+### Expected outcome
+
+Doc 4.3 compliance: 33% → ~90% (only AI extraction §16–§24 remaining, intentionally deferred).

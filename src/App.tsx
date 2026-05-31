@@ -39,6 +39,7 @@ import AdminPayslips from "./pages/staff/hub/admin/payroll/AdminPayslips";
 import FinanceIndex from "./pages/staff/hub/admin/finance/FinanceIndex";
 import FinanceSnapshotDetail from "./pages/staff/hub/admin/finance/FinanceSnapshotDetail";
 import PayslipDetail from "./pages/staff/hub/payslips/PayslipDetail";
+import EmailLog from "./pages/staff/hub/admin/EmailLog";
 
 // Marketing Portal (untouched)
 import MarketingLayout from "./components/marketing/MarketingLayout";

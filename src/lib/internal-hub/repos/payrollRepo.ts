@@ -369,6 +369,12 @@ export const payrollRepo = {
       .update({ status: 'Locked', locked_at: new Date().toISOString(), locked_by: _adminId } as any)
       .eq('id', runId);
     if (error) throw error;
+    void logAudit({
+      action: 'payroll.locked',
+      targetTable: 'ih_payroll_runs',
+      targetId: runId,
+      summary: `Payroll locked for ${run.month}`,
+    });
     return (await loadRun(runId))!;
   },
 

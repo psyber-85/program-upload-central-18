@@ -164,6 +164,38 @@ const AdminStaffDetail = () => {
           <ArrowLeft className="h-4 w-4 mr-1" /> Back
         </Button>
         <div className="flex items-center gap-2">
+          {canTogglePromotion && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  {targetIsAdmin ? (
+                    <><ShieldOff className="h-4 w-4 mr-1" />Revoke Admin</>
+                  ) : (
+                    <><ShieldCheck className="h-4 w-4 mr-1" />Promote to Admin</>
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {targetIsAdmin ? `Revoke Admin from ${staff.fullName}?` : `Promote ${staff.fullName} to Admin?`}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {targetIsAdmin
+                      ? 'They will lose access to admin-only areas (payroll, finance, staff management). Their staff profile is unchanged. At least one Admin must remain.'
+                      : 'They will gain full admin access: payroll, finance, staff management, and broadcasts. Only promote staff you trust.'}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => handlePromotion(targetIsAdmin ? 'revoke' : 'promote')}>
+                    {targetIsAdmin ? 'Revoke Admin' : 'Promote'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+
           {staff.status === 'Active' ? (
             <AlertDialog>
               <AlertDialogTrigger asChild>

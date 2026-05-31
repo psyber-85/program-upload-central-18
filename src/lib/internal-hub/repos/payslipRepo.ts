@@ -1,6 +1,7 @@
 // Doc 3.2 — Payslips backed by Supabase (`ih_payslips` + `ih_payslip_downloads`).
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from '@/integrations/supabase/client';
+import { logAudit } from '../audit';
 import type {
   HubRole,
   ManualAdjustment,

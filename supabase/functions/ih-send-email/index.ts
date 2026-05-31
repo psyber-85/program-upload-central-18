@@ -4,6 +4,7 @@
 // Logs every send attempt to ih_email_log BEFORE the provider call (§12).
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
+import { requireAdmin } from "../_shared/auth.ts";
 
 const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
 const SENDER_EMAIL = "system@theaihq.net";

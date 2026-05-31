@@ -70,14 +70,19 @@ const StaffHome = () => {
     queryFn: () => payslipRepo.listForStaff(currentStaff!.id, 2),
     enabled: !!currentStaff,
   });
+  const month = (() => {
+    const d = new Date();
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  })();
   const { data: payrollStatusRaw = 'NotPrepared' } = useQuery({
-    queryKey: ['ih-payroll-status', /* month */ undefined],
-    queryFn: () => {
-      const d = new Date();
-      const m = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-      return payrollRepo.statusFor(m);
-    },
+    queryKey: ['ih-payroll-status', month],
+    queryFn: () => payrollRepo.statusFor(month),
     enabled: !!currentStaff,
+  });
+  const { data: financeStatusRaw = 'NotStarted' } = useQuery({
+    queryKey: ['ih-finance-status', month],
+    queryFn: () => financeSnapshotRepo.statusFor(month),
+    enabled: isAdmin,
   });
 
   // Doc 3.1 §7 — idempotent payroll reminder (admin, after the 25th).

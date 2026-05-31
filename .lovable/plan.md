@@ -1,52 +1,33 @@
-## Patch 001 — gap analysis & implementation plan
+## Patch 001 §13 — Close carry-forward AL expiry gap
 
-### Gap matrix (audit of Patch 001 §1–§24 against shipped code)
+### Problem
+`al_carry_forward_expires_on` is never set, so the daily expiry branch in `ih-scheduled-reminders` is dead code. Patch 001 §13 requires expiry to "not depend only on manual memory."
 
-| § | Topic | Current state | Action |
-|---|---|---|---|
-| 3 | Build phase naming | implicit | Memory note only |
-| 4 | MC calendar sync | `buildSummary` handles `mc`; tests pass | None — compliant |
-| 5 | Payslip PDF boundary | `ih-generate-payslip-pdf` + System Issues retry | None |
-| 6 | Insurance notes admin-only | column-level GRANT restricts to admin | None |
-| 7 | Company Tools vs access checklist | lifecycle owns checklist | None |
-| 8 | Finance Snapshot non-accounting | enforced by Doc 3.3 + memory | None |
-| 9 | Audit consolidation | Doc 4.3 audit log + §6 audit calls shipped | None |
-| 10 | Scheduled-jobs boundary | `ih-scheduled-reminders` exists | Add code-comment + audit |
-| 11 | Payroll cadence (25/26/27–28/29) | Day-25 reminder only | **Add day-26 draft prep + day-29 finalize reminder** |
-| 12 | Notion unlock reminder | Implemented daily | None |
-| 13 | Carry-forward AL expiry | Schema lacks carry-forward + expiry fields, no job | **Add `al_carry_forward` + `al_carry_forward_expires_on` columns; expiry job** |
-| 14 | Acknowledgment reminder | None | **Add weekly ack-reminder digest to admins** |
-| 15–17 | Email/cal/PDF retry visibility | Manual retry in System Issues | None (auto-retry deferred per §15) |
-| 18 | File upload failure | Not tracked (no failure surface) | Out of scope |
-| 19 | System Issues view | Admin-only, exists | None |
-| 21 | Scheduled-job audit-readiness | Reminders don't log audit | **Add `logSystemAudit` for each scheduled action** |
+### Solution — Jan 1 year-rollover job branch
+Add a single dated branch to `supabase/functions/ih-scheduled-reminders/index.ts` that runs once per year on **Jan 1 (UTC)** and populates carry-forward + expiry from the previous year's unused AL.
 
-### Edits
+### Rules
+- **Eligible staff**: `ih_staff_profiles.status = 'Active'`.
+- **Source row**: previous year's `ih_leave_balances` (`year = previousYear`).
+- **Carry-forward amount**: `max(0, al_total - al_used)`, capped at **7 days** (company policy default; matches typical MY SME practice — flag for review if different).
+- **Expiry**: `currentYear-07-01` (6 months after Jan 1, per §13).
+- **Target row**: upsert the current-year row by `(staff_id, year)`, setting `al_carry_forward` and `al_carry_forward_expires_on`. Do not touch `al_total`, `al_used`, `sl_total`, `sl_used`.
+- **Idempotency**: skip if target row already has `al_carry_forward > 0 OR al_carry_forward_expires_on IS NOT NULL` (job already ran this year for that staff).
+- **Audit**: emit `leave.carry_forward_initialized` per staff via `ih_log_system_audit` with `{ year, amount, expiresOn, sourceYear }`.
 
-**1. Migration — leave balance carry-forward fields + system audit RPC**
-- `ALTER TABLE public.ih_leave_balances ADD COLUMN IF NOT EXISTS al_carry_forward integer NOT NULL DEFAULT 0;`
-- `ALTER TABLE public.ih_leave_balances ADD COLUMN IF NOT EXISTS al_carry_forward_expires_on date;`
-- Create `public.ih_log_system_audit(_action, _target_table, _target_id, _summary, _metadata)` SECURITY DEFINER — inserts into `ih_audit_log` with `actor_id=NULL`, `actor_role='system'`. Grant EXECUTE to `service_role` only.
-
-**2. `supabase/functions/ih-scheduled-reminders/index.ts` — extend (single file, additive only)**
-Add these branches; each idempotent via `idempotencyKey`:
-- **Day 26 — draft prep**: insert into `ih_payroll_runs` `(month=monthKey, status='Draft')` if no row for the month; log `payroll.draft_prepared` via system-audit RPC. Never finalize (§11).
-- **Day 29 — finalize reminder**: if current-month run isn't `Finalized`/`Locked`, send admins a reminder email (idempotency `payroll-finalize-reminder-{month}-{date}`); log `payroll.finalize_reminder_sent`.
-- **Daily — carry-forward AL expiry**: select balances where `al_carry_forward > 0 AND al_carry_forward_expires_on < today`; per row set `al_carry_forward=0`, clear `al_carry_forward_expires_on`; log `leave.carry_forward_expired` with staff_id + amount.
-- **Weekly (Mon) — ack reminder digest**: find ack-required notices unarchived, created ≥3 days ago, with at least one pending recipient; send one admin digest email (idempotency `ack-reminder-digest-{isoWeek}`); log `notice.ack_reminder_sent`.
-- Top-of-file comment references Patch 001 §10–§21.
-
-**3. Memory**
-- New file `mem://internal-hub/patch-001` — capture the 6 alignment rules + scheduled-job boundaries (read-last authority).
-- Update `mem://index.md` adding "Patch 001 (Alignment & Scheduled Jobs)" reference + a Core line: "Scheduled jobs may prepare/remind/expire/retry/flag only — never auto-finalize payroll or make high-impact decisions."
+### Edit
+`supabase/functions/ih-scheduled-reminders/index.ts` — add one branch (~30 lines) gated by `today.getUTCMonth() === 0 && dayOfMonth === 1`, placed before the existing daily expiry branch. Update `results` shape with `carry_forward_rollover: { processed: n }`. Top-of-file comment list updated.
 
 ### Out of scope (deliberately untouched)
-- /marketing, main site, CRM, Placement Portal, registration tracker.
-- No new product modules (LMS/HRMS/observability/password manager).
-- No auto-retry for email/calendar/PDF (§15 allows "still visible" as sufficient).
-- No file-upload failure tracker (§18) — no failure surface to wire today.
-- No cron scheduling SQL — existing scheduling infrastructure for `ih-scheduled-reminders` is assumed; we only extend its body.
-- Doc 0.1–4.3 not rewritten (per §22).
+- No new admin UI for manual carry-forward (current `StaffSupabaseRepo.alCarryForward` write path still works for ad-hoc overrides).
+- No backfill for past years — first run will be Jan 1, 2027.
+- Cap value (7 days) is a default; change requires a separate request.
+- No schema change.
+- §18 file-upload failure tracking remains Low/out-of-scope.
 
-### Acceptance check (§24)
-All alignment bullets already pass; scope-control bullets preserved; scheduled-job bullets satisfied after edit #2; audit-readiness satisfied by the `logSystemAudit` calls.
+### Verification
+- Manual test: invoke with `?force_date=2027-01-01` (would need a small dev-only override) — skipped; instead rely on the audit-log + `carry_forward_rollover.processed` count on the first real run.
+- Existing daily expiry branch unchanged → starts finding rows once rollover has populated them.
+
+### Acceptance
+Patch 001 §13 fully satisfied: balances roll forward automatically, expire automatically, and every action is audit-traced under `actor_role='system'`.

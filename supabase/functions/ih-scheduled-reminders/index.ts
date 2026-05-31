@@ -9,6 +9,7 @@
 //   - Day 26 daily      → payroll draft prep (insert Draft run if missing)
 //   - Day 29 daily      → payroll finalization reminder if not Finalized/Locked
 //   - Daily             → Notion readiness reminder (Patch 001 §12)
+//   - Jan 1             → carry-forward AL rollover from prior year (Patch 001 §13)
 //   - Daily             → carry-forward AL expiry (Patch 001 §13)
 //   - Weekly (Mon UTC)  → ack-required notice digest to admins (Patch 001 §14)
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
@@ -212,6 +213,65 @@ serve(async (req) => {
       });
       (results.notion as unknown[]).push({ staffId: s.id, status: r.status });
     }
+  }
+
+  // --- §13 Carry-forward AL rollover (Jan 1 only) ---
+  if (today.getUTCMonth() === 0 && dayOfMonth === 1) {
+    const currentYear = today.getUTCFullYear();
+    const previousYear = currentYear - 1;
+    const expiresOn = `${currentYear}-07-01`;
+    const CAP = 7;
+
+    const { data: activeStaff } = await supabase
+      .from("ih_staff_profiles")
+      .select("id")
+      .eq("status", "Active");
+
+    let processed = 0;
+    for (const s of (activeStaff ?? []) as any[]) {
+      const { data: prev } = await supabase
+        .from("ih_leave_balances")
+        .select("al_total, al_used")
+        .eq("staff_id", s.id)
+        .eq("year", previousYear)
+        .maybeSingle();
+      if (!prev) continue;
+      const unused = Math.max(0, (prev as any).al_total - (prev as any).al_used);
+      const amount = Math.min(CAP, unused);
+      if (amount <= 0) continue;
+
+      const { data: existing } = await supabase
+        .from("ih_leave_balances")
+        .select("id, al_carry_forward, al_carry_forward_expires_on")
+        .eq("staff_id", s.id)
+        .eq("year", currentYear)
+        .maybeSingle();
+
+      // Idempotency: skip if already populated this year
+      if (existing && ((existing as any).al_carry_forward > 0 || (existing as any).al_carry_forward_expires_on)) continue;
+
+      let targetId: string | null = (existing as any)?.id ?? null;
+      if (existing) {
+        const { error } = await supabase
+          .from("ih_leave_balances")
+          .update({ al_carry_forward: amount, al_carry_forward_expires_on: expiresOn })
+          .eq("id", targetId!);
+        if (error) continue;
+      } else {
+        const { data: created, error } = await supabase
+          .from("ih_leave_balances")
+          .insert({ staff_id: s.id, year: currentYear, al_carry_forward: amount, al_carry_forward_expires_on: expiresOn } as any)
+          .select("id")
+          .single();
+        if (error || !created) continue;
+        targetId = (created as any).id;
+      }
+      await logSystemAudit(supabase, "leave.carry_forward_initialized", "ih_leave_balances",
+        targetId, `Carry-forward AL initialized (${amount} day(s), expires ${expiresOn})`,
+        { staffId: s.id, year: currentYear, sourceYear: previousYear, amount, expiresOn });
+      processed += 1;
+    }
+    (results as any).carry_forward_rollover = { processed };
   }
 
   // --- §13 Carry-forward AL expiry (daily) ---

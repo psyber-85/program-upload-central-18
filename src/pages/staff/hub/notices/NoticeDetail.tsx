@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useHub } from '@/lib/internal-hub/HubContext';
 import { noticeRepo } from '@/lib/internal-hub';
 import { canAccessAdminArea } from '@/lib/internal-hub/access';
@@ -7,27 +8,73 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, ExternalLink, Archive, Edit, Check, ClipboardList } from 'lucide-react';
+import { ArrowLeft, Archive, Edit, Check, ClipboardList, Loader2 } from 'lucide-react';
 import { NoticeImportanceBadge, NoticeTypeBadge } from '@/components/internal-hub/notices/NoticeBadges';
 import { useToast } from '@/hooks/use-toast';
+import type { Notice } from '@/lib/internal-hub/types';
 
 const NoticeDetail = () => {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { currentStaff } = useHub();
   const isAdmin = canAccessAdminArea(currentStaff);
   const { toast } = useToast();
-  const [tick, setTick] = useState(0);
   const [editing, setEditing] = useState(false);
 
-  const notice = useMemo(() => noticeRepo.get(id), [id, tick]);
+  const { data: notice, isLoading } = useQuery({
+    queryKey: ['ih-notice', id],
+    queryFn: () => noticeRepo.get(id),
+    enabled: !!id,
+  });
+
+  const { data: ack } = useQuery({
+    queryKey: ['ih-notice-ack', id, currentStaff?.id],
+    queryFn: () => noticeRepo.ackBy(id, currentStaff!.id),
+    enabled: !!notice && !!currentStaff,
+  });
 
   // Mark read on open
   useEffect(() => {
-    if (notice && currentStaff) noticeRepo.markRead(notice.id, currentStaff.id);
-  }, [notice?.id, currentStaff?.id]);
+    if (notice && currentStaff) {
+      noticeRepo.markRead(notice.id, currentStaff.id).then(() => {
+        qc.invalidateQueries({ queryKey: ['ih-notice-reads', currentStaff.id] });
+      });
+    }
+  }, [notice?.id, currentStaff?.id, qc]);
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['ih-notice', id] });
+    qc.invalidateQueries({ queryKey: ['ih-notices'] });
+  };
+
+  const ackMutation = useMutation({
+    mutationFn: () => noticeRepo.acknowledge(notice!.id, currentStaff!.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['ih-notice-ack', id] });
+      qc.invalidateQueries({ queryKey: ['ih-notice-acks', currentStaff?.id] });
+      toast({ title: 'Acknowledged', description: 'Thanks — your acknowledgment is recorded.' });
+    },
+    onError: (e: Error) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: (archived: boolean) => (archived ? noticeRepo.unarchive(notice!.id) : noticeRepo.archive(notice!.id)),
+    onSuccess: (_d, archived) => {
+      invalidate();
+      toast({ title: archived ? 'Notice restored' : 'Notice archived' });
+    },
+    onError: (e: Error) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
+  });
 
   if (!currentStaff) return null;
+  if (isLoading) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto flex items-center text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 mr-2 animate-spin" />Loading…
+      </div>
+    );
+  }
   if (!notice) {
     return (
       <div className="p-6 max-w-3xl mx-auto">
@@ -36,8 +83,6 @@ const NoticeDetail = () => {
       </div>
     );
   }
-
-  const ack = noticeRepo.ackBy(notice.id, currentStaff.id);
 
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-4">
@@ -55,25 +100,13 @@ const NoticeDetail = () => {
           <CardTitle className="text-xl mt-2">{notice.title}</CardTitle>
           <p className="text-xs text-muted-foreground">
             Published {new Date(notice.publishedAt).toLocaleString()}
-            {notice.editedAt && ` · edited ${new Date(notice.editedAt).toLocaleString()}`}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           {editing && isAdmin ? (
-            <EditForm notice={notice} onDone={() => { setEditing(false); setTick((t) => t + 1); }} />
+            <EditForm notice={notice} onDone={() => { setEditing(false); invalidate(); }} />
           ) : (
             <p className="text-sm text-foreground whitespace-pre-wrap">{notice.message}</p>
-          )}
-
-          {notice.links.length > 0 && (
-            <div className="space-y-1">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">Links</div>
-              {notice.links.map((l, i) => (
-                <a key={i} href={l.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline inline-flex items-center gap-1">
-                  {l.label || l.url} <ExternalLink className="h-3 w-3" />
-                </a>
-              ))}
-            </div>
           )}
 
           {notice.importance === 'AcknowledgmentRequired' && (
@@ -84,14 +117,8 @@ const NoticeDetail = () => {
                   Acknowledged on {new Date(ack.acknowledgedAt).toLocaleString()}
                 </div>
               ) : (
-                <Button
-                  onClick={() => {
-                    noticeRepo.acknowledge(notice.id, currentStaff.id);
-                    setTick((t) => t + 1);
-                    toast({ title: 'Acknowledged', description: 'Thanks — your acknowledgment is recorded.' });
-                  }}
-                >
-                  Acknowledge
+                <Button onClick={() => ackMutation.mutate()} disabled={ackMutation.isPending}>
+                  {ackMutation.isPending ? 'Saving…' : 'Acknowledge'}
                 </Button>
               )}
             </div>
@@ -109,23 +136,14 @@ const NoticeDetail = () => {
                   </Link>
                 </Button>
               )}
-              {!notice.archived ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { noticeRepo.archive(notice.id); setTick((t) => t + 1); toast({ title: 'Notice archived' }); }}
-                >
-                  <Archive className="h-3.5 w-3.5 mr-1" />Archive
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { noticeRepo.unarchive(notice.id); setTick((t) => t + 1); }}
-                >
-                  Restore
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={archiveMutation.isPending}
+                onClick={() => archiveMutation.mutate(notice.archived)}
+              >
+                <Archive className="h-3.5 w-3.5 mr-1" />{notice.archived ? 'Restore' : 'Archive'}
+              </Button>
             </div>
           )}
         </CardContent>
@@ -134,13 +152,15 @@ const NoticeDetail = () => {
   );
 };
 
-const EditForm = ({ notice, onDone }: { notice: ReturnType<typeof noticeRepo.get>; onDone: () => void }) => {
-  const n = notice!;
-  const [title, setTitle] = useState(n.title);
-  const [message, setMessage] = useState(n.message);
-  const [linksText, setLinksText] = useState(
-    n.links.map((l) => `${l.label}|${l.url}`).join('\n'),
-  );
+const EditForm = ({ notice, onDone }: { notice: Notice; onDone: () => void }) => {
+  const { toast } = useToast();
+  const [title, setTitle] = useState(notice.title);
+  const [message, setMessage] = useState(notice.message);
+  const editMutation = useMutation({
+    mutationFn: () => noticeRepo.edit(notice.id, { title, message }),
+    onSuccess: () => { onDone(); toast({ title: 'Notice updated' }); },
+    onError: (e: Error) => toast({ title: 'Save failed', description: e.message, variant: 'destructive' }),
+  });
   return (
     <div className="space-y-3">
       <div>
@@ -151,30 +171,13 @@ const EditForm = ({ notice, onDone }: { notice: ReturnType<typeof noticeRepo.get
         <label className="text-xs text-muted-foreground">Message</label>
         <Textarea rows={5} value={message} onChange={(e) => setMessage(e.target.value)} />
       </div>
-      <div>
-        <label className="text-xs text-muted-foreground">Links (one per line, label|url)</label>
-        <Textarea rows={3} value={linksText} onChange={(e) => setLinksText(e.target.value)} />
-      </div>
       <p className="text-xs text-muted-foreground">
-        Edits are limited to title, message, and links. Material changes should be re-broadcast instead.
+        Edits are limited to title and message. Material changes should be re-broadcast instead.
       </p>
       <div className="flex gap-2">
-        <Button
-          size="sm"
-          onClick={() => {
-            const links = linksText
-              .split('\n')
-              .map((l) => l.trim())
-              .filter(Boolean)
-              .map((l) => {
-                const [label, url] = l.split('|');
-                return { label: (label ?? '').trim(), url: (url ?? label ?? '').trim() };
-              })
-              .filter((l) => l.url);
-            noticeRepo.edit(n.id, { title, message, links });
-            onDone();
-          }}
-        >Save</Button>
+        <Button size="sm" disabled={editMutation.isPending} onClick={() => editMutation.mutate()}>
+          {editMutation.isPending ? 'Saving…' : 'Save'}
+        </Button>
         <Button size="sm" variant="ghost" onClick={onDone}>Cancel</Button>
       </div>
     </div>

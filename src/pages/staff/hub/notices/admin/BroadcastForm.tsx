@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useHub } from '@/lib/internal-hub/HubContext';
 import { noticeRepo } from '@/lib/internal-hub';
 import type { NoticeAudience, NoticeImportance } from '@/lib/internal-hub/types';
@@ -18,6 +19,7 @@ type AudienceKey = 'Everyone' | 'Admin' | 'Training' | 'Solutions';
 const BroadcastForm = () => {
   const { currentStaff } = useHub();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { toast } = useToast();
 
   const [title, setTitle] = useState('');
@@ -25,7 +27,30 @@ const BroadcastForm = () => {
   const [audienceKey, setAudienceKey] = useState<AudienceKey>('Everyone');
   const [requireAck, setRequireAck] = useState(false);
   const [important, setImportant] = useState(false);
-  const [linksText, setLinksText] = useState('');
+
+  const broadcastMutation = useMutation({
+    mutationFn: () => {
+      const audience: NoticeAudience =
+        audienceKey === 'Everyone' ? { kind: 'Everyone' }
+        : audienceKey === 'Admin' ? { kind: 'Admin' }
+        : { kind: 'Arm', arm: audienceKey === 'Training' ? 'Training' : 'Solutions' };
+      const importance: NoticeImportance =
+        requireAck ? 'AcknowledgmentRequired' : important ? 'Important' : 'Normal';
+      return noticeRepo.broadcast({
+        title: title.trim(),
+        message: message.trim(),
+        importance,
+        audience,
+        createdBy: currentStaff!.id,
+      });
+    },
+    onSuccess: (n) => {
+      qc.invalidateQueries({ queryKey: ['ih-notices'] });
+      toast({ title: 'Broadcast published', description: 'In-app notice created and email marked as required.' });
+      navigate(`/staff/notices/${n.id}`);
+    },
+    onError: (e: Error) => toast({ title: 'Publish failed', description: e.message, variant: 'destructive' }),
+  });
 
   if (!currentStaff) return null;
 
@@ -34,37 +59,7 @@ const BroadcastForm = () => {
       toast({ title: 'Missing fields', description: 'Title and message are required.', variant: 'destructive' });
       return;
     }
-    const audience: NoticeAudience =
-      audienceKey === 'Everyone' ? { kind: 'Everyone' }
-      : audienceKey === 'Admin' ? { kind: 'Admin' }
-      : { kind: 'Arm', arm: audienceKey === 'Training' ? 'Training' : 'Solutions' };
-
-    const importance: NoticeImportance =
-      requireAck ? 'AcknowledgmentRequired' : important ? 'Important' : 'Normal';
-
-    const links = linksText
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .map((l) => {
-        const [label, url] = l.split('|');
-        return { label: (label ?? '').trim(), url: (url ?? label ?? '').trim() };
-      })
-      .filter((l) => l.url);
-
-    const n = noticeRepo.broadcast({
-      title: title.trim(),
-      message: message.trim(),
-      importance,
-      audience,
-      links,
-      createdBy: currentStaff.id,
-    });
-    toast({
-      title: 'Broadcast published',
-      description: 'In-app notice created and email marked as required.',
-    });
-    navigate(`/staff/notices/${n.id}`);
+    broadcastMutation.mutate();
   };
 
   return (
@@ -115,13 +110,10 @@ const BroadcastForm = () => {
             </div>
             <Switch checked={requireAck} onCheckedChange={setRequireAck} />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="links">Links (one per line, format: label|url)</Label>
-            <Textarea id="links" rows={3} value={linksText} onChange={(e) => setLinksText(e.target.value)} placeholder="Updated policy|https://www.notion.so/..." />
-            <p className="text-xs text-muted-foreground">Notices support links only — no file attachments.</p>
-          </div>
           <div className="flex gap-2 pt-2">
-            <Button onClick={submit}>Publish broadcast</Button>
+            <Button onClick={submit} disabled={broadcastMutation.isPending}>
+              {broadcastMutation.isPending ? 'Publishing…' : 'Publish broadcast'}
+            </Button>
             <Button variant="ghost" onClick={() => navigate('/staff/notices')}>Cancel</Button>
           </div>
         </CardContent>

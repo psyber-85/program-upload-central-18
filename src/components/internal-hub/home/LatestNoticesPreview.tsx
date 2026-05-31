@@ -8,10 +8,10 @@ import type { Notice } from '@/lib/internal-hub/types';
 
 interface Props {
   notices: Notice[];
-  isReadByMe: (id: string) => boolean;
+  readSet: Set<string>;
 }
 
-const LatestNoticesPreview = ({ notices, isReadByMe }: Props) => (
+const LatestNoticesPreview = ({ notices, readSet }: Props) => (
   <Card>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
       <CardTitle className="text-base">Latest Notices</CardTitle>
@@ -25,7 +25,7 @@ const LatestNoticesPreview = ({ notices, isReadByMe }: Props) => (
       ) : (
         <ul className="divide-y divide-border">
           {notices.map((n) => {
-            const read = isReadByMe(n.id);
+            const read = readSet.has(n.id);
             const ack = n.importance === 'AcknowledgmentRequired';
             return (
               <li key={n.id}>

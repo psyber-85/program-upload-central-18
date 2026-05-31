@@ -1,58 +1,123 @@
-// Doc 1.2 — admin-editable resources. Local-only.
-import type { Resource, ResourceCategory, StaffProfile } from '../types';
-import { nowISO, readJSON, uid, writeJSON } from '../storage';
-import { SEED_RESOURCES } from '../seedNotices';
-import { audienceMatches } from './noticeRepo';
+// Doc 4.1 — Supabase-backed resourceRepo.
+// Async API. RLS enforces visibility (audience match + active staff + not archived).
+// DB lacks `owner`, `isNew` columns — defaulted/derived in mapRow.
+import { supabase } from '@/integrations/supabase/client';
+import type { NoticeAudience, Resource, ResourceCategory, StaffProfile } from '../types';
 
-const KEY = 'resources';
+type DbResource = {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string;
+  url: string;
+  audience: string;
+  archived_at: string | null;
+  created_at: string;
+};
 
-function load(): Resource[] {
-  const existing = readJSON<Resource[] | null>(KEY, null);
-  if (existing && existing.length) return existing;
-  writeJSON(KEY, SEED_RESOURCES);
-  return SEED_RESOURCES;
+function audienceToDb(a: NoticeAudience): string {
+  if (a.kind === 'Arm' && (a.arm === 'Training' || a.arm === 'Solutions')) return a.arm;
+  // 'Everyone', 'Admin', 'Arm: Admin/General', 'Individual' → Everyone
+  return 'Everyone';
 }
-const save = (r: Resource[]) => writeJSON(KEY, r);
+
+function audienceFromDb(audience: string): NoticeAudience {
+  if (audience === 'Training') return { kind: 'Arm', arm: 'Training' };
+  if (audience === 'Solutions') return { kind: 'Arm', arm: 'Solutions' };
+  return { kind: 'Everyone' };
+}
+
+function mapRow(r: DbResource): Resource {
+  const external = r.url.startsWith('http');
+  return {
+    id: r.id,
+    title: r.title,
+    category: r.category as ResourceCategory,
+    link: r.url,
+    description: r.description ?? undefined,
+    audience: audienceFromDb(r.audience),
+    status: r.archived_at ? 'Archived' : 'Active',
+    createdAt: r.created_at,
+    updatedAt: r.created_at,
+    external,
+  };
+}
 
 export const resourceRepo = {
-  list(): Resource[] {
-    return load();
+  async list(): Promise<Resource[]> {
+    const { data, error } = await supabase
+      .from('ih_resources')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return ((data ?? []) as DbResource[]).map(mapRow);
   },
-  visibleFor(staff: StaffProfile): Resource[] {
-    return load()
-      .filter((r) => r.status === 'Active')
-      .filter((r) => audienceMatches(r.audience, staff));
+
+  /** RLS filters audience + archived for non-admins. */
+  async visibleFor(_staff: StaffProfile): Promise<Resource[]> {
+    const { data, error } = await supabase
+      .from('ih_resources')
+      .select('*')
+      .is('archived_at', null)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return ((data ?? []) as DbResource[]).map(mapRow);
   },
-  byCategory(cat: ResourceCategory): Resource[] {
-    return load().filter((r) => r.category === cat && r.status === 'Active');
+
+  async create(input: Omit<Resource, 'id' | 'createdAt' | 'updatedAt' | 'status'>): Promise<Resource> {
+    const { data, error } = await supabase
+      .from('ih_resources')
+      .insert({
+        title: input.title,
+        description: input.description ?? null,
+        category: input.category,
+        url: input.link,
+        audience: audienceToDb(input.audience),
+      })
+      .select('*')
+      .single();
+    if (error) throw error;
+    return mapRow(data as DbResource);
   },
-  create(input: Omit<Resource, 'id' | 'createdAt' | 'updatedAt' | 'status'>): Resource {
-    const now = nowISO();
-    const next: Resource = {
-      ...input,
-      id: uid('res'),
-      status: 'Active',
-      createdAt: now,
-      updatedAt: now,
-    };
-    save([next, ...load()]);
-    return next;
+
+  async update(id: string, patch: Partial<Resource>): Promise<Resource | undefined> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dbPatch: any = {};
+    if (patch.title !== undefined) dbPatch.title = patch.title;
+    if (patch.description !== undefined) dbPatch.description = patch.description;
+    if (patch.category !== undefined) dbPatch.category = patch.category;
+    if (patch.link !== undefined) dbPatch.url = patch.link;
+    if (patch.audience !== undefined) dbPatch.audience = audienceToDb(patch.audience);
+    if (patch.status !== undefined) {
+      dbPatch.archived_at = patch.status === 'Archived' ? new Date().toISOString() : null;
+    }
+    if (Object.keys(dbPatch).length === 0) {
+      const { data } = await supabase.from('ih_resources').select('*').eq('id', id).maybeSingle();
+      return data ? mapRow(data as DbResource) : undefined;
+    }
+    const { data, error } = await supabase
+      .from('ih_resources')
+      .update(dbPatch)
+      .eq('id', id)
+      .select('*')
+      .single();
+    if (error) throw error;
+    return mapRow(data as DbResource);
   },
-  update(id: string, patch: Partial<Resource>): Resource | undefined {
-    let updated: Resource | undefined;
-    save(
-      load().map((r) => {
-        if (r.id !== id) return r;
-        updated = { ...r, ...patch, id: r.id, updatedAt: nowISO() };
-        return updated;
-      }),
-    );
-    return updated;
+
+  async archive(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('ih_resources')
+      .update({ archived_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw error;
   },
-  archive(id: string) {
-    this.update(id, { status: 'Archived' });
-  },
-  unarchive(id: string) {
-    this.update(id, { status: 'Active' });
+
+  async unarchive(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('ih_resources')
+      .update({ archived_at: null })
+      .eq('id', id);
+    if (error) throw error;
   },
 };

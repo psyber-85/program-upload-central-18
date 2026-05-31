@@ -1,25 +1,36 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { noticeRepo, staffRepo } from '@/lib/internal-hub';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Check, Clock, Mail, Loader2 } from 'lucide-react';
+import { ArrowLeft, Check, Clock, Loader2 } from 'lucide-react';
 
 const AckReport = () => {
   const { id = '' } = useParams();
-  const notice = useMemo(() => noticeRepo.get(id), [id]);
-  const { data: allStaff = [], isLoading } = useQuery({
+
+  const { data: notice, isLoading: noticeLoading } = useQuery({
+    queryKey: ['ih-notice', id],
+    queryFn: () => noticeRepo.get(id),
+    enabled: !!id,
+  });
+  const { data: allStaff = [], isLoading: staffLoading } = useQuery({
     queryKey: ['ih-staff-list'],
     queryFn: () => staffRepo.list(),
   });
-  const report = useMemo(() => noticeRepo.ackReport(id, allStaff), [id, allStaff]);
-  const log = useMemo(() => noticeRepo.broadcastLogFor(id), [id]);
-  const createdByName = useMemo(
-    () => (log ? allStaff.find((s) => s.id === log.createdBy)?.fullName ?? 'Unknown' : null),
-    [log, allStaff],
-  );
+  const { data: report = { acknowledged: [], pending: [] }, isLoading: reportLoading } = useQuery({
+    queryKey: ['ih-ack-report', id, allStaff.length],
+    queryFn: () => noticeRepo.ackReport(id, allStaff),
+    enabled: !!notice && allStaff.length > 0,
+  });
 
+  if (noticeLoading) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto flex items-center text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 mr-2 animate-spin" />Loading…
+      </div>
+    );
+  }
   if (!notice) {
     return (
       <div className="p-6 max-w-3xl mx-auto">
@@ -39,20 +50,7 @@ const AckReport = () => {
         <p className="text-sm text-muted-foreground mt-1">{notice.title}</p>
       </header>
 
-      {log && (
-        <Card className="bg-muted/30">
-          <CardContent className="p-3 text-xs text-muted-foreground flex items-start gap-2">
-            <Mail className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-            <span>
-              Broadcast sent {new Date(log.createdAt).toLocaleString()} by {createdByName} →{' '}
-              {log.recipientCount} recipient{log.recipientCount === 1 ? '' : 's'} · Email queued
-              (pending integration)
-            </span>
-          </CardContent>
-        </Card>
-      )}
-
-      {isLoading ? (
+      {staffLoading || reportLoading ? (
         <div className="flex items-center text-sm text-muted-foreground"><Loader2 className="h-4 w-4 mr-2 animate-spin" />Loading staff…</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

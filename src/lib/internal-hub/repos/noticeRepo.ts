@@ -1,4 +1,12 @@
-// Doc 1.2 — notices, broadcasts, ack tracking. Local-only.
+// Doc 4.1 — Supabase-backed noticeRepo.
+// Async API. RLS enforces visibility (audience match + active staff + not archived).
+// Notes vs. legacy local model:
+//  - DB has no `links`, `type`, `editedAt`, or `broadcast log` columns — those
+//    return [] / 'AdminBroadcast' / undefined and broadcastLog methods are no-ops.
+//  - DB importance enum is Normal | Important | Critical. App's
+//    'AcknowledgmentRequired' is stored as importance='Critical' + ack_required=true.
+//  - App audience 'Admin' and 'Arm: Admin/General' fall back to 'Everyone' in DB.
+import { supabase } from '@/integrations/supabase/client';
 import type {
   BroadcastLogEntry,
   Notice,
@@ -6,31 +14,68 @@ import type {
   NoticeAudience,
   NoticeImportance,
   NoticeLink,
-  NoticeReadState,
   NoticeType,
   StaffProfile,
 } from '../types';
-import { nowISO, readJSON, uid, writeJSON } from '../storage';
-import { SEED_NOTICES } from '../seedNotices';
 
-const KEY_NOTICES = 'notices';
-const KEY_READS = 'notice-reads';
-const KEY_ACKS = 'notice-acks';
-const KEY_BROADCAST_LOG = 'notice-broadcast-log';
+type DbNotice = {
+  id: string;
+  title: string;
+  body: string;
+  audience: string;
+  audience_staff_id: string | null;
+  importance: 'Normal' | 'Important' | 'Critical';
+  ack_required: boolean;
+  email_required: boolean;
+  archived_at: string | null;
+  created_at: string;
+  created_by: string | null;
+};
 
-function loadNotices(): Notice[] {
-  const existing = readJSON<Notice[] | null>(KEY_NOTICES, null);
-  if (existing && existing.length) return existing;
-  writeJSON(KEY_NOTICES, SEED_NOTICES);
-  return SEED_NOTICES;
+function audienceToDb(a: NoticeAudience): { audience: string; audience_staff_id: string | null } {
+  if (a.kind === 'Individual') return { audience: 'Individual', audience_staff_id: a.staffId };
+  if (a.kind === 'Arm' && (a.arm === 'Training' || a.arm === 'Solutions')) {
+    return { audience: a.arm, audience_staff_id: null };
+  }
+  // 'Everyone', 'Admin', 'Arm: Admin/General' → Everyone (RLS doesn't model Admin-only audience)
+  return { audience: 'Everyone', audience_staff_id: null };
 }
-const saveNotices = (n: Notice[]) => writeJSON(KEY_NOTICES, n);
 
-const loadReads = (): NoticeReadState[] => readJSON<NoticeReadState[]>(KEY_READS, []);
-const saveReads = (r: NoticeReadState[]) => writeJSON(KEY_READS, r);
+function audienceFromDb(audience: string, staffId: string | null): NoticeAudience {
+  if (audience === 'Individual') return { kind: 'Individual', staffId: staffId ?? '' };
+  if (audience === 'Training') return { kind: 'Arm', arm: 'Training' };
+  if (audience === 'Solutions') return { kind: 'Arm', arm: 'Solutions' };
+  return { kind: 'Everyone' };
+}
 
-const loadAcks = (): NoticeAck[] => readJSON<NoticeAck[]>(KEY_ACKS, []);
-const saveAcks = (a: NoticeAck[]) => writeJSON(KEY_ACKS, a);
+function importanceToDb(imp: NoticeImportance): { importance: DbNotice['importance']; ack_required: boolean } {
+  if (imp === 'AcknowledgmentRequired') return { importance: 'Critical', ack_required: true };
+  if (imp === 'Important') return { importance: 'Important', ack_required: false };
+  return { importance: 'Normal', ack_required: false };
+}
+
+function importanceFromDb(imp: DbNotice['importance'], ack: boolean): NoticeImportance {
+  if (ack) return 'AcknowledgmentRequired';
+  if (imp === 'Important' || imp === 'Critical') return 'Important';
+  return 'Normal';
+}
+
+function mapRow(r: DbNotice): Notice {
+  return {
+    id: r.id,
+    title: r.title,
+    message: r.body,
+    type: 'AdminBroadcast' as NoticeType,
+    importance: importanceFromDb(r.importance, r.ack_required),
+    audience: audienceFromDb(r.audience, r.audience_staff_id),
+    links: [] as NoticeLink[],
+    createdBy: r.created_by ?? '',
+    createdAt: r.created_at,
+    publishedAt: r.created_at,
+    emailRequired: r.email_required,
+    archived: !!r.archived_at,
+  };
+}
 
 export function audienceMatches(audience: NoticeAudience, staff: StaffProfile): boolean {
   switch (audience.kind) {
@@ -56,133 +101,171 @@ export interface BroadcastInput {
 }
 
 export const noticeRepo = {
-  list(): Notice[] {
-    return loadNotices();
+  async list(includeArchived = false): Promise<Notice[]> {
+    let q = supabase.from('ih_notices').select('*').order('created_at', { ascending: false });
+    if (!includeArchived) q = q.is('archived_at', null);
+    const { data, error } = await q;
+    if (error) throw error;
+    return ((data ?? []) as DbNotice[]).map(mapRow);
   },
-  get(id: string): Notice | undefined {
-    return loadNotices().find((n) => n.id === id);
-  },
-  /** Notices visible to a staff member (audience match, not archived). */
-  visibleFor(staff: StaffProfile, opts: { includeArchived?: boolean } = {}): Notice[] {
-    return loadNotices()
-      .filter((n) => (opts.includeArchived ? true : !n.archived))
-      .filter((n) => audienceMatches(n.audience, staff))
-      .sort((a, b) => (a.publishedAt < b.publishedAt ? 1 : -1));
-  },
-  /** Doc 1.2 §12 — Admin broadcast = in-app + emailRequired + log. */
-  broadcast(input: BroadcastInput): Notice {
-    const all = loadNotices();
-    const now = nowISO();
-    const notice: Notice = {
-      id: uid('ntc'),
-      title: input.title,
-      message: input.message,
-      type: input.type ?? 'AdminBroadcast',
-      importance: input.importance,
-      audience: input.audience,
-      links: input.links ?? [],
-      createdBy: input.createdBy,
-      createdAt: now,
-      publishedAt: now,
-      emailRequired: true, // always true for broadcasts
-      archived: false,
-    };
-    saveNotices([notice, ...all]);
 
-    // Doc 1.2 §12 — persist a broadcast log entry for the (future) email fanout.
-    // Use cached staff list (warmed by StaffHome/AdminStaffList queries).
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { staffRepo } = require('./staffRepo') as typeof import('./staffRepo');
-    const recipientCount = staffRepo
-      .listCached()
-      .filter((s) => s.status === 'Active' && audienceMatches(notice.audience, s))
-      .length;
-    const log = readJSON<BroadcastLogEntry[]>(KEY_BROADCAST_LOG, []);
-    const entry: BroadcastLogEntry = {
-      id: uid('blog'),
-      noticeId: notice.id,
-      createdBy: notice.createdBy,
-      createdAt: now,
-      audience: notice.audience,
-      recipientCount,
-      emailRequired: true,
-    };
-    writeJSON(KEY_BROADCAST_LOG, [entry, ...log]);
+  async get(id: string): Promise<Notice | undefined> {
+    const { data, error } = await supabase
+      .from('ih_notices')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? mapRow(data as DbNotice) : undefined;
+  },
 
-    return notice;
+  /** RLS already filters by audience + active staff. */
+  async visibleFor(_staff: StaffProfile, opts: { includeArchived?: boolean } = {}): Promise<Notice[]> {
+    return this.list(opts.includeArchived);
   },
-  /** Doc 1.2 §12 — list all broadcast log entries (most recent first). */
-  listBroadcastLog(): BroadcastLogEntry[] {
-    return readJSON<BroadcastLogEntry[]>(KEY_BROADCAST_LOG, []);
+
+  /** Doc 1.2 §12 — Admin broadcast = in-app + emailRequired. */
+  async broadcast(input: BroadcastInput): Promise<Notice> {
+    const aud = audienceToDb(input.audience);
+    const imp = importanceToDb(input.importance);
+    const { data, error } = await supabase
+      .from('ih_notices')
+      .insert({
+        title: input.title,
+        body: input.message,
+        audience: aud.audience,
+        audience_staff_id: aud.audience_staff_id,
+        importance: imp.importance,
+        ack_required: imp.ack_required,
+        email_required: true,
+        created_by: input.createdBy,
+      })
+      .select('*')
+      .single();
+    if (error) throw error;
+    return mapRow(data as DbNotice);
   },
-  broadcastLogFor(noticeId: string): BroadcastLogEntry | undefined {
-    return this.listBroadcastLog().find((e) => e.noticeId === noticeId);
+
+  // Broadcast log table not implemented in Phase 2 — return empty.
+  async listBroadcastLog(): Promise<BroadcastLogEntry[]> {
+    return [];
   },
-  /** Limited edit per §21 — title/message/links only. */
-  edit(id: string, patch: Pick<Partial<Notice>, 'title' | 'message' | 'links'>): Notice | undefined {
-    const all = loadNotices();
-    let updated: Notice | undefined;
-    const next = all.map((n) => {
-      if (n.id !== id) return n;
-      updated = { ...n, ...patch, editedAt: nowISO() };
-      return updated;
-    });
-    saveNotices(next);
-    return updated;
+  async broadcastLogFor(_noticeId: string): Promise<BroadcastLogEntry | undefined> {
+    return undefined;
   },
-  archive(id: string) {
-    const all = loadNotices();
-    saveNotices(all.map((n) => (n.id === id ? { ...n, archived: true } : n)));
+
+  /** Limited edit per §21 — title/message only (links not stored in DB). */
+  async edit(id: string, patch: Pick<Partial<Notice>, 'title' | 'message' | 'links'>): Promise<Notice | undefined> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dbPatch: any = {};
+    if (patch.title !== undefined) dbPatch.title = patch.title;
+    if (patch.message !== undefined) dbPatch.body = patch.message;
+    if (Object.keys(dbPatch).length === 0) return this.get(id);
+    const { error } = await supabase.from('ih_notices').update(dbPatch).eq('id', id);
+    if (error) throw error;
+    return this.get(id);
   },
-  unarchive(id: string) {
-    const all = loadNotices();
-    saveNotices(all.map((n) => (n.id === id ? { ...n, archived: false } : n)));
+
+  async archive(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('ih_notices')
+      .update({ archived_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw error;
+  },
+
+  async unarchive(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('ih_notices')
+      .update({ archived_at: null })
+      .eq('id', id);
+    if (error) throw error;
   },
 
   // ---- read state ----
-  isReadBy(noticeId: string, staffId: string): boolean {
-    return loadReads().some((r) => r.noticeId === noticeId && r.staffId === staffId);
+  async listReadsForStaff(staffId: string): Promise<Set<string>> {
+    const { data, error } = await supabase
+      .from('ih_notice_reads')
+      .select('notice_id')
+      .eq('staff_id', staffId);
+    if (error) throw error;
+    return new Set(((data ?? []) as { notice_id: string }[]).map((r) => r.notice_id));
   },
-  markRead(noticeId: string, staffId: string) {
-    const reads = loadReads();
-    if (reads.some((r) => r.noticeId === noticeId && r.staffId === staffId)) return;
-    saveReads([...reads, { noticeId, staffId, readAt: nowISO() }]);
+
+  async markRead(noticeId: string, staffId: string): Promise<void> {
+    const { error } = await supabase
+      .from('ih_notice_reads')
+      .insert({ notice_id: noticeId, staff_id: staffId });
+    // Ignore duplicate-key errors (composite PK collisions)
+    if (error && !/duplicate|conflict|unique/i.test(error.message)) throw error;
   },
-  unreadCount(staff: StaffProfile): number {
-    const visible = this.visibleFor(staff);
-    const reads = loadReads();
-    return visible.filter(
-      (n) => !reads.some((r) => r.noticeId === n.id && r.staffId === staff.id),
-    ).length;
+
+  async unreadCount(staff: StaffProfile): Promise<number> {
+    const [notices, reads] = await Promise.all([
+      this.visibleFor(staff),
+      this.listReadsForStaff(staff.id),
+    ]);
+    return notices.filter((n) => !reads.has(n.id)).length;
   },
 
   // ---- acknowledgments ----
-  ackBy(noticeId: string, staffId: string): NoticeAck | undefined {
-    return loadAcks().find((a) => a.noticeId === noticeId && a.staffId === staffId);
+  async listAcksForStaff(staffId: string): Promise<Map<string, NoticeAck>> {
+    const { data, error } = await supabase
+      .from('ih_notice_acks')
+      .select('*')
+      .eq('staff_id', staffId);
+    if (error) throw error;
+    const m = new Map<string, NoticeAck>();
+    for (const a of (data ?? []) as { notice_id: string; staff_id: string; acked_at: string }[]) {
+      m.set(a.notice_id, { noticeId: a.notice_id, staffId: a.staff_id, acknowledgedAt: a.acked_at });
+    }
+    return m;
   },
-  acknowledge(noticeId: string, staffId: string) {
-    const acks = loadAcks();
-    if (acks.some((a) => a.noticeId === noticeId && a.staffId === staffId)) return;
-    saveAcks([...acks, { noticeId, staffId, acknowledgedAt: nowISO() }]);
+
+  async ackBy(noticeId: string, staffId: string): Promise<NoticeAck | undefined> {
+    const { data, error } = await supabase
+      .from('ih_notice_acks')
+      .select('*')
+      .eq('notice_id', noticeId)
+      .eq('staff_id', staffId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return undefined;
+    return { noticeId: data.notice_id, staffId: data.staff_id, acknowledgedAt: data.acked_at };
   },
-  ackRequiredPendingFor(staff: StaffProfile): Notice[] {
-    return this.visibleFor(staff).filter(
-      (n) =>
-        n.importance === 'AcknowledgmentRequired' && !this.ackBy(n.id, staff.id),
-    );
+
+  async acknowledge(noticeId: string, staffId: string): Promise<void> {
+    const { error } = await supabase
+      .from('ih_notice_acks')
+      .insert({ notice_id: noticeId, staff_id: staffId });
+    if (error && !/duplicate|conflict|unique/i.test(error.message)) throw error;
   },
+
+  async ackRequiredPendingFor(staff: StaffProfile): Promise<Notice[]> {
+    const [notices, acks] = await Promise.all([
+      this.visibleFor(staff),
+      this.listAcksForStaff(staff.id),
+    ]);
+    return notices.filter((n) => n.importance === 'AcknowledgmentRequired' && !acks.has(n.id));
+  },
+
   /** Admin report — who has and hasn't acknowledged. */
-  ackReport(noticeId: string, allStaff: StaffProfile[]) {
-    const n = this.get(noticeId);
-    if (!n) return { acknowledged: [], pending: [] };
+  async ackReport(noticeId: string, allStaff: StaffProfile[]) {
+    const n = await this.get(noticeId);
+    if (!n) return { acknowledged: [] as { staff: StaffProfile; at?: string }[], pending: [] as StaffProfile[] };
     const recipients = allStaff.filter((s) => s.status === 'Active' && audienceMatches(n.audience, s));
-    const acks = loadAcks().filter((a) => a.noticeId === noticeId);
-    const ackedIds = new Set(acks.map((a) => a.staffId));
+    const { data, error } = await supabase
+      .from('ih_notice_acks')
+      .select('*')
+      .eq('notice_id', noticeId);
+    if (error) throw error;
+    const acks = (data ?? []) as { staff_id: string; acked_at: string }[];
+    const ackMap = new Map(acks.map((a) => [a.staff_id, a.acked_at]));
     return {
       acknowledged: recipients
-        .filter((s) => ackedIds.has(s.id))
-        .map((s) => ({ staff: s, at: acks.find((a) => a.staffId === s.id)?.acknowledgedAt })),
-      pending: recipients.filter((s) => !ackedIds.has(s.id)),
+        .filter((s) => ackMap.has(s.id))
+        .map((s) => ({ staff: s, at: ackMap.get(s.id) })),
+      pending: recipients.filter((s) => !ackMap.has(s.id)),
     };
   },
 };

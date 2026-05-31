@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { escapeHtml, jsonError } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,13 +13,31 @@ interface HiringInterestRequest {
   hiringNeeds: string;
 }
 
+function isEmail(s: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { picName, contactNumber, email, hiringNeeds }: HiringInterestRequest = await req.json();
+    const raw = await req.json().catch(() => null) as Partial<HiringInterestRequest> | null;
+    if (!raw) return jsonError(400, "invalid_json");
+    const picName = String(raw.picName ?? "").trim().slice(0, 120);
+    const contactNumber = String(raw.contactNumber ?? "").trim().slice(0, 40);
+    const email = String(raw.email ?? "").trim().slice(0, 200);
+    const hiringNeeds = String(raw.hiringNeeds ?? "").trim().slice(0, 4000);
+    if (!picName || !contactNumber || !email || !hiringNeeds) {
+      return jsonError(400, "missing_fields");
+    }
+    if (!isEmail(email)) return jsonError(400, "invalid_email");
+
+    const safePic = escapeHtml(picName);
+    const safeContact = escapeHtml(contactNumber);
+    const safeEmail = escapeHtml(email);
+    const safeNeeds = escapeHtml(hiringNeeds);
 
     const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
     const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "info@theaihq.net";
@@ -26,6 +45,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (!SENDGRID_API_KEY) {
       throw new Error("SendGrid API key not configured");
     }
+
 
     // Send LOI email to the employer
     const emailResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {

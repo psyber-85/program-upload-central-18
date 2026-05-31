@@ -37,6 +37,29 @@ function mapRow(r: DbRow): RequestSummary {
   };
 }
 
+// Patch 1.3 — richer rows for pending-item / workbench aggregation.
+export interface RequestDetail {
+  id: string;
+  staffId: string;
+  type: RequestSummary['type'];
+  rawKind: DbKind;
+  rawStatus: DbStatus;
+  status: RequestStatus;
+  date: string;
+}
+
+function mapDetail(r: DbRow): RequestDetail {
+  return {
+    id: r.id,
+    staffId: r.staff_id,
+    type: mapKind(r.kind),
+    rawKind: r.kind,
+    rawStatus: r.status,
+    status: mapStatus(r.status),
+    date: r.created_at,
+  };
+}
+
 export const requestSummaryRepo = {
   async listForStaff(staffId: string, limit?: number): Promise<RequestSummary[]> {
     let q = supabase
@@ -80,6 +103,37 @@ export const requestSummaryRepo = {
       return 0;
     }
     return count ?? 0;
+  },
+
+  // Patch 1.3 — staff's own NeedsCorrection requests.
+  async listNeedsCorrectionForStaff(staffId: string): Promise<RequestDetail[]> {
+    const { data, error } = await supabase
+      .from('ih_requests')
+      .select('id, staff_id, kind, status, created_at')
+      .eq('staff_id', staffId)
+      .is('archived_at', null)
+      .eq('status', 'NeedsCorrection')
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('[requestSummaryRepo.listNeedsCorrectionForStaff]', error);
+      return [];
+    }
+    return (data as DbRow[] | null)?.map(mapDetail) ?? [];
+  },
+
+  // Patch 1.3 — Admin Workbench pending approvals (detailed).
+  async listPendingApprovalsDetailed(): Promise<RequestDetail[]> {
+    const { data, error } = await supabase
+      .from('ih_requests')
+      .select('id, staff_id, kind, status, created_at')
+      .is('archived_at', null)
+      .eq('status', 'Submitted')
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('[requestSummaryRepo.listPendingApprovalsDetailed]', error);
+      return [];
+    }
+    return (data as DbRow[] | null)?.map(mapDetail) ?? [];
   },
 };
 

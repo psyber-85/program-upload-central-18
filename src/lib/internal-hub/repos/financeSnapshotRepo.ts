@@ -75,6 +75,7 @@ async function payrollTotalsFor(month: string) {
   let payroll = 0, claims = 0, training = 0, adj = 0, bonus = 0;
   let employeeStat = 0, employerStat = 0;
   let epfTot = 0, socsoTot = 0, eisTot = 0;
+  let employerEpf = 0, employerSocso = 0;
   for (const r of (data ?? []) as any[]) {
     const base = Number(r.base_salary ?? 0);
     const epf = Number(r.epf ?? 0);

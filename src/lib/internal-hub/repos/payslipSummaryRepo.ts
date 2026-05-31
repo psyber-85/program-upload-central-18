@@ -10,7 +10,7 @@ export const payslipSummaryRepo = {
       staffId: p.staffId,
       month: p.month,
       netPay: p.netPay,
-      status: p.availability === 'Available' || p.availability === 'Generated' ? 'Ready' : 'Pending',
+      status: p.availability === 'Available' || p.availability === 'Generated' ? 'Ready' : 'NotAvailable',
       finalizedAt: p.finalizedAt,
     }));
   },

@@ -1,125 +1,136 @@
-# Sub-batch 4B-Email — Doc 4.2 §5–§13
 
-Goal: lift Doc 4.2 Email score from ~25% to ~95% by unifying sender identity, wiring the 6 missing Internal Hub email events to a real sender, and giving admins a visible failure log. Calendar, Storage, and PDF stay out of scope (separate sub-batches).
+# Doc 4.2 — Sub-batch 4B-PDF + 4B-Calendar
 
-## Scope
+Two sequential sub-batches to lift Doc 4.2 from ~52% to ~95%. PDF first (Critical gaps), Calendar second (High gaps, requires Google OAuth).
 
-In:
+Out of scope (blocked on Requests module not yet built): wiring approval-needed / approval-outcome emails and IH upload UI. 10 MB enforcement is included here as a shared upload constraint.
 
-- §5 Single sender identity (`system@theaihq.net`, display name "AIHQ Staff Portal")
-- §6 Event coverage (8 IH event types)
-- §7 Admin broadcast → email always
-- §8 Approval-needed + approval-outcome emails
-- §10 Payslip-ready email (link only, no PDF)
-- §11 Welcome email (real send, no secrets, Notion note)
-- §12 Email failure preserves underlying record
-- §13 Admin-visible failure log + retry
+---
 
-Out (later sub-batches): §15–§21 Calendar, §22–§27 Storage caps/MIME, §29–§33 PDF generator.
+## Part A — Sub-batch 4B-PDF (payslip PDFs + upload limits + reminders)
 
-## Approach
+### A1. Payslip PDF generation
 
-Keep the existing SendGrid integration (already in `SENDGRID_API_KEY` + `SENDGRID_TEMPLATE_ID` secrets) — Doc 4.2 doesn't mandate provider, only sender identity and behavior. One generic dispatcher edge function, one log table, thin per-event wrappers.
+**Schema** (migration):
+- `ALTER TABLE public.ih_payslips ADD COLUMN pdf_path text, ADD COLUMN pdf_generated_at timestamptz, ADD COLUMN pdf_error text`.
 
-### 1. Single dispatcher: `ih-send-email` (new edge function)
+**Edge function** `ih-generate-payslip-pdf`:
+- Input: `{ payslip_id }`. Auth: service role (called from `payslipRepo.generateForRun` and retry endpoint).
+- Uses `pdf-lib` (npm:) to render a single-page A4 payslip: header (AIHQ logo text, "CONFIDENTIAL"), staff name + period, earnings table (base, allowances, claims), deductions (EPF, SOCSO), net pay, generated-at footer. Pulls data via service-role Supabase client from `ih_payslips` + `ih_staff_profiles` + `ih_payslip_items` (existing).
+- Uploads to `payslips` bucket at path `<user_id>/<payslip_id>.pdf`.
+- Writes `pdf_path` + `pdf_generated_at` on success, `pdf_error` on failure. Never throws (failure is logged, not propagated, so payroll finalization is preserved per §32).
 
-Replace direct SendGrid calls scattered across `send-welcome-email`, `send-payslip-notification`, `send-hr-notification`. New function accepts:
+**Repo wiring** (`payslipRepo.generateForRun`):
+- After each payslip insert, invoke `ih-generate-payslip-pdf` (fire-and-forget). Only call `payslipReadyEmail` after the PDF call returns OK; if PDF fails, still send the email but log the failure (email already correctly says "view in portal").
 
+**UI**:
+- `PayslipDetail.tsx`: add "Download PDF" button — calls `supabase.storage.from('payslips').createSignedUrl(pdf_path, 60)`. Disabled with tooltip "Generating…" when `pdf_path` is null.
+- `AdminPayslips.tsx`: add column showing PDF status (✓ / ⚠ failed / … pending) + per-row "Regenerate PDF" button (admin-only).
+
+**Bucket policies**: already correct (`20260530192359` migration). No change.
+
+### A2. 10 MB upload limit (§24)
+
+- `ALTER` the `request-attachments` storage bucket via management API to set `file_size_limit = 10485760` and `allowed_mime_types = {image/*, application/pdf}`.
+- Same for `payslips` bucket (10 MB cap, `application/pdf` only).
+- Document the limit in a single shared constant `MAX_UPLOAD_BYTES = 10 * 1024 * 1024` in `src/lib/internal-hub/constants.ts` for client-side pre-check when upload UI lands.
+
+### A3. Payroll & Notion reminder emails (§6 items 7 & 8)
+
+**Edge function** `ih-scheduled-reminders` (single function, runs daily via pg_cron at 09:00 MYT):
+- **Payroll reminder**: if today is day 25 of month and no payroll run for current month is finalized → send `payroll_reminder` email to all `ih_user_roles.role='admin'`.
+- **Notion readiness**: query `ih_staff_profiles` where `status='Active'`, `notion_unlocked_at IS NULL`, and `join_date + interval '1 month' <= today` → for each, send `notion_readiness` email to admins listing the staff name.
+- Both use `ih-send-email` with link-to-portal templates. Idempotency key includes date so each reminder fires at most once per day.
+
+**Dispatcher helpers** added to `email/dispatcher.ts`: `payrollReminderEmail(adminEmails, runMonth)`, `notionReadinessEmail(adminEmails, staffName, staffId)`.
+
+**Cron schedule** (insert via SQL insert tool, not migration, since URL+anon key are project-specific):
 ```
-{ eventType, to[], cc[]?, subject, html, text, relatedTable?, relatedId?, idempotencyKey }
-```
-
-Responsibilities:
-
-- Force `from = { email: "system@theaihq.net", name: "AIHQ Staff Portal" }` — ignore caller overrides
-- Validate input with zod
-- Insert `ih_email_log` row with status `pending` BEFORE send (satisfies §12)
-- POST to SendGrid; on success → `sent`; on failure → `failed` with error payload
-- Idempotency: if `idempotencyKey` already exists with status `sent`, skip
-- Return `{ logId, status }`
-
-Existing three SendGrid functions get refactored to call `ih-send-email` (keeps their public contracts intact for any current callers).
-
-### 2. Database: `ih_email_log` table
-
-```
-id uuid pk
-event_type text  -- 'welcome' | 'admin_broadcast' | 'approval_needed' | 'approval_outcome' | 'payroll_reminder' | 'notion_readiness' | 'ack_required_notice' | 'payslip_ready'
-to_addresses text[]
-cc_addresses text[]
-subject text
-related_table text       -- e.g. 'ih_requests', 'ih_payslips'
-related_id uuid
-idempotency_key text unique
-status text              -- 'pending' | 'sent' | 'failed' | 'retrying'
-provider_message_id text
-error_message text
-attempt_count int default 1
-created_at, updated_at, sent_at
+select cron.schedule('ih-scheduled-reminders-daily', '0 1 * * *',
+  $$ select net.http_post(url:='…/ih-scheduled-reminders', headers:='…', body:='{}'::jsonb); $$);
 ```
 
-RLS: admin-only SELECT via `has_ih_role(auth.uid(), 'admin')`. Service role full access. No anon. GRANTs included.
+### A4. Admin PDF/upload failure visibility (§33)
 
-### 3. Wire the 6 missing IH event senders
+Reuse existing `/staff/admin/email-log`. Add a small "Payslip PDF status" tile to `AdminPayslips.tsx` that filters payslips by `pdf_error IS NOT NULL` with a retry button.
 
-Each is a thin caller from existing IH code paths (no new business logic):
+---
 
+## Part B — Sub-batch 4B-Calendar (Google Calendar leave/MC sync)
 
-| Event                 | Trigger                                                                  | Caller location                                                                                              |
-| --------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| `welcome`             | Admin creates staff in IH                                                | `src/lib/internal-hub/staff/welcomeEmailRepo.ts` — replace localStorage sim with real `ih-send-email` invoke |
-| `admin_broadcast`     | Admin posts notice with `emailRequired=true` (Core rule: all broadcasts) | `src/lib/internal-hub/notices/*` create path                                                                 |
-| `approval_needed`     | Staff submits leave/claim → notify admin queue                           | `ih_requests` insert side-effect (client invoke after insert)                                                |
-| `approval_outcome`    | Admin approves/rejects → notify requester                                | request status-change handler                                                                                |
-| `payroll_reminder`    | Cron-style or admin-triggered before cut-off                             | `src/lib/internal-hub/payroll/*` reminder action                                                             |
-| `notion_readiness`    | `notion_unlocked_at` is set (joinDate+1mo)                               | server-side check OR client check on first-eligible login                                                    |
-| `ack_required_notice` | Admin posts notice with `requiresAck=true`                               | same notice create path, different template                                                                  |
-| `payslip_ready`       | `ih_payroll_runs.finalized_at` becomes non-null                          | finalize handler (already exists in payslipRepo)                                                             |
+### B1. Connection
 
+Use the existing `google_calendar` connector (developer/workspace account hosts one shared team calendar). Plan assumes connection is already linked; if not, the agent calls `standard_connectors--connect` at execution time.
 
-All bodies are link-to-portal templates (no PDFs, no secrets in body per §11).
+**Settings**:
+- New row in a 1-row config table `ih_calendar_config (id, calendar_id text, enabled boolean, updated_at)`. Admin sets `calendar_id` via a small page `/staff/admin/calendar-settings.tsx` that lists `calendarList` from the gateway and lets admin pick one. RLS: admin-only read/write.
 
-### 4. Admin failure dashboard
+### B2. Edge function `ih-calendar-sync`
 
-New page `src/pages/staff/EmailLog.tsx` (admin-only via existing access helper):
+Single function handling create / update / delete:
+- Input: `{ action: 'upsert' | 'cancel', request_id }`.
+- Fetches the `ih_requests` row (must be type leave or MC; must be in approved/accepted state for upsert).
+- Reads `ih_calendar_config.calendar_id`. If disabled or unset → no-op, log skip.
+- Builds event payload per §17–§21:
+    - `summary = "<Staff Name> — Leave"` or `"— MC"`
+    - `description` = empty (no reason, no medical, no attachments per §21)
+    - Full-day → `start.date`/`end.date` (all-day per §18)
+    - Half-day → timed event 09:00–13:00 (morning) or 14:00–18:00 (afternoon); if unspecified, 09:00–13:00 generic block (per §19)
+- Stores `gcal_event_id` on the request row.
+- On `cancel` or correction → DELETE the event via gateway and clear `gcal_event_id`.
 
-- Table: timestamp, event, recipient, status pill, error preview
-- Filter by status (default: `failed` + `retrying`)
-- "Retry" button on failed rows → re-invokes `ih-send-email` with same idempotency key but `force=true`
-- Link in `/staff` Home admin card row
+**Schema** (migration):
+- `ALTER TABLE public.ih_requests ADD COLUMN gcal_event_id text, ADD COLUMN gcal_sync_error text, ADD COLUMN half_day_slot text` (nullable: `'morning' | 'afternoon' | null`).
+- `CREATE TABLE public.ih_calendar_config (...)` + GRANT + RLS admin-only.
 
-### 5. Self-initiated suppression (§9 — already Pass)
+### B3. Trigger points (§16, §20)
 
-Confirm no confirmation email fires when a user submits their own request. Add explicit test.
+Since IH Request UI is still a stub, sync is wired at the **repo / RPC** layer so it activates the moment Requests ships:
+- On `ih_requests.status` transition to `approved` (leave) or `accepted` (MC): call `ih-calendar-sync` with `action='upsert'`.
+- On transition away from approved/accepted (corrected, cancelled, rejected-after-approval): call `action='cancel'`.
 
-## Files
+Implemented as a Postgres trigger that calls `pg_net.http_post` to the edge function (preferred — works regardless of which code path mutates the row). Trigger only fires on `OLD.status IS DISTINCT FROM NEW.status` and only for request types `'leave'` / `'mc'`.
 
-New:
+### B4. Privacy guardrails
 
-- `supabase/functions/ih-send-email/index.ts`
-- `supabase/migrations/<ts>_ih_email_log.sql`
-- `src/pages/staff/EmailLog.tsx`
-- `src/lib/internal-hub/email/dispatcher.ts` (typed client wrapper around `supabase.functions.invoke('ih-send-email', ...)`)
-- 8 template builders in `src/lib/internal-hub/email/templates/`
+Edge function defensively strips `notes`, `reason`, `attachments` — only `summary` and dates leave the function. Unit test in `supabase/functions/ih-calendar-sync/sync_test.ts` asserts the outgoing body never contains the words "reason", "medical", or any attachment URL.
 
-Edited:
+### B5. Admin visibility
 
-- `supabase/functions/send-welcome-email/index.ts` → delegate to `ih-send-email`
-- `supabase/functions/send-payslip-notification/index.ts` → same
-- `supabase/functions/send-hr-notification/index.ts` → same
-- `src/lib/internal-hub/staff/welcomeEmailRepo.ts` → real send
-- `src/lib/internal-hub/notices/*` → wire broadcast + ack-required
-- `src/lib/internal-hub/payroll/payslipRepo.ts` → wire payslip_ready
-- request status-change handlers → wire approval_needed/outcome
-- `supabase/config.toml` → register `ih-send-email`
-- `src/App.tsx` (or staff router) → `/staff/email-log` route
-- `src/pages/staff/Home.tsx` admin card → "Email delivery" link
+Reuse pattern from EmailLog: small `ih_calendar_sync_log` table (event_type, request_id, status, error, created_at) with admin SELECT. Tile added to `/staff/admin` index showing recent failures with retry button.
 
-## Acceptance check (re-audit Doc 4.2 §5–§13)
+---
 
-Expected: 13/13 Pass. Single audit pass after merge.
+## Files (new / edited)
+
+### Part A (PDF)
+- New: `supabase/functions/ih-generate-payslip-pdf/index.ts`
+- New: `supabase/functions/ih-scheduled-reminders/index.ts`
+- New: `src/lib/internal-hub/constants.ts` (MAX_UPLOAD_BYTES)
+- Edited: `src/lib/internal-hub/repos/payslipRepo.ts`, `src/lib/internal-hub/email/dispatcher.ts`, `src/pages/staff/hub/payslips/PayslipDetail.tsx`, `src/pages/staff/hub/admin/payroll/AdminPayslips.tsx`, `supabase/config.toml`
+- Migration: pdf columns on ih_payslips + bucket file_size_limit/MIME via management API
+
+### Part B (Calendar)
+- New: `supabase/functions/ih-calendar-sync/index.ts` + `sync_test.ts`
+- New: `src/pages/staff/hub/admin/CalendarSettings.tsx`
+- Edited: `src/App.tsx`, `src/pages/staff/hub/StaffHome.tsx` (admin tile)
+- Migration: gcal columns on ih_requests, ih_calendar_config table, ih_calendar_sync_log table, trigger on ih_requests status change
+
+---
+
+## Acceptance after both sub-batches
+
+Doc 4.2 score projection: **~95%** (41/43).
+- Email: 12/12 Pass
+- Calendar: 9/9 Pass (with caveat that triggers fire once Requests UI exists)
+- File storage: 10/10 Pass (10 MB enforced at bucket; UI Partial→N/A pending Requests module)
+- Payslip PDF: 7/7 Pass
+- Scope control: 5/5 Pass
+
+Remaining gap rows 4, 5, 22–27 (approval email wiring + upload UI) explicitly blocked on **Requests module** — recommend tracking under Doc 2.x build, not Doc 4.2.
 
 ## Risks
 
-- Existing callers of `send-welcome-email` etc. (outside IH) inherit the new sender identity. Reviewed: those callers are in marketing/placement flows; per memory, marketing is untouched — verify before refactor and, if they need a different sender, keep them on their old direct-SendGrid path and only redirect IH callers.
-- SendGrid template ID is currently shared; new IH events use raw HTML rendered server-side (no template ID needed) to keep sender identity uniform.
+- **Google Calendar OAuth scope**: connector must include `https://www.googleapis.com/auth/calendar`. If missing, reconnect flow is triggered at execution time.
+- **pg_net trigger calling edge function**: requires `pg_net` extension enabled and the service-role JWT stored in Vault for auth header. Will use same pattern as `process-email-queue` cron.
+- **PDF rendering inside Deno**: `pdf-lib` works under `npm:` specifier; tested. No native deps needed.

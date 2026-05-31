@@ -1,33 +1,90 @@
-## Patch 001 §13 — Close carry-forward AL expiry gap
+# Internal Hub — Spec Gap Fix Plan
 
-### Problem
-`al_carry_forward_expires_on` is never set, so the daily expiry branch in `ih-scheduled-reminders` is dead code. Patch 001 §13 requires expiry to "not depend only on manual memory."
+Closes the 9 gaps from the audit. Grouped by risk/severity. No scope creep — only what the docs already require.
 
-### Solution — Jan 1 year-rollover job branch
-Add a single dated branch to `supabase/functions/ih-scheduled-reminders/index.ts` that runs once per year on **Jan 1 (UTC)** and populates carry-forward + expiry from the previous year's unused AL.
+## Phase 1 — High severity (Requests & Leave correctness)
 
-### Rules
-- **Eligible staff**: `ih_staff_profiles.status = 'Active'`.
-- **Source row**: previous year's `ih_leave_balances` (`year = previousYear`).
-- **Carry-forward amount**: `max(0, al_total - al_used)`, capped at **7 days** (company policy default; matches typical MY SME practice — flag for review if different).
-- **Expiry**: `currentYear-07-01` (6 months after Jan 1, per §13).
-- **Target row**: upsert the current-year row by `(staff_id, year)`, setting `al_carry_forward` and `al_carry_forward_expires_on`. Do not touch `al_total`, `al_used`, `sl_total`, `sl_used`.
-- **Idempotency**: skip if target row already has `al_carry_forward > 0 OR al_carry_forward_expires_on IS NOT NULL` (job already ran this year for that staff).
-- **Audit**: emit `leave.carry_forward_initialized` per staff via `ih_log_system_audit` with `{ year, amount, expiresOn, sourceYear }`.
+### 1. Human-readable request reference numbers (Doc 2.1)
+- Add `reference_no TEXT UNIQUE` to `ih_requests`.
+- Create sequence `ih_request_ref_seq` + trigger that assigns `REQ-YYYYMM-NNNN` on INSERT.
+- Backfill existing rows.
+- Surface in `RequestsIndex.tsx` list/detail and notice/email templates that reference a request.
 
-### Edit
-`supabase/functions/ih-scheduled-reminders/index.ts` — add one branch (~30 lines) gated by `today.getUTCMonth() === 0 && dayOfMonth === 1`, placed before the existing daily expiry branch. Update `results` shape with `carry_forward_rollover: { processed: n }`. Top-of-file comment list updated.
+### 2. Overlapping leave prevention (Doc 2.2)
+- In `requestRepo.create`, before insert: query `ih_requests` for same `staff_id`, kind in `('AnnualLeave','SickLeave','UnpaidLeave')`, status in `('Submitted','Approved')`, with date-range overlap.
+- Throw a typed `OverlappingLeaveError` → caught in form, shown inline.
+- Add a DB-level `EXCLUDE USING gist` constraint as defense-in-depth.
 
-### Out of scope (deliberately untouched)
-- No new admin UI for manual carry-forward (current `StaffSupabaseRepo.alCarryForward` write path still works for ad-hoc overrides).
-- No backfill for past years — first run will be Jan 1, 2027.
-- Cap value (7 days) is a default; change requires a separate request.
-- No schema change.
-- §18 file-upload failure tracking remains Low/out-of-scope.
+### 3. Weekend exclusion in leave duration (Doc 2.2)
+- Add `lib/internal-hub/leaveDays.ts` with `countWorkingDays(start, end, halfDaySlot?)` excluding Sat/Sun.
+- Use it in request form (live duration preview) and in `requestRepo.create` to persist `working_days` on the row.
+- Leave public-holiday calendar as a TODO hook (spec marks "public holiday readiness", not active enforcement) — pass an empty array but expose the parameter.
 
-### Verification
-- Manual test: invoke with `?force_date=2027-01-01` (would need a small dev-only override) — skipped; instead rely on the audit-log + `carry_forward_rollover.processed` count on the first real run.
-- Existing daily expiry branch unchanged → starts finding rows once rollover has populated them.
+### 4. Training fund annual cycle (Doc 2.3)
+- Already-existing `sp_training_entitlements` is the SP-side equivalent — mirror as `ih_training_entitlements (staff_id, year, allotted_amount, used_amount, carried_in, updated_at)`.
+- On `TrainingApplication` approval: insert `pending_amount`; on `TrainingClaim` approval+payroll-inclusion: convert pending → used.
+- Show balance in Request form ("Training fund remaining: RM X / RM Y for 2026").
+- Block submission when `requested > remaining` unless admin override flag set.
 
-### Acceptance
-Patch 001 §13 fully satisfied: balances roll forward automatically, expire automatically, and every action is audit-traced under `actor_role='system'`.
+## Phase 2 — Medium severity (balance wiring + payroll math)
+
+### 5. AL / SL balance display & deduction (Doc 2.2)
+- `ih_leave_balances` already exists; wire up:
+  - On approve: decrement; on cancel-after-approve: re-credit (idempotent via `request_id` ledger column).
+  - Show balances on `StaffHome` + leave request form header.
+- Add monthly carry-forward / new-joiner prorate per memory `mem://staff-portal/approval-and-leave-balance-mechanics`.
+
+### 6. Claim auto-approval guardrails (Doc 2.3)
+- Add `claim_auto_approve_threshold` to a small config (constant for now, RM 50).
+- In `requestRepo.create` for `Claim`: if `amount <= threshold` AND attachment present AND not flagged → set `status='Approved'`, `auto_approved=true`, audit-log.
+- Anything over threshold or missing proof stays `Submitted` and hits admin queue.
+
+### 7. Employer EPF / SOCSO calculation (Doc 3.1)
+- Add `employer_epf_rate`, `employer_socso_rate` to `ih_staff_profiles` (defaults 13%, configurable).
+- In `payrollRepo.preparePayroll`: compute `employer_epf`, `employer_socso`; persist into `ih_payroll_items`.
+- Fix `total_company_cost = base + claims + training_claims + employer_epf + employer_socso` (not + employee deductions).
+- Update payslip PDF "Employer contributions" line.
+
+### 8. Finance Snapshot EPF/SOCSO autofill (Doc 3.3) — downstream of #7
+- `financeSnapshotRepo` already sums `employer_epf + employer_socso` from payroll items → becomes correct once #7 lands. Verify with a snapshot for the current month.
+
+## Phase 3 — Low severity
+
+### 9. MC distinct accept/reject (Doc 2.2)
+- Add admin action labels: "Accept MC" / "Reject MC" when `kind='SickLeave'` with attachment, mapping to `Approved` / `Rejected` under the hood (no new status, just clearer UX + audit summary text).
+
+## Technical details
+
+**Migrations (one per phase to keep blast radius small):**
+- `M1`: alter `ih_requests` (`reference_no`, `working_days`, `auto_approved`); add `ih_request_ref_seq` + trigger; backfill; add GiST overlap constraint.
+- `M2`: create `ih_training_entitlements` (+ GRANT to `authenticated` read-own/admin-all, RLS, service_role).
+- `M3`: alter `ih_staff_profiles` add employer rate columns; alter `ih_payroll_items` add `employer_epf`, `employer_socso`.
+
+**Code touch list:**
+- `src/lib/internal-hub/repos/requestRepo.ts` — overlap check, working_days, auto-approve
+- `src/lib/internal-hub/repos/claimRepo.ts` — threshold logic
+- `src/lib/internal-hub/repos/payrollRepo.ts` — employer contrib calc, total_company_cost fix
+- `src/lib/internal-hub/repos/leaveBalanceRepo.ts` (new) — ledger-style debit/credit
+- `src/lib/internal-hub/leaveDays.ts` (new)
+- `src/pages/staff/hub/requests/*` — show balances, reference_no, training remaining
+- `src/pages/staff/hub/StaffHome.tsx` — show AL/SL balances
+- `supabase/functions/ih-generate-payslip-pdf/index.ts` — employer contrib line
+
+**Invariants honored:**
+- RLS preserved (overlap query uses `auth.uid()`), GRANTs included in every new table.
+- No scheduled-job auto-finalize (Patch 001).
+- No PDF email attachments (Doc 3.2).
+- Payroll lock after finalize untouched.
+
+**Memory updates after ship:**
+- Update `mem://internal-hub/payroll-doc-3.1` with employer EPF/SOCSO formula.
+- Append claim auto-approval threshold + leave overlap rule to existing IH memories.
+
+## Out of scope (deliberately)
+- Public holiday calendar source (hook only).
+- Multi-approver workflows.
+- AI extraction (still deferred per Doc 4.3).
+- Any SP / placement / marketing surfaces.
+
+## Suggested execution order
+Phase 1 → Phase 2 → Phase 3, with a verify pass after each (one snapshot, one payroll dry-run, one leave request) before moving on.

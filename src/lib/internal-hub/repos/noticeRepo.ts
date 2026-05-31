@@ -7,6 +7,7 @@
 //    'AcknowledgmentRequired' is stored as importance='Critical' + ack_required=true.
 //  - App audience 'Admin' and 'Arm: Admin/General' fall back to 'Everyone' in DB.
 import { supabase } from '@/integrations/supabase/client';
+import { logAudit } from '../audit';
 import type {
   BroadcastLogEntry,
   Notice,

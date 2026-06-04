@@ -26,6 +26,7 @@ type DbRow = {
   employer_epf_rate: number | null;
   employer_socso_rate: number | null;
   employer_eis_rate: number | null;
+  insurance_covered: boolean | null;
   admin_notes: string | null;
   insurance_notes: string | null;
   deactivated_at: string | null;
@@ -45,7 +46,10 @@ function mapRow(r: DbRow): StaffProfile {
       : r.business_arm === 'Both' ? 'Admin/General'
       : 'Training',
     joinDate: r.join_date,
-    status: r.status === 'Active' ? 'Active' : 'Inactive',
+    status:
+      r.status === 'Active' ? 'Active'
+      : r.status === 'Pending' ? 'Pending'
+      : 'Inactive',
     baseSalary: Number(r.salary_base ?? 0),
     epfRate: Number(r.epf_rate ?? 11),
     socsoRate: Number(r.socso_rate ?? 2),
@@ -53,12 +57,13 @@ function mapRow(r: DbRow): StaffProfile {
     employerEpfRate: r.employer_epf_rate == null ? undefined : Number(r.employer_epf_rate),
     employerSocsoRate: r.employer_socso_rate == null ? undefined : Number(r.employer_socso_rate),
     employerEisRate: r.employer_eis_rate == null ? undefined : Number(r.employer_eis_rate),
-    insuranceCovered: false,
+    insuranceCovered: !!r.insurance_covered,
     adminNotes: r.admin_notes ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
 }
+
 
 function toBusinessArmDb(arm: StaffProfile['businessArm']): 'Training' | 'Solutions' | 'Both' {
   return arm === 'Solutions' ? 'Solutions' : arm === 'Admin/General' ? 'Both' : 'Training';
@@ -176,7 +181,9 @@ export const staffRepo = {
     if (patch.employerSocsoRate !== undefined) dbPatch.employer_socso_rate = patch.employerSocsoRate ?? null;
     if (patch.employerEisRate !== undefined) dbPatch.employer_eis_rate = patch.employerEisRate ?? null;
     if (patch.adminNotes !== undefined) dbPatch.admin_notes = patch.adminNotes;
+    if (patch.insuranceCovered !== undefined) dbPatch.insurance_covered = patch.insuranceCovered;
     if (patch.status !== undefined) dbPatch.status = patch.status;
+
 
     const { error } = await supabase
       .from('ih_staff_profiles')

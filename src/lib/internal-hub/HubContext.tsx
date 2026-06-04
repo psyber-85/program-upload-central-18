@@ -46,7 +46,7 @@ async function loadHubProfile(): Promise<StaffProfile | null> {
     employerEpfRate: (data as any).employer_epf_rate == null ? undefined : Number((data as any).employer_epf_rate),
     employerSocsoRate: (data as any).employer_socso_rate == null ? undefined : Number((data as any).employer_socso_rate),
     employerEisRate: (data as any).employer_eis_rate == null ? undefined : Number((data as any).employer_eis_rate),
-    insuranceCovered: false,
+    insuranceCovered: !!(data as any).insurance_covered,
     adminNotes: data.admin_notes ?? undefined,
     createdAt: data.created_at,
     updatedAt: data.updated_at,

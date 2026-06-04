@@ -140,7 +140,7 @@ serve(async (req) => {
       40, y, { size: 8, color: [0.45, 0.45, 0.45] });
 
     draw(`Generated ${new Date().toISOString()}`, 40, 40, { size: 8, color: [0.5, 0.5, 0.5] });
-    draw(`AIHQ Staff Portal — system@theaihq.net`, 40, 28, { size: 8, color: [0.5, 0.5, 0.5] });
+    draw(`AIHQ Staff Portal — wani@theaihq.net`, 40, 28, { size: 8, color: [0.5, 0.5, 0.5] });
 
     const bytes = await pdf.save();
     const path = `${ps.staff_id}/${ps.id}.pdf`;

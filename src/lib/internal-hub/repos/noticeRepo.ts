@@ -26,6 +26,7 @@ type DbNotice = {
   audience: string;
   audience_staff_id: string | null;
   importance: 'Normal' | 'Important' | 'Critical';
+  type: NoticeType | null;
   ack_required: boolean;
   email_required: boolean;
   archived_at: string | null;
@@ -35,15 +36,17 @@ type DbNotice = {
 
 function audienceToDb(a: NoticeAudience): { audience: string; audience_staff_id: string | null } {
   if (a.kind === 'Individual') return { audience: 'Individual', audience_staff_id: a.staffId };
+  if (a.kind === 'Admin') return { audience: 'Admin', audience_staff_id: null };
   if (a.kind === 'Arm' && (a.arm === 'Training' || a.arm === 'Solutions')) {
     return { audience: a.arm, audience_staff_id: null };
   }
-  // 'Everyone', 'Admin', 'Arm: Admin/General' → Everyone (RLS doesn't model Admin-only audience)
+  // 'Everyone' or 'Arm: Admin/General' (Both) → Everyone
   return { audience: 'Everyone', audience_staff_id: null };
 }
 
 function audienceFromDb(audience: string, staffId: string | null): NoticeAudience {
   if (audience === 'Individual') return { kind: 'Individual', staffId: staffId ?? '' };
+  if (audience === 'Admin') return { kind: 'Admin' };
   if (audience === 'Training') return { kind: 'Arm', arm: 'Training' };
   if (audience === 'Solutions') return { kind: 'Arm', arm: 'Solutions' };
   return { kind: 'Everyone' };
@@ -66,7 +69,7 @@ function mapRow(r: DbNotice): Notice {
     id: r.id,
     title: r.title,
     message: r.body,
-    type: 'AdminBroadcast' as NoticeType,
+    type: (r.type ?? 'AdminBroadcast') as NoticeType,
     importance: importanceFromDb(r.importance, r.ack_required),
     audience: audienceFromDb(r.audience, r.audience_staff_id),
     links: [] as NoticeLink[],
@@ -77,6 +80,7 @@ function mapRow(r: DbNotice): Notice {
     archived: !!r.archived_at,
   };
 }
+
 
 export function audienceMatches(audience: NoticeAudience, staff: StaffProfile): boolean {
   switch (audience.kind) {
@@ -158,10 +162,11 @@ export const noticeRepo = {
         audience: aud.audience,
         audience_staff_id: aud.audience_staff_id,
         importance: imp.importance,
+        type: (input.type ?? 'AdminBroadcast') as NoticeType,
         ack_required: imp.ack_required,
         email_required: true,
         created_by: input.createdBy,
-      })
+      } as any)
       .select('*')
       .single();
     if (error) throw error;
@@ -169,9 +174,20 @@ export const noticeRepo = {
 
     // Doc 4.2 §7 — send broadcast email (fire-and-forget; failures are
     // surfaced via the admin email log and do not block notice creation).
-    void this._sendBroadcastEmail(notice).catch((e) => {
+    const recipients = await resolveBroadcastRecipients(notice);
+    void this._sendBroadcastEmail(notice, recipients).catch((e) => {
       console.error('[noticeRepo.broadcast] email dispatch failed', e);
     });
+
+    // Doc 1.2 §12 — record broadcast log entry.
+    void supabase.from('ih_broadcast_log').insert({
+      notice_id: notice.id,
+      recipient_count: recipients.length,
+      audience: aud.audience,
+      audience_staff_id: aud.audience_staff_id,
+      email_required: true,
+      created_by: input.createdBy,
+    } as any);
 
     // Doc 4.3 §6 — audit broadcast send.
     void logAudit({
@@ -179,15 +195,14 @@ export const noticeRepo = {
       targetTable: 'ih_notices',
       targetId: notice.id,
       summary: `Broadcast "${notice.title}"`,
-      metadata: { audience: notice.audience, importance: notice.importance },
+      metadata: { audience: notice.audience, importance: notice.importance, type: notice.type, recipientCount: recipients.length },
     });
 
     return notice;
   },
 
-  async _sendBroadcastEmail(notice: Notice): Promise<void> {
+  async _sendBroadcastEmail(notice: Notice, recipients: string[]): Promise<void> {
     const { broadcastEmail } = await import('../email/dispatcher');
-    const recipients = await resolveBroadcastRecipients(notice);
     if (recipients.length === 0) return;
     await broadcastEmail({
       id: notice.id,
@@ -198,13 +213,43 @@ export const noticeRepo = {
     });
   },
 
-  // Broadcast log table not implemented in Phase 2 — return empty.
   async listBroadcastLog(): Promise<BroadcastLogEntry[]> {
-    return [];
+    const { data, error } = await supabase
+      .from('ih_broadcast_log')
+      .select('*')
+      .order('broadcast_at', { ascending: false });
+    if (error) return [];
+    return ((data ?? []) as any[]).map((r) => ({
+      id: r.id,
+      noticeId: r.notice_id,
+      createdBy: r.created_by ?? '',
+      createdAt: r.broadcast_at,
+      audience: audienceFromDb(r.audience, r.audience_staff_id ?? null),
+      recipientCount: r.recipient_count ?? 0,
+      emailRequired: true,
+    }));
   },
-  async broadcastLogFor(_noticeId: string): Promise<BroadcastLogEntry | undefined> {
-    return undefined;
+  async broadcastLogFor(noticeId: string): Promise<BroadcastLogEntry | undefined> {
+    const { data, error } = await supabase
+      .from('ih_broadcast_log')
+      .select('*')
+      .eq('notice_id', noticeId)
+      .order('broadcast_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return undefined;
+    const r = data as any;
+    return {
+      id: r.id,
+      noticeId: r.notice_id,
+      createdBy: r.created_by ?? '',
+      createdAt: r.broadcast_at,
+      audience: audienceFromDb(r.audience, r.audience_staff_id ?? null),
+      recipientCount: r.recipient_count ?? 0,
+      emailRequired: true,
+    };
   },
+
 
   /** Limited edit per §21 — title/message only (links not stored in DB). */
   async edit(id: string, patch: Pick<Partial<Notice>, 'title' | 'message' | 'links'>): Promise<Notice | undefined> {

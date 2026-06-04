@@ -54,6 +54,9 @@ Deno.serve(async (req) => {
     if (!body?.email || !body?.name) {
       return json({ ok: false, error: "name_and_email_required" }, 400);
     }
+    if (!body.businessArm || !["Training", "Solutions", "Both"].includes(body.businessArm)) {
+      return json({ ok: false, error: "business_arm_required" }, 400);
+    }
     const email = body.email.toLowerCase().trim();
     const role = body.role === "admin" ? "admin" : "staff";
 
@@ -76,7 +79,8 @@ Deno.serve(async (req) => {
       userId = invited!.user!.id;
     }
 
-    // Create profile.
+    // Create profile. Doc 0.2 §6 — staff are Active from the moment they're invited;
+    // there is no separate activation step. Login itself is gated by the invite email.
     const { error: profileErr } = await admin
       .from("ih_staff_profiles")
       .upsert({
@@ -84,12 +88,13 @@ Deno.serve(async (req) => {
         name: body.name,
         email,
         role,
-        status: "Pending",
+        status: "Active",
         job_title: body.jobTitle ?? null,
-        business_arm: body.businessArm ?? "Training",
+        business_arm: body.businessArm,
         join_date: body.joinDate ?? new Date().toISOString().slice(0, 10),
       }, { onConflict: "id" });
     if (profileErr) throw profileErr;
+
 
     // Role row.
     const { error: roleErr } = await admin

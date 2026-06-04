@@ -27,16 +27,26 @@ import { buildWorkbenchItems } from '@/lib/internal-hub/workbench/adminWorkbench
 
 const StaffHome = () => {
   const { currentStaff } = useHub();
-  const [tick] = useState(0);
+  const [tick, setTick] = useState(0);
   void tick;
 
   const isAdmin = canAccessAdminArea(currentStaff);
+
+  // Hydrate tool-access cache from Supabase. For admins, load all staff;
+  // for regular staff, just self. The cache feeds buildPendingItems /
+  // buildWorkbenchItems below via sync `toolAccessRepo.get()`.
+  useEffect(() => {
+    if (!currentStaff) return;
+    if (isAdmin) void toolAccessRepo.ensureLoadedAll().then(() => setTick((t) => t + 1));
+    else void toolAccessRepo.ensureLoaded(currentStaff.id).then(() => setTick((t) => t + 1));
+  }, [currentStaff?.id, isAdmin]);
 
   const { data: allStaff = [] } = useQuery({
     queryKey: ['ih-staff-list'],
     queryFn: () => staffRepo.list(),
     enabled: isAdmin,
   });
+
   const { data: noticesAll = [] } = useQuery({
     queryKey: ['ih-notices', { includeArchived: false }],
     queryFn: () => noticeRepo.list(false),

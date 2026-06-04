@@ -12,10 +12,7 @@ const HubShell = () => {
   if (currentStaff && currentStaff.status === 'Inactive') {
     return <Navigate to="/login?reason=inactive" replace />;
   }
-  // Pending staff have an account but haven't been activated yet.
-  if (currentStaff && currentStaff.status === 'Pending') {
-    return <Navigate to="/login?reason=pending" replace />;
-  }
+
 
   return (
     <SidebarProvider>

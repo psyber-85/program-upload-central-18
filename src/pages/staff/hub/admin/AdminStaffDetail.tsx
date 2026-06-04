@@ -49,10 +49,17 @@ const AdminStaffDetail = () => {
     enabled: !!id,
   });
 
+  // Hydrate Supabase-backed tool access on entry.
+  useEffect(() => {
+    if (!id) return;
+    void toolAccessRepo.ensureLoaded(id).then(() => bump());
+  }, [id]);
+
   const onboarding = useMemo(() => (staff ? onboardingRepo.get(staff.id) : undefined), [staff?.id, tick]);
   const tools = useMemo(() => (staff ? toolAccessRepo.get(staff.id) : []), [staff?.id, tick]);
   const offboarding = useMemo(() => (staff ? offboardingRepo.get(staff.id) : undefined), [staff?.id, tick]);
   const welcome = useMemo(() => (staff ? welcomeEmailRepo.get(staff.id) : undefined), [staff?.id, tick]);
+
 
   const [editValues, setEditValues] = useState<StaffFormValues | null>(null);
   useEffect(() => {
@@ -272,7 +279,28 @@ const AdminStaffDetail = () => {
             </CardContent>
           </Card>
           <WelcomeEmailStatus event={welcome} staffId={staff.id} onUpdate={bump} />
+          <Card>
+            <CardHeader><CardTitle className="text-base">Insurance coverage</CardTitle></CardHeader>
+            <CardContent>
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-sm text-foreground">
+                  Covered by company insurance
+                  <span className="block text-xs text-muted-foreground">Doc 0.1 §13 — admin-only.</span>
+                </span>
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={!!editValues.insuranceCovered}
+                  onChange={(e) => setEditValues((v) => v ? { ...v, insuranceCovered: e.target.checked } : v)}
+                />
+              </label>
+              <div className="mt-3 flex justify-end">
+                <Button size="sm" variant="outline" onClick={handleSave}>Save insurance</Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
+
 
         <TabsContent value="onboarding" className="space-y-4 mt-4">
           <NotionUnlockBanner joinDate={staff.joinDate} granted={notionTool?.status === 'Granted'} />

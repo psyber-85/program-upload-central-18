@@ -16,11 +16,10 @@ const Login = () => {
 
   const reason = searchParams.get('reason');
   const reasonMessage =
-    reason === 'pending'
-      ? 'Your account is pending activation by an admin. Please check back later.'
-      : reason === 'inactive'
+    reason === 'inactive'
       ? 'This account is inactive. Contact an admin to regain access.'
       : '';
+
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

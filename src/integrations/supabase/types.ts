@@ -296,6 +296,39 @@ export type Database = {
         }
         Relationships: []
       }
+      ih_broadcast_log: {
+        Row: {
+          audience: string
+          audience_staff_id: string | null
+          broadcast_at: string
+          created_by: string | null
+          email_required: boolean
+          id: string
+          notice_id: string
+          recipient_count: number
+        }
+        Insert: {
+          audience: string
+          audience_staff_id?: string | null
+          broadcast_at?: string
+          created_by?: string | null
+          email_required?: boolean
+          id?: string
+          notice_id: string
+          recipient_count?: number
+        }
+        Update: {
+          audience?: string
+          audience_staff_id?: string | null
+          broadcast_at?: string
+          created_by?: string | null
+          email_required?: boolean
+          id?: string
+          notice_id?: string
+          recipient_count?: number
+        }
+        Relationships: []
+      }
       ih_calendar_config: {
         Row: {
           calendar_id: string | null
@@ -637,6 +670,7 @@ export type Database = {
           id: string
           importance: Database["public"]["Enums"]["ih_notice_importance"]
           title: string
+          type: Database["public"]["Enums"]["ih_notice_type"]
         }
         Insert: {
           ack_required?: boolean
@@ -650,6 +684,7 @@ export type Database = {
           id?: string
           importance?: Database["public"]["Enums"]["ih_notice_importance"]
           title: string
+          type?: Database["public"]["Enums"]["ih_notice_type"]
         }
         Update: {
           ack_required?: boolean
@@ -663,6 +698,7 @@ export type Database = {
           id?: string
           importance?: Database["public"]["Enums"]["ih_notice_importance"]
           title?: string
+          type?: Database["public"]["Enums"]["ih_notice_type"]
         }
         Relationships: [
           {
@@ -1232,6 +1268,7 @@ export type Database = {
           employer_socso_rate: number | null
           epf_rate: number | null
           id: string
+          insurance_covered: boolean
           insurance_notes: string | null
           job_title: string | null
           join_date: string
@@ -1256,6 +1293,7 @@ export type Database = {
           employer_socso_rate?: number | null
           epf_rate?: number | null
           id: string
+          insurance_covered?: boolean
           insurance_notes?: string | null
           job_title?: string | null
           join_date?: string
@@ -1280,6 +1318,7 @@ export type Database = {
           employer_socso_rate?: number | null
           epf_rate?: number | null
           id?: string
+          insurance_covered?: boolean
           insurance_notes?: string | null
           job_title?: string | null
           join_date?: string
@@ -2679,6 +2718,14 @@ export type Database = {
       ih_business_arm: "Training" | "Solutions" | "Both"
       ih_finance_status: "Draft" | "Reviewed" | "Locked"
       ih_notice_importance: "Normal" | "Important" | "Critical"
+      ih_notice_type:
+        | "AdminBroadcast"
+        | "SystemNotification"
+        | "ResourceUpdate"
+        | "PayrollNotice"
+        | "AccessNotice"
+        | "DeadlineReminder"
+        | "GeneralAnnouncement"
       ih_payroll_status: "Draft" | "ReadyForReview" | "Finalized" | "Locked"
       ih_request_kind: "Leave" | "MC" | "Claim" | "Training" | "Benefit"
       ih_request_status:
@@ -2843,6 +2890,15 @@ export const Constants = {
       ih_business_arm: ["Training", "Solutions", "Both"],
       ih_finance_status: ["Draft", "Reviewed", "Locked"],
       ih_notice_importance: ["Normal", "Important", "Critical"],
+      ih_notice_type: [
+        "AdminBroadcast",
+        "SystemNotification",
+        "ResourceUpdate",
+        "PayrollNotice",
+        "AccessNotice",
+        "DeadlineReminder",
+        "GeneralAnnouncement",
+      ],
       ih_payroll_status: ["Draft", "ReadyForReview", "Finalized", "Locked"],
       ih_request_kind: ["Leave", "MC", "Claim", "Training", "Benefit"],
       ih_request_status: [

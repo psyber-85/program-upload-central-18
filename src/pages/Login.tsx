@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,11 +11,20 @@ import { Loader2, LogIn, ArrowLeft, Mail } from 'lucide-react';
 
 const Login = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { login, isAuthenticated, isLoading: authLoading } = useAuth();
-  
+
+  const reason = searchParams.get('reason');
+  const reasonMessage =
+    reason === 'pending'
+      ? 'Your account is pending activation by an admin. Please check back later.'
+      : reason === 'inactive'
+      ? 'This account is inactive. Contact an admin to regain access.'
+      : '';
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(reasonMessage);
   const [success, setSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mode, setMode] = useState<'login' | 'forgot'>('login');

@@ -1,7 +1,7 @@
 // Doc 0.1 + 0.2 + 1.1 + 1.2 type model — frontend-first, local-data-backed.
 
 export type HubRole = 'Admin' | 'Staff';
-export type StaffStatus = 'Active' | 'Inactive';
+export type StaffStatus = 'Active' | 'Pending' | 'Inactive';
 export type BusinessArm = 'Training' | 'Solutions' | 'Admin/General';
 export type OnboardingState = 'NotStarted' | 'InProgress' | 'Complete';
 

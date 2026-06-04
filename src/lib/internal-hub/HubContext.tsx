@@ -38,7 +38,7 @@ async function loadHubProfile(): Promise<StaffProfile | null> {
       : data.business_arm === 'Both' ? 'Admin/General'
       : 'Training',
     joinDate: data.join_date,
-    status: data.status === 'Active' ? 'Active' : 'Inactive',
+    status: data.status === 'Active' ? 'Active' : data.status === 'Pending' ? 'Pending' : 'Inactive',
     baseSalary: Number(data.salary_base ?? 0),
     epfRate: Number(data.epf_rate ?? 11),
     socsoRate: Number(data.socso_rate ?? 2),

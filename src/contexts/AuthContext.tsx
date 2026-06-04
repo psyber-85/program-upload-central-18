@@ -132,6 +132,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await supabase.auth.signOut();
         return { success: false, error: 'This account is inactive. Contact an admin.' };
       }
+      if (profile.status === 'Pending') {
+        await supabase.auth.signOut();
+        return { success: false, error: 'Your account is pending activation by an admin. Please check back later.' };
+      }
       setUser(profile);
       return { success: true };
     } catch {

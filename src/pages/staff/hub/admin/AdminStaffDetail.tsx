@@ -49,10 +49,17 @@ const AdminStaffDetail = () => {
     enabled: !!id,
   });
 
+  // Hydrate Supabase-backed tool access on entry.
+  useEffect(() => {
+    if (!id) return;
+    void toolAccessRepo.ensureLoaded(id).then(() => bump());
+  }, [id]);
+
   const onboarding = useMemo(() => (staff ? onboardingRepo.get(staff.id) : undefined), [staff?.id, tick]);
   const tools = useMemo(() => (staff ? toolAccessRepo.get(staff.id) : []), [staff?.id, tick]);
   const offboarding = useMemo(() => (staff ? offboardingRepo.get(staff.id) : undefined), [staff?.id, tick]);
   const welcome = useMemo(() => (staff ? welcomeEmailRepo.get(staff.id) : undefined), [staff?.id, tick]);
+
 
   const [editValues, setEditValues] = useState<StaffFormValues | null>(null);
   useEffect(() => {

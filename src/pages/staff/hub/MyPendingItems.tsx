@@ -1,5 +1,5 @@
 // Patch 1.3 §5 — Full My Pending Items page.
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
@@ -11,9 +11,16 @@ import { toolAccessRepo } from '@/lib/internal-hub/repos/toolAccessRepo';
 import { buildPendingItems } from '@/lib/internal-hub/workbench/pendingItems';
 import PendingItemsPreview from '@/components/internal-hub/home/PendingItemsPreview';
 
+
 const MyPendingItems = () => {
   const { currentStaff } = useHub();
   const staffId = currentStaff?.id;
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!staffId) return;
+    void toolAccessRepo.ensureLoaded(staffId).then(() => setTick((t) => t + 1));
+  }, [staffId]);
+
 
   const { data: notices = [] } = useQuery({
     queryKey: ['ih-notices', { includeArchived: false }],

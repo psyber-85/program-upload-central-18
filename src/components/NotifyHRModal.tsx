@@ -245,8 +245,8 @@ _______`;
           subject: emailSubject,
           message: emailPreview,
           prospect_name: prospectData?.name,
-          program_title: prospectData?.programTitle || 'Training Program',
-          product_type: prospectData?.programTitle // Use program title for edge function compatibility
+          program_title: programName || prospectData?.programTitle || 'Training Program',
+          product_type: programName || prospectData?.programTitle
         }
       });
 

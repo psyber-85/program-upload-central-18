@@ -167,8 +167,10 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
         signupForm: "https://drive.google.com/file/d/[SIGN_UP_FORM_NOT_FOUND]",
         courseBrochure: "https://drive.google.com/file/d/[COURSE_BROCHURE_NOT_FOUND]"
       };
+      setLinksMissing(true);
     } else {
       console.log('Found links for program:', programKey, links);
+      setLinksMissing(false);
     }
 
     const preview = `Dear ${hrName},

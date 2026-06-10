@@ -350,6 +350,29 @@ _______`;
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="programName">Program Name</Label>
+              <Input
+                id="programName"
+                value={programName}
+                onChange={(e) => setProgramName(e.target.value)}
+                required
+                placeholder="e.g. AI for Business Operations"
+              />
+              <p className="text-xs text-muted-foreground">
+                Used to look up the brochure and sign-up form links, and shown in the email body.
+              </p>
+            </div>
+
+            {linksMissing && (
+              <div className="p-3 rounded-md border border-red-300 bg-red-50 text-sm text-red-800">
+                <div className="font-medium">Brochure / Sign-Up links missing for this program.</div>
+                <div className="mt-1">
+                  Add them in Registration Tracker → Edit Program, or adjust the Program Name above to match an existing entry. Send is disabled until links are resolved.
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
               <Label htmlFor="subject">Email Subject</Label>
               <Input
                 id="subject"

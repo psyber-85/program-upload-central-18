@@ -1,8 +1,8 @@
 // Patch 1.3 §9–§12 — Full Admin Workbench page.
-import React, { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,7 @@ import { useHub } from '@/lib/internal-hub/HubContext';
 import { canAccessAdminArea } from '@/lib/internal-hub/access';
 import { requestSummaryRepo, payrollRepo, staffRepo } from '@/lib/internal-hub';
 import { listSystemIssues } from '@/lib/internal-hub/repos/systemIssuesRepo';
+import { toolAccessRepo } from '@/lib/internal-hub/repos/toolAccessRepo';
 import { buildWorkbenchItems, WORKBENCH_TYPE_LABELS } from '@/lib/internal-hub/workbench/adminWorkbench';
 import { ACTION_LABELS, type WorkbenchItemType } from '@/lib/internal-hub/workbench/types';
 

@@ -51,11 +51,15 @@ export function buildWorkbenchItems(input: BuildInput): WorkbenchItem[] {
   }
 
   // Onboarding / Offboarding / Notion access (per active staff)
+  // Patch 1.7 — onboarding/offboarding repos are still per-device (localStorage);
+  // only emit items when the local checklist shows actual progress (>0 items
+  // touched) so we don't surface phantom rows for staff this device has never
+  // opened. Full Supabase migration is deferred to a later patch.
   for (const s of staff) {
     if (s.status !== 'Active') continue;
     const ob = onboardingRepo.get(s.id);
     const p = checklistProgress(ob.items);
-    if (p.done < p.total) {
+    if (p.done < p.total && p.done > 0) {
       items.push({
         id: `onb:${s.id}`,
         type: 'Onboarding',

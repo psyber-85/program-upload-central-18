@@ -425,8 +425,8 @@ _______`;
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Sending...' : 'Send Email'}
+            <Button type="submit" disabled={isSubmitting || linksMissing}>
+              {isSubmitting ? 'Sending...' : linksMissing ? 'Send (links missing)' : 'Send Email'}
             </Button>
           </DialogFooter>
         </form>

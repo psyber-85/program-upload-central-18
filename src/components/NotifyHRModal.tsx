@@ -217,6 +217,14 @@ _______`;
       });
       return;
     }
+    if (linksMissing) {
+      toast({
+        title: "Cannot send",
+        description: "Brochure and Sign-Up links are missing for this program. Add them in Registration Tracker → Edit Program, or adjust the Program Name to match an existing entry.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsSubmitting(true);
     try {

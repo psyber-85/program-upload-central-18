@@ -130,10 +130,11 @@ const generateEmailTemplate = async (hrName: string, staffName: string, courseNa
       <p>Thank you for your attention and support. We look forward to welcoming <strong>${safeStaffName}</strong> to the program.</p>
       
       <p>Warm regards,<br>
-      Vino<br>
+      Zarnaaz<br>
       Training Support Specialist<br>
       AIHQ Training & Consultancy<br>
-      Phone: 016-4609464</p>
+      Phone: 011-6184-8751</p>
+      
       
       <hr style="border: none; border-top: 1px solid #ccc; margin: 20px 0;">
     </div>
@@ -163,10 +164,10 @@ Should you have any questions or need further assistance, please feel free to co
 Thank you for your attention and support. We look forward to welcoming ${staffName} to the program.
 
 Warm regards,
-Vino
+Zarnaaz
 Training Support Specialist
 AIHQ Training & Consultancy
-Phone: 016-4609464
+Phone: 011-6184-8751
 
 _______`;
 
@@ -215,7 +216,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('Sending email via SendGrid...');
     console.log('Email subject:', emailSubject);
     console.log('Program title:', program_title);
-    console.log('Recipients - HR:', to_email, 'Participant:', participant_email, 'CC: vino@theaihq.net');
+    console.log('Recipients - HR:', to_email, 'Participant:', participant_email, 'CC: zarnaaz@theaihq.net');
     
     // Deduplicate email addresses (case-insensitive)
     const toRecipients = [];
@@ -248,7 +249,7 @@ const handler = async (req: Request): Promise<Response> => {
             to: toRecipients,
             cc: [
               {
-                email: "vino@theaihq.net",
+                email: "zarnaaz@theaihq.net",
                 name: "AIHQ Training and Consultancy",
               },
             ],
@@ -256,7 +257,7 @@ const handler = async (req: Request): Promise<Response> => {
           },
         ],
         from: {
-          email: "vino@theaihq.net",
+          email: "zarnaaz@theaihq.net",
           name: "AIHQ Training and Consultancy",
         },
         content: [
@@ -290,7 +291,7 @@ const handler = async (req: Request): Promise<Response> => {
         recipients: {
           hr: to_email,
           participant: participant_email,
-          cc: "vino@theaihq.net"
+          cc: "zarnaaz@theaihq.net"
         },
         subject: emailSubject
       }),

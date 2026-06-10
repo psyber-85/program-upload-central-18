@@ -82,6 +82,14 @@ function mapItem(r: any): PayrollItem {
     includedTrainingClaimIds: (r.included_training_claim_ids as string[]) ?? [],
     notes: r.notes ?? undefined,
   };
+  // Patch 1.7 — self-heal employer contributions if older row stored zeros.
+  // Uses default Malaysian rates (13 / 1.75 / 0.2) when row was finalized before
+  // the employer split landed. Display only — no DB write.
+  if (it.baseSalary > 0 && it.employerEpf === 0 && it.employerSocso === 0 && it.employerEis === 0) {
+    it.employerEpf = round2((it.baseSalary * DEFAULT_EMPLOYER_EPF_RATE) / 100);
+    it.employerSocso = round2((it.baseSalary * DEFAULT_EMPLOYER_SOCSO_RATE) / 100);
+    it.employerEis = round2((it.baseSalary * DEFAULT_EMPLOYER_EIS_RATE) / 100);
+  }
   // Back-fill totals if older row has zeros.
   if (!it.totalEmployeeDeductions || !it.totalEmployerContribution) {
     const t = totals(it);

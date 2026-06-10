@@ -407,7 +407,7 @@ _______`;
                     <div><strong>To:</strong> {prospectData?.name} ({prospectData?.email})</div>
                     <div><strong>CC:</strong> AIHQ Training and Consultancy (zarnaaz@theaihq.net)</div>
                     <div><strong>From:</strong> Zarnaaz - AIHQ Training and Consultancy (zarnaaz@theaihq.net)</div>
-                    <div><strong>Program:</strong> {prospectData?.programTitle}</div>
+                    <div><strong>Program:</strong> {programName || prospectData?.programTitle}</div>
                     <div><strong>Pricing:</strong> RM{pricing}</div>
                     <div><strong>Participant:</strong> {prospectData?.name}</div>
                   </div>

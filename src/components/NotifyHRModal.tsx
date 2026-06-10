@@ -118,21 +118,16 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
         pricing: programPricing
       });
 
-      // Add program title and pricing to prospect data
       const prospectWithProgram = { ...prospect, programTitle, pricing: programPricing };
       setProspectData(prospectWithProgram);
       setPricing(programPricing);
-      
+      setProgramName(programTitle);
+
       if (prospect.hr_contacts && prospect.hr_contacts.length > 0) {
         const hrContactData = prospect.hr_contacts[0];
         setHrContact(hrContactData);
         setHrEmail(hrContactData.email || '');
-        
-        // Set default email subject using program title
         setEmailSubject(`Training Registration for ${programTitle}`);
-        
-        // Generate email preview using program title
-        generateEmailPreview(hrContactData.name, prospect.name, programTitle, programTitle, programPricing);
       }
     } catch (error) {
       console.error('Failed to load prospect data:', error);

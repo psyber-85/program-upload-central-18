@@ -24,9 +24,11 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
   const [prospectData, setProspectData] = useState<any>(null);
   const [hrContact, setHrContact] = useState<any>(null);
   const [hrEmail, setHrEmail] = useState('');
+  const [programName, setProgramName] = useState('');
   const [emailSubject, setEmailSubject] = useState('');
   const [emailPreview, setEmailPreview] = useState('');
   const [pricing, setPricing] = useState<number>(2850);
+  const [linksMissing, setLinksMissing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [programLinks, setProgramLinks] = useState<Record<string, { signupForm: string; courseBrochure: string }>>({});
   const { toast } = useToast();
@@ -38,18 +40,18 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
     }
   }, [isOpen, prospectId]);
 
-  // Regenerate email preview when program links are loaded
+  // Regenerate email preview when program links, prospect, hr contact, or program name changes
   useEffect(() => {
-    if (Object.keys(programLinks).length > 0 && prospectData && hrContact) {
+    if (Object.keys(programLinks).length > 0 && prospectData && hrContact && programName) {
       generateEmailPreview(
-        hrContact.name, 
-        prospectData.name, 
-        prospectData.programTitle, 
-        prospectData.programTitle, 
-        prospectData.pricing
+        hrContact.name,
+        prospectData.name,
+        programName,
+        programName,
+        prospectData.pricing,
       );
     }
-  }, [programLinks, prospectData, hrContact]);
+  }, [programLinks, prospectData, hrContact, programName]);
 
   const loadProgramLinks = async () => {
     try {
@@ -116,21 +118,16 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
         pricing: programPricing
       });
 
-      // Add program title and pricing to prospect data
       const prospectWithProgram = { ...prospect, programTitle, pricing: programPricing };
       setProspectData(prospectWithProgram);
       setPricing(programPricing);
-      
+      setProgramName(programTitle);
+
       if (prospect.hr_contacts && prospect.hr_contacts.length > 0) {
         const hrContactData = prospect.hr_contacts[0];
         setHrContact(hrContactData);
         setHrEmail(hrContactData.email || '');
-        
-        // Set default email subject using program title
         setEmailSubject(`Training Registration for ${programTitle}`);
-        
-        // Generate email preview using program title
-        generateEmailPreview(hrContactData.name, prospect.name, programTitle, programTitle, programPricing);
       }
     } catch (error) {
       console.error('Failed to load prospect data:', error);
@@ -170,8 +167,10 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
         signupForm: "https://drive.google.com/file/d/[SIGN_UP_FORM_NOT_FOUND]",
         courseBrochure: "https://drive.google.com/file/d/[COURSE_BROCHURE_NOT_FOUND]"
       };
+      setLinksMissing(true);
     } else {
       console.log('Found links for program:', programKey, links);
+      setLinksMissing(false);
     }
 
     const preview = `Dear ${hrName},
@@ -218,6 +217,14 @@ _______`;
       });
       return;
     }
+    if (linksMissing) {
+      toast({
+        title: "Cannot send",
+        description: "Brochure and Sign-Up links are missing for this program. Add them in Registration Tracker → Edit Program, or adjust the Program Name to match an existing entry.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -238,8 +245,8 @@ _______`;
           subject: emailSubject,
           message: emailPreview,
           prospect_name: prospectData?.name,
-          program_title: prospectData?.programTitle || 'Training Program',
-          product_type: prospectData?.programTitle // Use program title for edge function compatibility
+          program_title: programName || prospectData?.programTitle || 'Training Program',
+          product_type: programName || prospectData?.programTitle
         }
       });
 
@@ -286,9 +293,11 @@ _______`;
     setProspectData(null);
     setHrContact(null);
     setHrEmail('');
+    setProgramName('');
     setEmailSubject('');
     setEmailPreview('');
     setPricing(2850);
+    setLinksMissing(false);
     onClose();
   };
 
@@ -341,6 +350,29 @@ _______`;
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="programName">Program Name</Label>
+              <Input
+                id="programName"
+                value={programName}
+                onChange={(e) => setProgramName(e.target.value)}
+                required
+                placeholder="e.g. AI for Business Operations"
+              />
+              <p className="text-xs text-muted-foreground">
+                Used to look up the brochure and sign-up form links, and shown in the email body.
+              </p>
+            </div>
+
+            {linksMissing && (
+              <div className="p-3 rounded-md border border-red-300 bg-red-50 text-sm text-red-800">
+                <div className="font-medium">Brochure / Sign-Up links missing for this program.</div>
+                <div className="mt-1">
+                  Add them in Registration Tracker → Edit Program, or adjust the Program Name above to match an existing entry. Send is disabled until links are resolved.
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
               <Label htmlFor="subject">Email Subject</Label>
               <Input
                 id="subject"
@@ -375,7 +407,7 @@ _______`;
                     <div><strong>To:</strong> {prospectData?.name} ({prospectData?.email})</div>
                     <div><strong>CC:</strong> AIHQ Training and Consultancy (zarnaaz@theaihq.net)</div>
                     <div><strong>From:</strong> Zarnaaz - AIHQ Training and Consultancy (zarnaaz@theaihq.net)</div>
-                    <div><strong>Program:</strong> {prospectData?.programTitle}</div>
+                    <div><strong>Program:</strong> {programName || prospectData?.programTitle}</div>
                     <div><strong>Pricing:</strong> RM{pricing}</div>
                     <div><strong>Participant:</strong> {prospectData?.name}</div>
                   </div>
@@ -393,8 +425,8 @@ _______`;
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Sending...' : 'Send Email'}
+            <Button type="submit" disabled={isSubmitting || linksMissing}>
+              {isSubmitting ? 'Sending...' : linksMissing ? 'Send (links missing)' : 'Send Email'}
             </Button>
           </DialogFooter>
         </form>

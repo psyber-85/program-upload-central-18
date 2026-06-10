@@ -1,101 +1,50 @@
-# Patch 1.7 — Employer EPF, live Workbench, marketing email & JSON bulk-fill
+# Patch 1.8 — Editable Program Links & Variable Fields
 
-## 1. Employer EPF / SOCSO / EIS always 0
+## Problem
 
-**Root cause.** `buildItem()` in `payrollRepo.ts` correctly computes employer EPF/SOCSO/EIS (defaults 13 / 1.75 / 0.2 when staff rates null). Newest run shows correct values (employer_epf=390 on base=3000). But the older draft and all `ih_payslips` rows have employer_*=0 because they were created/finalized before this calc landed. PayslipDetail then renders "Employer EPF 0.00".
+`NotifyHRModal` resolves brochure + signup form URLs from `program_links` by exact `program_title` match. The June–Sept AI training programs have no matching rows, so emails render `[COURSE_BROCHURE_NOT_FOUND]` / `[SIGN_UP_FORM_NOT_FOUND]`. There is no UI to add/edit those links, edit pricing, or override the program name used in the email.
 
-**Fix**
-- **Data backfill** via `supabase--insert`: update `ih_payroll_items` and `ih_payslips` where `employer_epf = 0 AND base_salary > 0`, recomputing:
-  - `employer_epf = base_salary * coalesce(s.employer_epf_rate, 13)/100`
-  - `employer_socso = base_salary * coalesce(s.employer_socso_rate, 1.75)/100`
-  - `employer_eis = base_salary * coalesce(s.employer_eis_rate, 0.2)/100`
-  - `total_employer_contribution = sum`
-  - Net pay untouched (Patch 1.5 invariant).
-- **Defense-in-depth** in `payrollRepo.mapItem`: if `employer_epf===0 && base_salary>0`, recompute on read using cached staff rates. Display only, no DB write.
+## Scope
 
-## 2. Admin Workbench — not "live and real"
+Admin editing inside Registration Tracker (`/staff/marketing/register-tracker`) + per-send program-name override in the HR modal. No schema changes — `registration_programs` and `program_links` already exist.
 
-**Audit:**
+## Changes
 
-| Source | Backed by | Live? |
-| --- | --- | --- |
-| `requestSummaryRepo.listPendingApprovalsDetailed()` | Supabase | yes |
-| `staffRepo.list()` | Supabase | yes |
-| `systemIssuesRepo.listSystemIssues()` | Supabase | yes |
-| `payrollRepo.statusFor(month)` | Supabase | yes |
-| **`onboardingRepo.get()`** | **localStorage** | **NO — per-device** |
-| **`offboardingRepo.get()`** | **localStorage** | **NO — per-device** |
-| **`toolAccessRepo.get()` (Notion access)** | in-memory cache | partial |
+### 1. `AddProgramForm.tsx` — expand on create
+Add optional fields:
+- Pricing (RM)
+- Signup form URL
+- Brochure URL
 
-**Fix (surgical — no new tables):**
-- In `AdminWorkbench.tsx`: `useEffect(() => { toolAccessRepo.ensureLoadedAll().then(() => qc.invalidateQueries(['ih-staff-list'])); }, [staff.length])` so Notion-access items reflect DB truth.
-- In `adminWorkbench.ts buildWorkbenchItems`: only emit Onboarding/Offboarding items when local checklist has *actual progress* (>0 items touched). Stops fake "incomplete" rows on machines that never opened that staff.
-- Add `refetchInterval: 30_000` to the four DB-backed queries + a "Refresh" button in the header.
-- One-line info banner under the header: *"Onboarding/Offboarding checklists are tracked per-device until next patch."*
+On submit: insert `registration_programs`, then upsert `program_links` (key = `program_title`) when either URL is provided.
 
-Full onboarding/offboarding → Supabase migration deferred (separate patch, new tables + RLS + repo rewrite).
+### 2. New `EditProgramModal.tsx`
+Edit existing program. Loads current `registration_programs` row + matching `program_links` row. Fields:
+- Title
+- Pricing
+- Signup form URL
+- Brochure URL
 
-## 3. Marketing — `NotifyHRModal`
+Save: update `registration_programs`; upsert `program_links` under new title; if title changed, delete the old `program_links` row to avoid orphans. Single try/catch with toast.
 
-### 3a. Editable HR email in the dialog
-- Add `const [hrEmail, setHrEmail] = useState('')`, seed from `hrContact.email`.
-- Render `<Input type="email" required>` labeled **"Send to HR Email"** above preview.
-- Use `hrEmail` (not `hrContact.email`) for `supabase.functions.invoke('send-hr-notification', { to_email: hrEmail, ... })` and the recipients summary. `hr_contacts.email_sent_at` update still keys on `hrContact.id`.
+### 3. `ProgramCard.tsx` — edit button + link status chip
+- Pencil "Edit" button beside Collapse/Expand → opens `EditProgramModal`.
+- Status chip: green "Links: OK" when both URLs present for this title, amber "Links: Missing" otherwise. Makes the June–Sept gap visible at a glance.
 
-### 3b. Sender swap — frontend + backend
-**Email** `vino@theaihq.net` → `zarnaaz@theaihq.net`
-**Name** `Vino` → `Zarnaaz`
-**Phone** `016-4609464` → `011-6184-8751`
+### 4. `NotifyHRModal.tsx` — editable program name + hard block on missing links
+- Add editable **Program Name** input (defaulted to `prospectData.programTitle`). Used as the lookup key for `program_links` and as the course name in the email body / subject. Re-runs `generateEmailPreview` on change.
+- Detect when resolved links contain `[*_NOT_FOUND]` (i.e., no exact or partial match for the typed name). Show a red banner: "Brochure/Sign-up links missing for this program. Add them in Registration Tracker → Edit Program, or adjust the Program Name above to match an existing entry."
+- **Disable the Send button** while links are missing. Server-side untouched.
 
-Verified-only occurrences (ripgrep):
+## Files
 
-`src/components/NotifyHRModal.tsx`
-- L199 signature, L202 phone, L358 CC label, L359 From label
-
-`supabase/functions/send-hr-notification/index.ts`
-- L133 HTML signature, L136 HTML phone, L166 plain-text signature, L169 plain-text phone, L218 console log, L251 CC email, L259 From email, L293 response cc
-
-Org name `"AIHQ Training and Consultancy"` unchanged. Then `deploy_edge_functions: ["send-hr-notification"]`.
-
-## 4. JSON bulk-fill for "Add Prospect" modal
-
-Currently `AddProspectModal` requires filling 7 fields one-by-one: `name, email, phone, org, role, payment, prospect_score`.
-
-**Add a JSON mode** (toggle in the dialog header):
-- Toggle button: **"Manual" | "JSON"** at top of dialog.
-- JSON mode shows a single `<Textarea>` with placeholder showing the schema:
-  ```json
-  {
-    "name": "Jane Tan",
-    "email": "jane@acme.com",
-    "phone": "012-3456789",
-    "org": "Acme Sdn Bhd",
-    "role": "HR Manager",
-    "payment": "Pending",
-    "prospect_score": "B"
-  }
-  ```
-- "Apply" button parses the JSON and **only fills fields that are currently empty** ("add only, not replace existing"). Switches back to Manual view with the form populated so user can verify/edit before submit.
-- Invalid JSON → inline error, no destructive change.
-- Unknown keys → ignored silently (logged to console).
-- `prospect_score` validated against `'A'|'B'|'C'|'D'`; falls back to existing value if invalid.
-- Manual fields, validation, and submit flow unchanged.
-
-**Scope**: `AddProspectModal.tsx` only (single file). Not applied to `AddProspectForm`, `AddHRContactModal`, or other forms in this patch — confirm if you want those too.
-
----
-
-## Technical summary
-- **No schema migration** — data backfill only (UPDATE ih_payroll_items + ih_payslips).
-- **Code edits**: `payrollRepo.ts`, `AdminWorkbench.tsx`, `adminWorkbench.ts`, `NotifyHRModal.tsx`, `send-hr-notification/index.ts` (+ redeploy), `AddProspectModal.tsx`.
-- **Memory update**: `mem://register-tracker/hr-email-notification-updates` → Zarnaaz / zarnaaz@theaihq.net / 011-6184-8751.
+- edit `src/components/AddProgramForm.tsx`
+- create `src/components/registration/EditProgramModal.tsx`
+- edit `src/components/registration/ProgramCard.tsx`
+- edit `src/components/NotifyHRModal.tsx`
 
 ## Out of scope
-- Migrating onboarding/offboarding repos to Supabase.
-- Any other payroll UI changes.
-- JSON mode on other forms (HR contact, AddProspectForm page, bulk upload).
-- Any other marketing components.
 
-## Confirm before I build
-1. Workbench fix surgical (above) — or do you want full onboarding/offboarding → Supabase migration done now (bigger lift)?
-2. JSON bulk-fill on `AddProspectModal` only — or also on `AddProspectForm` and `AddHRContactModal`?
+- Migrating `program_links` to FK on `registration_programs.id` (would need data move).
+- Per-program sender overrides, duration, HRDC code, etc. Add later if requested.
+- Auto-seeding June–Sept rows — staff fills via the new UI.

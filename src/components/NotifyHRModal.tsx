@@ -40,18 +40,18 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
     }
   }, [isOpen, prospectId]);
 
-  // Regenerate email preview when program links are loaded
+  // Regenerate email preview when program links, prospect, hr contact, or program name changes
   useEffect(() => {
-    if (Object.keys(programLinks).length > 0 && prospectData && hrContact) {
+    if (Object.keys(programLinks).length > 0 && prospectData && hrContact && programName) {
       generateEmailPreview(
-        hrContact.name, 
-        prospectData.name, 
-        prospectData.programTitle, 
-        prospectData.programTitle, 
-        prospectData.pricing
+        hrContact.name,
+        prospectData.name,
+        programName,
+        programName,
+        prospectData.pricing,
       );
     }
-  }, [programLinks, prospectData, hrContact]);
+  }, [programLinks, prospectData, hrContact, programName]);
 
   const loadProgramLinks = async () => {
     try {

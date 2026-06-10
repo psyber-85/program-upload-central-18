@@ -23,6 +23,7 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
 }) => {
   const [prospectData, setProspectData] = useState<any>(null);
   const [hrContact, setHrContact] = useState<any>(null);
+  const [hrEmail, setHrEmail] = useState('');
   const [emailSubject, setEmailSubject] = useState('');
   const [emailPreview, setEmailPreview] = useState('');
   const [pricing, setPricing] = useState<number>(2850);
@@ -123,6 +124,7 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
       if (prospect.hr_contacts && prospect.hr_contacts.length > 0) {
         const hrContactData = prospect.hr_contacts[0];
         setHrContact(hrContactData);
+        setHrEmail(hrContactData.email || '');
         
         // Set default email subject using program title
         setEmailSubject(`Training Registration for ${programTitle}`);
@@ -196,10 +198,10 @@ Should you have any questions or need further assistance, please feel free to co
 Thank you for your attention and support. We look forward to welcoming ${staffName} to the program.
 
 Warm regards,
-Vino
+Zarnaaz
 Training Support Specialist
 AIHQ Training & Consultancy
-Phone: 016-4609464
+Phone: 011-6184-8751
 
 _______`;
 
@@ -208,7 +210,7 @@ _______`;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hrContact || !emailSubject.trim() || !prospectData) {
+    if (!hrContact || !emailSubject.trim() || !prospectData || !hrEmail.trim()) {
       toast({
         title: "Error",
         description: "Missing required information",
@@ -220,7 +222,7 @@ _______`;
     setIsSubmitting(true);
     try {
       console.log('Sending email with data:', {
-        to_email: hrContact.email,
+        to_email: hrEmail,
         to_name: hrContact.name,
         participant_email: prospectData.email,
         prospect_name: prospectData?.name,
@@ -230,7 +232,7 @@ _______`;
       // Call the SendGrid edge function with program title
       const { data, error } = await supabase.functions.invoke('send-hr-notification', {
         body: {
-          to_email: hrContact.email,
+          to_email: hrEmail,
           to_name: hrContact.name,
           participant_email: prospectData.email,
           subject: emailSubject,
@@ -283,6 +285,7 @@ _______`;
   const handleClose = () => {
     setProspectData(null);
     setHrContact(null);
+    setHrEmail('');
     setEmailSubject('');
     setEmailPreview('');
     setPricing(2850);
@@ -323,6 +326,21 @@ _______`;
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div className="space-y-2">
+              <Label htmlFor="hrEmail">Send to HR Email</Label>
+              <Input
+                id="hrEmail"
+                type="email"
+                value={hrEmail}
+                onChange={(e) => setHrEmail(e.target.value)}
+                required
+                placeholder="hr@company.com"
+              />
+              <p className="text-xs text-muted-foreground">
+                Default: {hrContact.email}. Edit if this HR uses a different address.
+              </p>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="subject">Email Subject</Label>
               <Input
                 id="subject"
@@ -353,10 +371,10 @@ _______`;
                 <div>
                   <div className="font-medium text-blue-900">Email Recipients</div>
                   <div className="text-sm text-blue-700 mt-1">
-                    <div><strong>To:</strong> {hrContact.name} ({hrContact.email})</div>
+                    <div><strong>To:</strong> {hrContact.name} ({hrEmail || hrContact.email})</div>
                     <div><strong>To:</strong> {prospectData?.name} ({prospectData?.email})</div>
-                    <div><strong>CC:</strong> AIHQ Training and Consultancy (vino@theaihq.net)</div>
-                    <div><strong>From:</strong> Vino - AIHQ Training and Consultancy (vino@theaihq.net)</div>
+                    <div><strong>CC:</strong> AIHQ Training and Consultancy (zarnaaz@theaihq.net)</div>
+                    <div><strong>From:</strong> Zarnaaz - AIHQ Training and Consultancy (zarnaaz@theaihq.net)</div>
                     <div><strong>Program:</strong> {prospectData?.programTitle}</div>
                     <div><strong>Pricing:</strong> RM{pricing}</div>
                     <div><strong>Participant:</strong> {prospectData?.name}</div>

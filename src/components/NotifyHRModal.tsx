@@ -293,9 +293,11 @@ _______`;
     setProspectData(null);
     setHrContact(null);
     setHrEmail('');
+    setProgramName('');
     setEmailSubject('');
     setEmailPreview('');
     setPricing(2850);
+    setLinksMissing(false);
     onClose();
   };
 

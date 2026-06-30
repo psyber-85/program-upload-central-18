@@ -257,6 +257,12 @@ _______`;
         throw new Error(error.message || 'Failed to send email');
       }
 
+      // Edge function now returns structured failures with HTTP 200
+      if (data && data.success === false) {
+        const detail = data.sendgridBody ? `: ${String(data.sendgridBody).slice(0, 300)}` : '';
+        throw new Error(`${data.error || 'Email send failed'}${detail}`);
+      }
+
       // Update HR contact to mark email as sent
       const { error: updateError } = await supabase
         .from('hr_contacts')
@@ -272,7 +278,9 @@ _______`;
 
       toast({
         title: "Success",
-        description: `Email sent successfully to HR, participant, and CC'd to AIHQ`,
+        description: isSelfHR
+          ? `Email sent successfully (participant is also HR — single recipient, CC'd to AIHQ)`
+          : `Email sent successfully to HR, participant, and CC'd to AIHQ`,
       });
 
       onComplete();

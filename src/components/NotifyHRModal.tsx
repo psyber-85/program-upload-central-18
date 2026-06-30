@@ -426,8 +426,10 @@ _______`;
                 <div>
                   <div className="font-medium text-blue-900">Email Recipients</div>
                   <div className="text-sm text-blue-700 mt-1">
-                    <div><strong>To:</strong> {hrContact.name} ({hrEmail || hrContact.email})</div>
-                    <div><strong>To:</strong> {prospectData?.name} ({prospectData?.email})</div>
+                    <div><strong>To:</strong> {hrContact.name} ({hrEmail || hrContact.email}){isSelfHR ? ' — also the participant' : ''}</div>
+                    {!isSelfHR && (
+                      <div><strong>To:</strong> {prospectData?.name} ({prospectData?.email})</div>
+                    )}
                     <div><strong>CC:</strong> AIHQ Training and Consultancy (zarnaaz@theaihq.net)</div>
                     <div><strong>From:</strong> Zarnaaz - AIHQ Training and Consultancy (zarnaaz@theaihq.net)</div>
                     <div><strong>Program:</strong> {programName || prospectData?.programTitle}</div>

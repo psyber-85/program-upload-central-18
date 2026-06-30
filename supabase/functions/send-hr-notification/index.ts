@@ -218,25 +218,50 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('Program title:', program_title);
     console.log('Recipients - HR:', to_email, 'Participant:', participant_email, 'CC: zarnaaz@theaihq.net');
     
-    // Deduplicate email addresses (case-insensitive)
-    const toRecipients = [];
-    const normalizedToEmail = to_email.toLowerCase();
-    const normalizedParticipantEmail = participant_email.toLowerCase();
-    
-    toRecipients.push({
-      email: to_email,
-      name: to_name || to_email,
-    });
-    
-    // Only add participant email if it's different from HR email
-    if (normalizedParticipantEmail !== normalizedToEmail) {
+    // Normalise addresses (case + whitespace insensitive)
+    const CC_EMAIL = "zarnaaz@theaihq.net";
+    const norm = (s: string) => (s || "").trim().toLowerCase();
+    const hrNorm = norm(to_email);
+    const participantNorm = norm(participant_email);
+    const ccNorm = norm(CC_EMAIL);
+    const localPart = (e: string) => (e.includes("@") ? e.split("@")[0] : e);
+    const safeName = (n: string | undefined, e: string) => (n && n.trim()) || localPart(e);
+
+    const isSelfHR = participantNorm === hrNorm;
+
+    // Build TO list — HR always; participant only if distinct from HR and CC
+    const toRecipients: { email: string; name: string }[] = [
+      { email: to_email, name: safeName(to_name, to_email) },
+    ];
+    if (!isSelfHR && participantNorm !== ccNorm) {
       toRecipients.push({
         email: participant_email,
-        name: prospect_name,
+        name: safeName(prospect_name, participant_email),
       });
     }
-    
-    // SendGrid API request with multiple recipients
+
+    // Build CC — omit if it would duplicate any TO
+    const toSet = new Set(toRecipients.map((r) => norm(r.email)));
+    const ccRecipients: { email: string; name: string }[] = toSet.has(ccNorm)
+      ? []
+      : [{ email: CC_EMAIL, name: "AIHQ Training and Consultancy" }];
+
+    // If self-HR, prepend a one-line note to both bodies
+    let finalHtml = htmlTemplate;
+    let finalText = plainTextTemplate;
+    if (isSelfHR) {
+      const noteHtml = `<p style="margin:0 0 12px;padding:10px 12px;background:#f1f5f9;border-left:3px solid #2754C5;font-family:Arial,sans-serif;color:#334155"><em>Note: This message is sent to you as both the HR contact and the program participant.</em></p>`;
+      const noteText = `Note: This message is sent to you as both the HR contact and the program participant.\n\n`;
+      finalHtml = noteHtml + htmlTemplate;
+      finalText = noteText + plainTextTemplate;
+    }
+
+    const personalization: Record<string, unknown> = {
+      to: toRecipients,
+      subject: emailSubject,
+    };
+    if (ccRecipients.length > 0) personalization.cc = ccRecipients;
+
     const sendgridResponse = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
       headers: {
@@ -244,41 +269,34 @@ const handler = async (req: Request): Promise<Response> => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        personalizations: [
-          {
-            to: toRecipients,
-            cc: [
-              {
-                email: "zarnaaz@theaihq.net",
-                name: "AIHQ Training and Consultancy",
-              },
-            ],
-            subject: emailSubject,
-          },
-        ],
+        personalizations: [personalization],
         from: {
           email: "zarnaaz@theaihq.net",
           name: "AIHQ Training and Consultancy",
         },
         content: [
-          {
-            type: "text/plain",
-            value: plainTextTemplate,
-          },
-          {
-            type: "text/html",
-            value: htmlTemplate,
-          },
+          { type: "text/plain", value: finalText },
+          { type: "text/html", value: finalHtml },
         ],
       }),
     });
 
     console.log('SendGrid response status:', sendgridResponse.status);
-    
+
     if (!sendgridResponse.ok) {
       const errorText = await sendgridResponse.text();
       console.error('SendGrid error response:', errorText);
-      throw new Error(`SendGrid API error: ${sendgridResponse.status} - ${errorText}`);
+      // Return 200 with structured failure so the client can surface a meaningful toast
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `SendGrid rejected the request`,
+          sendgridStatus: sendgridResponse.status,
+          sendgridBody: errorText.slice(0, 1000),
+          recipients: { to: toRecipients, cc: ccRecipients, selfHR: isSelfHR },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } },
+      );
     }
 
     const responseText = await sendgridResponse.text();

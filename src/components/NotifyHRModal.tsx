@@ -386,6 +386,15 @@ _______`;
               </div>
             )}
 
+            {isSelfHR && (
+              <div className="p-3 rounded-md border border-blue-300 bg-blue-50 text-sm text-blue-800">
+                <div className="font-medium">Participant is also the HR contact.</div>
+                <div className="mt-1">
+                  A single email will be sent to <strong>{hrEmail}</strong> (CC: AIHQ). A short note in the email body will explain this to the recipient.
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="subject">Email Subject</Label>
               <Input

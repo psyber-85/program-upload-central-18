@@ -33,6 +33,12 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
   const [programLinks, setProgramLinks] = useState<Record<string, { signupForm: string; courseBrochure: string }>>({});
   const { toast } = useToast();
 
+  const isSelfHR = !!(
+    hrEmail &&
+    prospectData?.email &&
+    hrEmail.trim().toLowerCase() === String(prospectData.email).trim().toLowerCase()
+  );
+
   useEffect(() => {
     if (isOpen && prospectId) {
       loadProgramLinks();

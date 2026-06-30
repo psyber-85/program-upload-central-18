@@ -1,50 +1,49 @@
-# Patch 1.8 — Editable Program Links & Variable Fields
-
 ## Problem
 
-`NotifyHRModal` resolves brochure + signup form URLs from `program_links` by exact `program_title` match. The June–Sept AI training programs have no matching rows, so emails render `[COURSE_BROCHURE_NOT_FOUND]` / `[SIGN_UP_FORM_NOT_FOUND]`. There is no UI to add/edit those links, edit pricing, or override the program name used in the email.
+In Marketing → Register Tracker, when the prospect (participant) and the HR contact share the same email (e.g. Ahmed Tashrik, who acts as his own HR), `send-hr-notification` returns a non-2xx error and the email fails to send.
 
-## Scope
+Likely cause (matches SendGrid behavior): the edge function builds a `personalizations` block with `to: [HR, participant]` and a fixed `cc: [zarnaaz@theaihq.net]`. SendGrid rejects a personalization when the same address appears in more than one slot, or when required `name`/`email` fields are blank. The current dedupe only trims `to` against `to` — it does NOT handle:
 
-Admin editing inside Registration Tracker (`/staff/marketing/register-tracker`) + per-send program-name override in the HR modal. No schema changes — `registration_programs` and `program_links` already exist.
+1. participant email equal to HR email but written with different casing/whitespace (mostly handled, but the resulting single-recipient payload still relies on `to_name` being non-empty).
+2. participant or HR email equal to the CC (`zarnaaz@theaihq.net`) — would produce a duplicate across to+cc.
+3. The case where the only `to` left after dedupe has an empty `name`, which SendGrid 400s on.
+4. The frontend never tells the user this is a "self-HR" send, so the UX is silent on what happened.
 
-## Changes
+## Plan (scoped strictly to this issue — no other changes)
 
-### 1. `AddProgramForm.tsx` — expand on create
-Add optional fields:
-- Pricing (RM)
-- Signup form URL
-- Brochure URL
+### 1. Backend: `supabase/functions/send-hr-notification/index.ts`
 
-On submit: insert `registration_programs`, then upsert `program_links` (key = `program_title`) when either URL is provided.
+- Normalise all addresses (lowercase + trim) once into `hrEmailNorm`, `participantEmailNorm`, `ccEmailNorm = 'zarnaaz@theaihq.net'`.
+- Build `to` list:
+  - Always include HR (`to_email`, name = `to_name || to_email`).
+  - Add participant only if `participantEmailNorm !== hrEmailNorm` AND `participantEmailNorm !== ccEmailNorm`.
+- Build `cc` list:
+  - Include `zarnaaz@theaihq.net` only if it is not already in the final `to` list.
+  - If after that `cc` is empty, omit the `cc` field entirely from the personalization (SendGrid requires either non-empty or absent).
+- Guarantee every recipient object has a non-empty `name` (fall back to the email local-part).
+- When `participantEmailNorm === hrEmailNorm`, append a one-line note at the top of both the plain-text and HTML bodies: *"Note: This message is sent to you as both the HR contact and the program participant."*
+- Improve error surface: on SendGrid 4xx, return `{ success: false, error, sendgridStatus, sendgridBody }` with HTTP 200 so the frontend can display a meaningful toast instead of an opaque "non-2xx" error.
 
-### 2. New `EditProgramModal.tsx`
-Edit existing program. Loads current `registration_programs` row + matching `program_links` row. Fields:
-- Title
-- Pricing
-- Signup form URL
-- Brochure URL
+### 2. Frontend: `src/components/NotifyHRModal.tsx`
 
-Save: update `registration_programs`; upsert `program_links` under new title; if title changed, delete the old `program_links` row to avoid orphans. Single try/catch with toast.
+- Compute `isSelfHR = hrEmail && prospectData?.email && hrEmail.trim().toLowerCase() === prospectData.email.trim().toLowerCase()`.
+- When `isSelfHR` is true:
+  - Show an info banner at the top of the dialog: *"Participant is also the HR contact — a single email will be sent to this address (CC: AIHQ)."*
+  - Keep the Send button enabled (no behavior change otherwise).
+- Read the new structured error from the edge function and surface `error` / `sendgridBody` in the failure toast so future failures are diagnosable.
 
-### 3. `ProgramCard.tsx` — edit button + link status chip
-- Pencil "Edit" button beside Collapse/Expand → opens `EditProgramModal`.
-- Status chip: green "Links: OK" when both URLs present for this title, amber "Links: Missing" otherwise. Makes the June–Sept gap visible at a glance.
+### 3. Out of scope
 
-### 4. `NotifyHRModal.tsx` — editable program name + hard block on missing links
-- Add editable **Program Name** input (defaulted to `prospectData.programTitle`). Used as the lookup key for `program_links` and as the course name in the email body / subject. Re-runs `generateEmailPreview` on change.
-- Detect when resolved links contain `[*_NOT_FOUND]` (i.e., no exact or partial match for the typed name). Show a red banner: "Brochure/Sign-up links missing for this program. Add them in Registration Tracker → Edit Program, or adjust the Program Name above to match an existing entry."
-- **Disable the Send button** while links are missing. Server-side untouched.
+- No change to HR contact data model, prospect schema, program links, pricing, sender identity, CC address, or any other portal area.
+- No retroactive re-send for previously failed records — user can retry from the existing UI after this fix.
 
-## Files
+## Files touched
 
-- edit `src/components/AddProgramForm.tsx`
-- create `src/components/registration/EditProgramModal.tsx`
-- edit `src/components/registration/ProgramCard.tsx`
-- edit `src/components/NotifyHRModal.tsx`
+- `supabase/functions/send-hr-notification/index.ts` (dedupe + cc handling + better error response + self-HR note)
+- `src/components/NotifyHRModal.tsx` (self-HR banner + richer error toast)
 
-## Out of scope
+## Validation
 
-- Migrating `program_links` to FK on `registration_programs.id` (would need data move).
-- Per-program sender overrides, duration, HRDC code, etc. Add later if requested.
-- Auto-seeding June–Sept rows — staff fills via the new UI.
+- Trigger Notify HR for Ahmed Tashrik (participant == HR) → expect a single recipient send, CC to AIHQ preserved, 200 response, success toast.
+- Trigger normal case (participant != HR) → unchanged behavior, both recipients receive the email.
+- Trigger edge case where HR email == `zarnaaz@theaihq.net` → CC omitted, no duplicate-address rejection.

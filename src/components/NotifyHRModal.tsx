@@ -33,6 +33,12 @@ const NotifyHRModal: React.FC<NotifyHRModalProps> = ({
   const [programLinks, setProgramLinks] = useState<Record<string, { signupForm: string; courseBrochure: string }>>({});
   const { toast } = useToast();
 
+  const isSelfHR = !!(
+    hrEmail &&
+    prospectData?.email &&
+    hrEmail.trim().toLowerCase() === String(prospectData.email).trim().toLowerCase()
+  );
+
   useEffect(() => {
     if (isOpen && prospectId) {
       loadProgramLinks();
@@ -257,6 +263,12 @@ _______`;
         throw new Error(error.message || 'Failed to send email');
       }
 
+      // Edge function now returns structured failures with HTTP 200
+      if (data && data.success === false) {
+        const detail = data.sendgridBody ? `: ${String(data.sendgridBody).slice(0, 300)}` : '';
+        throw new Error(`${data.error || 'Email send failed'}${detail}`);
+      }
+
       // Update HR contact to mark email as sent
       const { error: updateError } = await supabase
         .from('hr_contacts')
@@ -272,7 +284,9 @@ _______`;
 
       toast({
         title: "Success",
-        description: `Email sent successfully to HR, participant, and CC'd to AIHQ`,
+        description: isSelfHR
+          ? `Email sent successfully (participant is also HR — single recipient, CC'd to AIHQ)`
+          : `Email sent successfully to HR, participant, and CC'd to AIHQ`,
       });
 
       onComplete();
@@ -372,6 +386,15 @@ _______`;
               </div>
             )}
 
+            {isSelfHR && (
+              <div className="p-3 rounded-md border border-blue-300 bg-blue-50 text-sm text-blue-800">
+                <div className="font-medium">Participant is also the HR contact.</div>
+                <div className="mt-1">
+                  A single email will be sent to <strong>{hrEmail}</strong> (CC: AIHQ). A short note in the email body will explain this to the recipient.
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="subject">Email Subject</Label>
               <Input
@@ -403,8 +426,10 @@ _______`;
                 <div>
                   <div className="font-medium text-blue-900">Email Recipients</div>
                   <div className="text-sm text-blue-700 mt-1">
-                    <div><strong>To:</strong> {hrContact.name} ({hrEmail || hrContact.email})</div>
-                    <div><strong>To:</strong> {prospectData?.name} ({prospectData?.email})</div>
+                    <div><strong>To:</strong> {hrContact.name} ({hrEmail || hrContact.email}){isSelfHR ? ' — also the participant' : ''}</div>
+                    {!isSelfHR && (
+                      <div><strong>To:</strong> {prospectData?.name} ({prospectData?.email})</div>
+                    )}
                     <div><strong>CC:</strong> AIHQ Training and Consultancy (zarnaaz@theaihq.net)</div>
                     <div><strong>From:</strong> Zarnaaz - AIHQ Training and Consultancy (zarnaaz@theaihq.net)</div>
                     <div><strong>Program:</strong> {programName || prospectData?.programTitle}</div>

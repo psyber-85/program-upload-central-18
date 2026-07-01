@@ -1686,6 +1686,7 @@ export type Database = {
           prospect_score: string | null
           registration_status: string | null
           role: string | null
+          row_color: string | null
           status_reason: string | null
           updated_at: string
         }
@@ -1703,6 +1704,7 @@ export type Database = {
           prospect_score?: string | null
           registration_status?: string | null
           role?: string | null
+          row_color?: string | null
           status_reason?: string | null
           updated_at?: string
         }
@@ -1720,6 +1722,7 @@ export type Database = {
           prospect_score?: string | null
           registration_status?: string | null
           role?: string | null
+          row_color?: string | null
           status_reason?: string | null
           updated_at?: string
         }

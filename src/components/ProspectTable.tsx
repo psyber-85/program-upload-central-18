@@ -14,6 +14,7 @@ import NotifyHRModal from './NotifyHRModal';
 import UpdateStatusModal from './UpdateStatusModal';
 import ViewCallNotesModal from './ViewCallNotesModal';
 import AddProspectModal from './AddProspectModal';
+import RowColorPicker, { getRowTintClass, RowColor } from './registration/RowColorPicker';
 
 interface HRContact {
   name: string;
@@ -37,6 +38,7 @@ interface Prospect {
   lastCall?: string;
   hrContact?: HRContact;
   hasCallNotes?: boolean;
+  row_color?: RowColor | null;
 }
 
 type SortField = 'name' | 'email' | 'org' | 'role' | 'program' | 'registration_status' | 'prospect_score' | 'payment' | 'lastCall';
@@ -238,7 +240,8 @@ const ProspectTable: React.FC<ProspectTableProps> = ({ programId }) => {
             email: hrContact.email,
             email_sent_at: hrContact.email_sent_at
           } : undefined,
-          hasCallNotes
+          hasCallNotes,
+          row_color: (prospect as any).row_color ?? null,
         };
       }) || [];
 
@@ -480,6 +483,7 @@ const ProspectTable: React.FC<ProspectTableProps> = ({ programId }) => {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-8 px-2"><span className="sr-only">Color</span></TableHead>
               {!programId && (
                 <TableHead className="cursor-pointer" onClick={() => handleSort('program')}>
                   <div className="flex items-center gap-1">
@@ -541,7 +545,7 @@ const ProspectTable: React.FC<ProspectTableProps> = ({ programId }) => {
           <TableBody>
             {currentProspects.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={showSecondaryColumns ? 14 : 6} className="text-center py-6">
+                <TableCell colSpan={showSecondaryColumns ? 15 : 7} className="text-center py-6">
                   {searchTerm || statusFilter !== 'all' 
                     ? 'No prospects found matching your filters.' 
                     : 'No prospects found. Add some prospects to get started.'}
@@ -549,7 +553,18 @@ const ProspectTable: React.FC<ProspectTableProps> = ({ programId }) => {
               </TableRow>
             ) : (
               currentProspects.map((prospect) => (
-                <TableRow key={prospect.id}>
+                <TableRow key={prospect.id} className={getRowTintClass(prospect.row_color)}>
+                  <TableCell className="w-8 px-2">
+                    <RowColorPicker
+                      prospectId={prospect.id}
+                      currentColor={prospect.row_color}
+                      onChange={(color) =>
+                        setProspects((prev) =>
+                          prev.map((p) => (p.id === prospect.id ? { ...p, row_color: color } : p))
+                        )
+                      }
+                    />
+                  </TableCell>
                   {!programId && (
                     <TableCell className="font-medium max-w-xs">
                       <div className="truncate" title={prospect.program}>

@@ -1,7 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0';
-import { requireAdmin, escapeHtml, jsonError } from "../_shared/auth.ts";
+import { authenticate, escapeHtml, jsonError } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -182,8 +182,23 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const auth = await requireAdmin(req);
+  const auth = await authenticate(req);
   if (!auth.ok) return jsonError(auth.status, auth.error);
+
+  // Allow admins, service role, OR any Active IH staff (marketing staff use this endpoint)
+  if (!auth.isService && !auth.isAdmin) {
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    const { data: staff } = await adminClient
+      .from("ih_staff_profiles")
+      .select("id")
+      .eq("id", auth.userId)
+      .eq("status", "Active")
+      .maybeSingle();
+    if (!staff) return jsonError(403, "staff_required");
+  }
 
   try {
     const body: EmailRequest = await req.json();

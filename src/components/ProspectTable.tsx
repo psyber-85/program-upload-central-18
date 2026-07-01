@@ -483,6 +483,7 @@ const ProspectTable: React.FC<ProspectTableProps> = ({ programId }) => {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-8 px-2"><span className="sr-only">Color</span></TableHead>
               {!programId && (
                 <TableHead className="cursor-pointer" onClick={() => handleSort('program')}>
                   <div className="flex items-center gap-1">

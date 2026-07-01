@@ -14,6 +14,7 @@ import NotifyHRModal from './NotifyHRModal';
 import UpdateStatusModal from './UpdateStatusModal';
 import ViewCallNotesModal from './ViewCallNotesModal';
 import AddProspectModal from './AddProspectModal';
+import RowColorPicker, { getRowTintClass, RowColor } from './registration/RowColorPicker';
 
 interface HRContact {
   name: string;

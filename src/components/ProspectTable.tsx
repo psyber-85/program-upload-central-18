@@ -545,7 +545,7 @@ const ProspectTable: React.FC<ProspectTableProps> = ({ programId }) => {
           <TableBody>
             {currentProspects.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={showSecondaryColumns ? 14 : 6} className="text-center py-6">
+                <TableCell colSpan={showSecondaryColumns ? 15 : 7} className="text-center py-6">
                   {searchTerm || statusFilter !== 'all' 
                     ? 'No prospects found matching your filters.' 
                     : 'No prospects found. Add some prospects to get started.'}
@@ -553,7 +553,18 @@ const ProspectTable: React.FC<ProspectTableProps> = ({ programId }) => {
               </TableRow>
             ) : (
               currentProspects.map((prospect) => (
-                <TableRow key={prospect.id}>
+                <TableRow key={prospect.id} className={getRowTintClass(prospect.row_color)}>
+                  <TableCell className="w-8 px-2">
+                    <RowColorPicker
+                      prospectId={prospect.id}
+                      currentColor={prospect.row_color}
+                      onChange={(color) =>
+                        setProspects((prev) =>
+                          prev.map((p) => (p.id === prospect.id ? { ...p, row_color: color } : p))
+                        )
+                      }
+                    />
+                  </TableCell>
                   {!programId && (
                     <TableCell className="font-medium max-w-xs">
                       <div className="truncate" title={prospect.program}>

@@ -240,7 +240,8 @@ const ProspectTable: React.FC<ProspectTableProps> = ({ programId }) => {
             email: hrContact.email,
             email_sent_at: hrContact.email_sent_at
           } : undefined,
-          hasCallNotes
+          hasCallNotes,
+          row_color: (prospect as any).row_color ?? null,
         };
       }) || [];
 

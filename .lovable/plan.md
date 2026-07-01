@@ -1,36 +1,60 @@
-## Goal
-Let platform users tag each participant row in the register tracker with one of five colors, purely for visual differentiation. Color is per-prospect, persisted, and visible to anyone viewing the tracker.
+## Root cause
 
-## Scope (only this)
-- `staff/marketing/register-tracker` prospect table only.
-- No changes to HR notification flow, program links/pricing, or any other area.
+The `send-hr-notification` edge function is gated by `requireAdmin(req)`:
 
-## Color palette (fixed, 5 options + "none")
-1. None (default — no tint)
-2. Red
-3. Amber
-4. Green
-5. Blue
-6. Purple
+```ts
+// supabase/functions/send-hr-notification/index.ts (~line 193)
+const auth = await requireAdmin(req);
+if (!auth.ok) return jsonError(auth.status, auth.error);   // returns HTTP 403 for non-admins
+```
 
-Rendered as soft background tints via semantic tokens (light bg + subtle left border), so they stay readable in both themes and don't clash with status badges.
+Confirmed from the database:
 
-## UX
-- In `ProspectTable.tsx`, add a small color swatch cell (leftmost or next to name) on each row.
-- Click swatch → popover with the 6 swatches + a "Clear" option. Selecting one updates the row immediately (optimistic) and persists.
-- Row background gets the tint; keeps existing hover/status styling intact.
-- Mobile: same swatch, tappable.
+| User    | `ih_staff_profiles.role` | `ih_user_roles.role` | Status |
+|---------|--------------------------|----------------------|--------|
+| Pang    | admin                    | admin                | Active |
+| Zarnaaz | **staff**                | **staff**            | Active |
 
-## Data
-Add a nullable `row_color` text column on `prospects` (values: `red | amber | green | blue | purple | null`). Constrained via CHECK. Realtime channel already subscribed to `prospects`, so other viewers update live.
+- **Pang** passes the admin check → 200, email sends.
+- **Zarnaaz** fails the admin check → the function returns **HTTP 403**, which `supabase.functions.invoke` surfaces to the modal as *"Edge Function returned a non-2xx status code."*
 
-## Technical details
-- Migration: `ALTER TABLE public.prospects ADD COLUMN row_color text CHECK (row_color IN ('red','amber','green','blue','purple'))`.
-- Types: extend `Prospect` in `src/lib/registration/types.ts` with `row_color?: string | null`.
-- New component: `src/components/registration/RowColorPicker.tsx` — popover with 6 swatches, calls `supabase.from('prospects').update({ row_color }).eq('id', id)`.
-- Tint styles: map color key → `bg-*/10` + `border-l-4 border-*` using semantic-friendly Tailwind classes (defined in one small helper, not hardcoded per row).
-- `ProspectTable.tsx`: add swatch column, apply row tint class based on `prospect.row_color`.
-- No changes to `RegistrationContext`, edge functions, or other modals.
+This is a permissions mismatch, not a SendGrid / self-HR / program-links issue. Register-Tracker is a marketing tool operated by non-admin marketing staff — Zarnaaz is literally the sender/CC identity baked into the email itself — but the endpoint was locked to admins only.
 
-## Out of scope
-Filtering/sorting by color, bulk color assignment, color legend/labels, custom colors, per-user (viewer-specific) colors.
+## Proposed fix
+
+Scope: only `supabase/functions/send-hr-notification/index.ts`. No frontend, DB, template, or other-function changes.
+
+1. Replace `requireAdmin(req)` with `authenticate(req)` and then allow the call if the caller is **service, admin, OR an Active IH staff member**. Anon / inactive users still get 401/403.
+
+   ```ts
+   const auth = await authenticate(req);
+   if (!auth.ok) return jsonError(auth.status, auth.error);
+
+   if (!auth.isService && !auth.isAdmin) {
+     const admin = createClient(
+       Deno.env.get("SUPABASE_URL")!,
+       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+     );
+     const { data: staff } = await admin
+       .from("ih_staff_profiles")
+       .select("id")
+       .eq("id", auth.userId)
+       .eq("status", "Active")
+       .maybeSingle();
+     if (!staff) return jsonError(403, "staff_required");
+   }
+   ```
+
+2. Everything else (self-HR handling, program-links lookup, SendGrid call, structured error responses) stays as-is.
+
+## What is NOT changing
+
+- No changes to `NotifyHRModal.tsx`, `ProspectTable.tsx`, or any DB schema.
+- No relaxation to fully public — still requires a valid JWT belonging to an Active IH staff member (or admin/service).
+- Admin-only endpoints elsewhere are untouched.
+
+## Verification after implementation
+
+- Zarnaaz clicks "Send Email" for Nur Syazliyana → 200, email delivered.
+- Pang continues to work as before.
+- Unauthenticated / inactive callers still receive 401/403.

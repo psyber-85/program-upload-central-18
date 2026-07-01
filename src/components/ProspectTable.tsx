@@ -38,6 +38,7 @@ interface Prospect {
   lastCall?: string;
   hrContact?: HRContact;
   hasCallNotes?: boolean;
+  row_color?: RowColor | null;
 }
 
 type SortField = 'name' | 'email' | 'org' | 'role' | 'program' | 'registration_status' | 'prospect_score' | 'payment' | 'lastCall';

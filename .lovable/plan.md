@@ -1,60 +1,43 @@
+# Fix: Birthday Dashboard "Test Email" fails
+
 ## Root cause
 
-The `send-hr-notification` edge function is gated by `requireAdmin(req)`:
+`supabase/functions/test-email/index.ts` gates on a `TEST_TOKEN` bearer header (lines 62-70). The dashboard UI (`src/pages/BirthdayDashboard.tsx`) initialises `testToken` as an empty string and never provides any way to populate it, so every call sends `Authorization: Bearer ` and the function returns **401 Unauthorized**. The frontend surfaces that as the generic "Failed to send test email" toast.
 
-```ts
-// supabase/functions/send-hr-notification/index.ts (~line 193)
-const auth = await requireAdmin(req);
-if (!auth.ok) return jsonError(auth.status, auth.error);   // returns HTTP 403 for non-admins
-```
+`send-remaining` has the same broken gate for the same reason ("Send Remaining Now" button will 401 too).
 
-Confirmed from the database:
+SendGrid config itself is fine — nothing to change there.
 
-| User    | `ih_staff_profiles.role` | `ih_user_roles.role` | Status |
-|---------|--------------------------|----------------------|--------|
-| Pang    | admin                    | admin                | Active |
-| Zarnaaz | **staff**                | **staff**            | Active |
+## Fix (mirror the pattern we already applied to `send-hr-notification`)
 
-- **Pang** passes the admin check → 200, email sends.
-- **Zarnaaz** fails the admin check → the function returns **HTTP 403**, which `supabase.functions.invoke` surfaces to the modal as *"Edge Function returned a non-2xx status code."*
+Replace the `TEST_TOKEN` check with the shared active-staff auth used elsewhere in the marketing portal. Any signed-in Active IH staff (or admin/service) can send test / remaining birthday emails; unauthenticated callers still get 401.
 
-This is a permissions mismatch, not a SendGrid / self-HR / program-links issue. Register-Tracker is a marketing tool operated by non-admin marketing staff — Zarnaaz is literally the sender/CC identity baked into the email itself — but the endpoint was locked to admins only.
+### Changes
 
-## Proposed fix
+1. **`supabase/functions/test-email/index.ts`**
+   - Import `authenticate`, `corsHeaders`, `jsonError` from `../_shared/auth.ts`.
+   - Drop the `TEST_TOKEN` check.
+   - Require an authenticated caller; additionally verify the user is an Active IH staff via `ih_staff_profiles` (same lookup used by `send-hr-notification`).
+   - Keep SendGrid send logic unchanged.
 
-Scope: only `supabase/functions/send-hr-notification/index.ts`. No frontend, DB, template, or other-function changes.
+2. **`supabase/functions/send-remaining/index.ts`**
+   - Same swap: remove `TEST_TOKEN` gate, use active-staff auth.
+   - Keep CORS helper aligned with the shared one (adds `x-cron-secret` allow — harmless).
 
-1. Replace `requireAdmin(req)` with `authenticate(req)` and then allow the call if the caller is **service, admin, OR an Active IH staff member**. Anon / inactive users still get 401/403.
+3. **`src/pages/BirthdayDashboard.tsx`**
+   - Remove the unused `testToken` state and the `headers: { Authorization: Bearer ${testToken} }` overrides on the two `functions.invoke` calls. `supabase.functions.invoke` auto-attaches the user's JWT, which is exactly what the new gate expects.
+   - No UI changes.
 
-   ```ts
-   const auth = await authenticate(req);
-   if (!auth.ok) return jsonError(auth.status, auth.error);
+4. **Test send after deploy**
+   - Call `test-email` for `psyber85@gmail.com` / name "Vino" using the browser session so we can confirm 200 + SendGrid 202. If the SendGrid call itself fails, surface the real error message in the toast (already does via `error.message`).
 
-   if (!auth.isService && !auth.isAdmin) {
-     const admin = createClient(
-       Deno.env.get("SUPABASE_URL")!,
-       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-     );
-     const { data: staff } = await admin
-       .from("ih_staff_profiles")
-       .select("id")
-       .eq("id", auth.userId)
-       .eq("status", "Active")
-       .maybeSingle();
-     if (!staff) return jsonError(403, "staff_required");
-   }
-   ```
+## Not touched
 
-2. Everything else (self-HR handling, program-links lookup, SendGrid call, structured error responses) stays as-is.
+- SendGrid template body/image (that lives in the SendGrid dashboard, not this codebase).
+- `birthday` / `birthday-log` cron functions.
+- `TEST_TOKEN` secret (leave as-is; nothing else uses it, safe to delete later).
 
-## What is NOT changing
+## Verification
 
-- No changes to `NotifyHRModal.tsx`, `ProspectTable.tsx`, or any DB schema.
-- No relaxation to fully public — still requires a valid JWT belonging to an Active IH staff member (or admin/service).
-- Admin-only endpoints elsewhere are untouched.
-
-## Verification after implementation
-
-- Zarnaaz clicks "Send Email" for Nur Syazliyana → 200, email delivered.
-- Pang continues to work as before.
-- Unauthenticated / inactive callers still receive 401/403.
+- Sign in as any Active staff → dashboard → Send Test to `psyber85@gmail.com` → toast "Test email sent" and email arrives.
+- Unauthenticated fetch to `/functions/v1/test-email` still returns 401.

@@ -48,7 +48,6 @@ const BirthdayDashboard = () => {
   const [sendingRemaining, setSendingRemaining] = useState(false);
   const [testEmail, setTestEmail] = useState({ to: '', name: '' });
   const [sendingTest, setSendingTest] = useState(false);
-  const [testToken, setTestToken] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -80,9 +79,6 @@ const BirthdayDashboard = () => {
       setSendingRemaining(true);
       const { data, error } = await supabase.functions.invoke('send-remaining', {
         body: {},
-        headers: {
-          'Authorization': `Bearer ${testToken}`
-        }
       });
       
       if (error) throw error;
@@ -122,9 +118,6 @@ const BirthdayDashboard = () => {
       setSendingTest(true);
       const { data, error } = await supabase.functions.invoke('test-email', {
         body: testEmail,
-        headers: {
-          'Authorization': `Bearer ${testToken}`
-        }
       });
       
       if (error) throw error;

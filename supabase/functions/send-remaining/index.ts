@@ -1,198 +1,143 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.0";
 import { formatInTimeZone } from "https://esm.sh/date-fns-tz@3.2.0";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { authenticate, corsHeaders, jsonError } from "../_shared/auth.ts";
 
 interface SendGridResponse {
   statusCode: number;
-  body?: any;
+  body?: unknown;
 }
 
 async function sendBirthdayEmail(to: string, name: string): Promise<SendGridResponse> {
-  const SENDGRID_API_KEY = Deno.env.get('SENDGRID_API_KEY');
-  const SENDGRID_TEMPLATE_ID = Deno.env.get('SENDGRID_TEMPLATE_ID');
-  const FROM_EMAIL = Deno.env.get('FROM_EMAIL');
-  
+  const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
+  const SENDGRID_TEMPLATE_ID = Deno.env.get("SENDGRID_TEMPLATE_ID");
+  const FROM_EMAIL = Deno.env.get("FROM_EMAIL");
+
   if (!SENDGRID_API_KEY || !SENDGRID_TEMPLATE_ID || !FROM_EMAIL) {
-    throw new Error('Missing SendGrid configuration');
+    throw new Error("Missing SendGrid configuration");
   }
 
   const emailData = {
-    personalizations: [{
-      to: [{ email: to }],
-      dynamic_template_data: { name }
-    }],
+    personalizations: [{ to: [{ email: to }], dynamic_template_data: { name } }],
     from: { email: FROM_EMAIL, name: "AIHQ - theaihq.net" },
-    template_id: SENDGRID_TEMPLATE_ID
+    template_id: SENDGRID_TEMPLATE_ID,
   };
 
-  const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-    method: 'POST',
+  const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    method: "POST",
     headers: {
-      'Authorization': `Bearer ${SENDGRID_API_KEY}`,
-      'Content-Type': 'application/json',
+      Authorization: `Bearer ${SENDGRID_API_KEY}`,
+      "Content-Type": "application/json",
     },
     body: JSON.stringify(emailData),
   });
 
   return {
     statusCode: response.status,
-    body: response.status !== 202 ? await response.text() : null
+    body: response.status !== 202 ? await response.text() : null,
   };
 }
 
 async function retryOperation<T>(operation: () => Promise<T>, maxRetries = 3): Promise<T> {
   const delays = [0, 2000, 5000];
-  
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       return await operation();
     } catch (error) {
       if (attempt === maxRetries - 1) throw error;
-      
-      // Only retry on 429 or 5xx errors
-      if (error instanceof Error && error.message.includes('429') || 
-          error instanceof Error && error.message.includes('5')) {
-        await new Promise(resolve => setTimeout(resolve, delays[attempt]));
+      const msg = error instanceof Error ? error.message : "";
+      if (msg.includes("429") || msg.includes("5")) {
+        await new Promise((r) => setTimeout(r, delays[attempt]));
         continue;
       }
       throw error;
     }
   }
-  throw new Error('Max retries exceeded');
+  throw new Error("Max retries exceeded");
 }
 
-const handler = async (req: Request): Promise<Response> => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
-    });
-  }
+serve(async (req: Request): Promise<Response> => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") return jsonError(405, "method_not_allowed");
 
   try {
-    // Verify TEST_TOKEN
-    const authHeader = req.headers.get('Authorization');
-    const TEST_TOKEN = Deno.env.get('TEST_TOKEN');
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.slice(7) !== TEST_TOKEN) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
+    const auth = await authenticate(req);
+    if (!auth.ok) return jsonError(auth.status, auth.error);
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
+
+    if (!auth.isAdmin && !auth.isService) {
+      if (!auth.userId) return jsonError(403, "forbidden");
+      const { data: staff } = await supabase
+        .from("ih_staff_profiles")
+        .select("status")
+        .eq("id", auth.userId)
+        .maybeSingle();
+      if (!staff || staff.status !== "Active") return jsonError(403, "active_staff_required");
     }
 
-    const TIMEZONE = 'Asia/Kuala_Lumpur';
+    const TIMEZONE = "Asia/Kuala_Lumpur";
     const now = new Date();
-    const mmdd = formatInTimeZone(now, TIMEZONE, 'MM-dd');
-    const year = formatInTimeZone(now, TIMEZONE, 'yyyy');
+    const mmdd = formatInTimeZone(now, TIMEZONE, "MM-dd");
+    const year = formatInTimeZone(now, TIMEZONE, "yyyy");
 
     console.log(`Send remaining function called for ${mmdd}`);
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    // Query only today's pending birthdays (NULL or not sent this year)
-    // Use order by email and registered_at to ensure consistent results and avoid duplicates
     const { data: pendingBirthdays, error } = await supabase
-      .from('participants_bday_duplicate')
-      .select('id, name, email, last_birthday_sent_year')
-      .eq('birth_mmdd', mmdd)
+      .from("participants_bday_duplicate")
+      .select("id, name, email, last_birthday_sent_year")
+      .eq("birth_mmdd", mmdd)
       .or(`last_birthday_sent_year.is.null,last_birthday_sent_year.neq.${year}`)
-      .order('email, registered_at', { ascending: false }); // Order by email first, then latest registration
+      .order("email, registered_at", { ascending: false });
 
-    if (error) {
-      console.error('Database error:', error);
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      });
-    }
+    if (error) return jsonError(500, error.message);
 
     const stats = {
       sent: 0,
-      pendingBefore: pendingBirthdays?.length || 0,
-      errors: [] as Array<{id: string, email: string, reason: string}>
+      pendingBefore: pendingBirthdays?.length ?? 0,
+      errors: [] as Array<{ id: string; email: string; reason: string }>,
     };
 
-    console.log(`Found ${stats.pendingBefore} pending birthday emails`);
-
-    // Track processed emails to prevent duplicates
     const processedEmails = new Set<string>();
 
-    if (pendingBirthdays && pendingBirthdays.length > 0) {
-      for (const person of pendingBirthdays) {
-        if (!person.email) {
-          continue;
-        }
+    for (const person of pendingBirthdays ?? []) {
+      if (!person.email) continue;
+      if (processedEmails.has(person.email.toLowerCase())) continue;
+      processedEmails.add(person.email.toLowerCase());
 
-        // Skip if we've already processed this email
-        if (processedEmails.has(person.email.toLowerCase())) {
-          console.log(`Skipping duplicate email: ${person.email}`);
-          continue;
-        }
-        
-        processedEmails.add(person.email.toLowerCase());
-
-        try {
-          await retryOperation(async () => {
-            const result = await sendBirthdayEmail(person.email, person.name);
-            if (result.statusCode !== 202) {
-              throw new Error(`SendGrid error: ${result.statusCode} - ${result.body}`);
-            }
-          });
-
-          // Update last_birthday_sent_year
-          const { error: updateError } = await supabase
-            .from('participants_bday_duplicate')
-            .update({ last_birthday_sent_year: year })
-            .eq('id', person.id);
-
-          if (updateError) {
-            console.error(`Failed to update last_birthday_sent_year for ${person.id}:`, updateError);
+      try {
+        await retryOperation(async () => {
+          const result = await sendBirthdayEmail(person.email, person.name);
+          if (result.statusCode !== 202) {
+            throw new Error(`SendGrid error: ${result.statusCode} - ${result.body}`);
           }
+        });
 
-          stats.sent++;
-          console.log(`Sent remaining birthday email to ${person.name} (${person.email})`);
+        await supabase
+          .from("participants_bday_duplicate")
+          .update({ last_birthday_sent_year: year })
+          .eq("id", person.id);
 
-        } catch (error) {
-          console.error(`Failed to send email to ${person.email}:`, error);
-          stats.errors.push({
-            id: person.id,
-            email: person.email,
-            reason: error instanceof Error ? error.message : 'Unknown error'
-          });
-        }
+        stats.sent++;
+      } catch (err) {
+        stats.errors.push({
+          id: person.id,
+          email: person.email,
+          reason: err instanceof Error ? err.message : "Unknown error",
+        });
       }
     }
 
-    console.log(`Send remaining function completed:`, stats);
-
+    console.log("Send remaining completed:", stats);
     return new Response(JSON.stringify(stats), {
       status: 200,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-
   } catch (error) {
-    console.error('Send remaining function error:', error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      }
-    );
+    console.error("Send remaining error:", error);
+    return jsonError(500, error instanceof Error ? error.message : "unknown_error");
   }
-};
-
-serve(handler);
+});
